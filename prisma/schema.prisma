@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+}
+
+model user {
+  userId          String   @id @default(uuid())
+  userFirstName   String?
+  userLastName    String?
+  userDisplayName String?
+  userPhone       String?
+  userEmail       String   @unique
+  userPassword    String
+  userRole        role     @relation(fields: [userRoleId], references: [roleId])
+  userRoleId      String
+  userStatus      String   @default("ACTIVE")
+  userCreatedAt   DateTime @default(now())
+  userUpdatedAt   DateTime @updatedAt
+}
+
+model role {
+  roleId          String   @id @default(uuid())
+  roleName        String   @unique
+  roleDescription String?
+  roleStatus      String   @default("ACTIVE")
+  roleCreatedAt   DateTime @default(now())
+  roleUpdatedAt   DateTime @updatedAt
+
+  users user[]
+}
+
+model privilege {
+  privilegeId          String   @id @default(uuid())
+  privilegeName        String   @unique
+  privilegeDescription String?
+  privilegeStatus      String   @default("ACTIVE")
+  privilegeCreatedAt   DateTime @default(now())
+  privilegeUpdatedAt   DateTime @updatedAt
+}
