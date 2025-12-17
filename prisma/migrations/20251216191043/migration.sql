@@ -1,0 +1,31 @@
+BEGIN TRY
+
+BEGIN TRAN;
+
+-- CreateTable
+CREATE TABLE [dbo].[otpLogs] (
+    [otpLogId] NVARCHAR(1000) NOT NULL,
+    [otpLogHash] NVARCHAR(1000) NOT NULL,
+    [otpLogUserId] NVARCHAR(1000) NOT NULL,
+    [otpLogStatus] NVARCHAR(1000) NOT NULL CONSTRAINT [otpLogs_otpLogStatus_df] DEFAULT 'ACTIVE',
+    [otpLogExpiry] DATETIME2 NOT NULL,
+    [otpLogCreatedAt] DATETIME2 NOT NULL CONSTRAINT [otpLogs_otpLogCreatedAt_df] DEFAULT CURRENT_TIMESTAMP,
+    [otpLogUpdatedAt] DATETIME2 NOT NULL,
+    CONSTRAINT [otpLogs_pkey] PRIMARY KEY CLUSTERED ([otpLogId])
+);
+
+-- AddForeignKey
+ALTER TABLE [dbo].[otpLogs] ADD CONSTRAINT [otpLogs_otpLogUserId_fkey] FOREIGN KEY ([otpLogUserId]) REFERENCES [dbo].[user]([userId]) ON DELETE NO ACTION ON UPDATE CASCADE;
+
+COMMIT TRAN;
+
+END TRY
+BEGIN CATCH
+
+IF @@TRANCOUNT > 0
+BEGIN
+    ROLLBACK TRAN;
+END;
+THROW
+
+END CATCH

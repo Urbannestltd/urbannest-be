@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const InitiateRegistrationSchema = z.object({
   userEmail: z.email(),
-  userRoleName: z.uuid(),
+  userRoleName: z.string(),
   userFirstName: z.string().optional(),
   userLastName: z.string().optional(),
   userDisplayName: z.string().optional(),
@@ -23,4 +23,50 @@ export interface InitiateRegistrationRequest {
   userDisplayName?: string;
   userPhone?: string;
   userRoleName: string;
+}
+
+export const VerifyOtpSchema = z.object({
+  email: z.email(),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+});
+
+export interface VerifyOtpRequest {
+  email: string;
+  otp: string;
+}
+
+export const LoginSchema = z.object({
+  email: z.email(),
+  password: z.string(),
+});
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export const GoogleLoginSchema = z.object({
+  idToken: z.string().min(10, "Invalid Google Token"),
+});
+
+export interface GoogleLoginRequest {
+  idToken: string;
+}
+
+export const ForgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(10, "Invalid token"),
+  newPassword: z.string().min(8, "Password must be 8+ chars"),
+});
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
 }
