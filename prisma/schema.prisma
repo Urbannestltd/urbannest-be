@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlserver"
+  url      = env("DATABASE_URL")
 }
 
 model user {
@@ -13,12 +14,16 @@ model user {
   userDisplayName String?
   userPhone       String?
   userEmail       String   @unique
-  userPassword    String
+  userPassword    String?
+  userGoogleId    String?  @unique
   userRole        role     @relation(fields: [userRoleId], references: [roleId])
   userRoleId      String
   userStatus      String   @default("ACTIVE")
   userCreatedAt   DateTime @default(now())
   userUpdatedAt   DateTime @updatedAt
+
+  otpLogs otpLogs[]
+  passwordResetTokens passwordReset[]
 }
 
 model role {
@@ -39,4 +44,31 @@ model privilege {
   privilegeStatus      String   @default("ACTIVE")
   privilegeCreatedAt   DateTime @default(now())
   privilegeUpdatedAt   DateTime @updatedAt
+}
+
+model otpLogs {
+  otpLogId        String   @id @default(uuid())
+  otpLogHash      String
+  otpLogUserId    String
+  otpLogUser      user     @relation(fields: [otpLogUserId], references: [userId])
+  otpLogStatus    String   @default("ACTIVE")
+  otpLogExpiry    DateTime
+  otpLogCreatedAt DateTime @default(now())
+  otpLogUpdatedAt DateTime @updatedAt
+}
+
+model passwordReset {
+  passwordResetId        String   @id @default(uuid())
+  passwordResetToken     String   @unique
+  passwordResetExpiresAt DateTime
+  
+  
+  passwordResetUserId    String
+  passwordResetUser      user     @relation(fields: [passwordResetUserId], references: [userId], onDelete: Cascade)
+
+  passwordResetUsed      Boolean  @default(false) 
+  passwordResetIpAddress String?
+  
+  passwordResetCreatedAt DateTime @default(now())
+  passwordResetUpdatedAt DateTime @updatedAt
 }
