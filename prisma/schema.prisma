@@ -72,3 +72,4 @@ model passwordReset {
   passwordResetCreatedAt DateTime @default(now())
   passwordResetUpdatedAt DateTime @updatedAt
 }
+
