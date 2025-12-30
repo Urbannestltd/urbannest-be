@@ -4,11 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "prestart": "npm run tsoa",
+    "prestart": "",
+    "postinstall": "prisma generate",
     "start": "node dist/server.js",
     "dev": "nodemon",
     "tsoa": "tsoa spec-and-routes",
-    "build": "tsc"
+    "build": "npm run tsoa && tsc"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
