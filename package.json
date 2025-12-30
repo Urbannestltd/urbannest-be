@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && npx tsoa spec-and-routes",
     "start": "node dist/server.js",
     "dev": "nodemon",
     "tsoa": "tsoa spec-and-routes",
