@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "prestart": "",
     "postinstall": "prisma generate",
     "start": "node dist/server.js",
     "dev": "nodemon",
