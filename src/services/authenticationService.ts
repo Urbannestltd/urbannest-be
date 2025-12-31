@@ -16,8 +16,10 @@ import {
 import * as jwt from "jsonwebtoken";
 import * as bcrypt from "bcrypt";
 import { ApiResponse } from "../dtos/apiResponse";
-import { GOOGLE_CLIENT_ID, JWTSECRET } from "../config/env";
+import { GOOGLE_CLIENT_ID, JWTSECRET, MAIL_USER } from "../config/env";
 import { OAuth2Client } from "google-auth-library";
+import sendEmail from "../config/resend";
+import transporter from "../config/nodemailer";
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -74,7 +76,28 @@ export class AuthenticationService {
       },
     });
 
-    console.log(`[EMAIL SERVICE] Sending OTP to ${params.userEmail}: ${otp}`);
+    // console.log(`[EMAIL SERVICE] Sending OTP to ${params.userEmail}: ${otp}`);
+    // sendEmail(
+    //   params.userEmail,
+    //   "Verify your Email for Urbannest",
+    //   `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p><br><br>Best Regards,<br>The Urbannest Team`
+    // );
+
+    const mailOptions = {
+      from: {
+        address: MAIL_USER as string,
+        name: "Urbannest Support",
+      },
+      to: params.userEmail,
+      subject: "Verify your Email for Urbannest",
+      html: `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p><br><br>Best Regards,<br>The Urbannest Team`,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        new BadRequestError(error.message);
+      }
+    });
 
     return {
       success: true,
@@ -262,8 +285,28 @@ export class AuthenticationService {
     });
 
     const resetLink = `http://localhost:3000/auth/reset-password?token=${resetToken}`;
-    console.log(`[EMAIL] Link: ${resetLink}`);
+    // console.log(`[EMAIL] Link: ${resetLink}`);
+    // await sendEmail(
+    //   params.email,
+    //   "Password Reset",
+    //   `<p>Click <a href="${resetLink}">here</a> to reset your password.<br><br>Best Regards,<br>The Urbannest Team</p>`
+    // );
 
+    const mailOptions = {
+      from: {
+        address: MAIL_USER as string,
+        name: "Urbannest Support",
+      },
+      to: params.email,
+      subject: "Password Reset for Urbannest Account",
+      html: `<p>Click <a href="${resetLink}">here</a> to reset your password.<br><br>Best Regards,<br>The Urbannest Team</p>`,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        new BadRequestError(error.message);
+      }
+    });
     return { message: "If that email exists, a reset link has been sent." };
   }
 
