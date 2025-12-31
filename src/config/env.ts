@@ -9,3 +9,5 @@ export const JWTSECRET = process.env.JWTSECRET || "your_jwt_secret";
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 export const DIRECT_URL = process.env.DIRECT_URL || "";
 export const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+export const MAIL_USER = process.env.MAIL_USER || "";
+export const MAIL_PASS = process.env.MAIL_PASS || "";
