@@ -18,6 +18,7 @@ import * as bcrypt from "bcrypt";
 import { ApiResponse } from "../dtos/apiResponse";
 import { GOOGLE_CLIENT_ID, JWTSECRET } from "../config/env";
 import { OAuth2Client } from "google-auth-library";
+import sendEmail from "../config/resend";
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -75,6 +76,11 @@ export class AuthenticationService {
     });
 
     console.log(`[EMAIL SERVICE] Sending OTP to ${params.userEmail}: ${otp}`);
+    sendEmail(
+      params.userEmail,
+      "Verify your Email for Urbannest",
+      `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p><br><br>Best Regards,<br>The Urbannest Team`
+    );
 
     return {
       success: true,
@@ -262,7 +268,12 @@ export class AuthenticationService {
     });
 
     const resetLink = `http://localhost:3000/auth/reset-password?token=${resetToken}`;
-    console.log(`[EMAIL] Link: ${resetLink}`);
+    // console.log(`[EMAIL] Link: ${resetLink}`);
+    sendEmail(
+      params.email,
+      "Password Reset",
+      `<p>Click <a href="${resetLink}">here</a> to reset your password.<br><br>Best Regards,<br>The Urbannest Team</p>`
+    );
 
     return { message: "If that email exists, a reset link has been sent." };
   }
