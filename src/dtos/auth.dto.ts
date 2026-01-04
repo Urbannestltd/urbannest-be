@@ -1,10 +1,8 @@
 import { z } from "zod";
 
-export const InitiateRegistrationSchema = z.object({
-  userEmail: z.email(),
+export const RegisterSchema = z.object({
   userRoleName: z.string(),
-  userFirstName: z.string().optional(),
-  userLastName: z.string().optional(),
+  userFullName: z.string().optional(),
   userDisplayName: z.string().optional(),
   userPhone: z.string().optional(),
   userPassword: z
@@ -15,11 +13,9 @@ export const InitiateRegistrationSchema = z.object({
     .regex(/[^a-zA-Z0-9]/, "Must contain at least one special character"),
 });
 
-export interface InitiateRegistrationRequest {
-  userEmail: string;
+export interface RegisterRequest {
   userPassword: string;
-  userFirstName?: string;
-  userLastName?: string;
+  userFullName?: string;
   userDisplayName?: string;
   userPhone?: string;
   userRoleName: string;

@@ -11,20 +11,20 @@ datasource db {
 model user {
   userId          String   @id @default(uuid())
   userFirstName   String?
-  userLastName    String?
-  userDisplayName String?
+  userFullName    String?
   userPhone       String?
   userEmail       String   @unique
   userPassword    String?
   userGoogleId    String?  @unique
   userRole        role     @relation(fields: [userRoleId], references: [roleId])
   userRoleId      String
-  userStatus      String   @default("ACTIVE")
+  userStatus      String   @default("PENDING")
   userCreatedAt   DateTime @default(now())
   userUpdatedAt   DateTime @updatedAt
 
   otpLogs otpLogs[]
   passwordResetTokens passwordReset[]
+  registrationLinks userRegistrationLink[]
 }
 
 model role {
@@ -56,6 +56,21 @@ model otpLogs {
   otpLogExpiry    DateTime
   otpLogCreatedAt DateTime @default(now())
   otpLogUpdatedAt DateTime @updatedAt
+}
+
+model userRegistrationLink {
+  userRegistrationLinkId        String   @id @default(uuid())
+  userRegistrationLinkToken     String   @unique
+  userRegistrationLinkExpiresAt DateTime
+
+  userRegistrationLinkUserId    String
+  userRegistrationLinkUser      user     @relation(fields: [userRegistrationLinkUserId], references: [userId], onDelete: Cascade)
+
+  userRegistrationLinkUsed      Boolean  @default(false)
+  userRegistrationLinkIpAddress String?
+
+  userRegistrationLinkCreatedAt DateTime @default(now())
+  userRegistrationLinkUpdatedAt DateTime @updatedAt
 }
 
 model passwordReset {
