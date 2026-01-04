@@ -2,7 +2,7 @@ import { prisma } from "../config/prisma";
 import {
   ForgotPasswordRequest,
   GoogleLoginRequest,
-  InitiateRegistrationRequest,
+  RegisterRequest,
   LoginRequest,
   ResetPasswordRequest,
   VerifyOtpRequest,
@@ -24,27 +24,44 @@ import transporter from "../config/nodemailer";
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 export class AuthenticationService {
-  public async initiateRegistration(
-    params: InitiateRegistrationRequest
+  public async register(
+    params: RegisterRequest,
+    token: string
   ): Promise<ApiResponse<any>> {
-    const existing = await prisma.user.findUnique({
-      where: { userEmail: params.userEmail },
-    });
-
-    if (existing) {
-      throw new BadRequestError("Email already exists");
-    }
-
     const hashedPassword = await bcrypt.hash(params.userPassword, 10);
 
-    const newUser = await prisma.user.create({
+    const email = token.split("$$")[0];
+
+    const userExists = await prisma.user.findUnique({
+      where: { userEmail: email, userStatus: "ACTIVE" },
+    });
+
+    if (userExists)
+      throw new BadRequestError("User with this email already exists");
+
+    const regLinkCheck = await prisma.userRegistrationLink.findUnique({
+      where: { userRegistrationLinkToken: token },
+    });
+
+    if (!regLinkCheck)
+      throw new BadRequestError("Invalid registration token provided");
+
+    if (regLinkCheck.userRegistrationLinkExpiresAt < new Date())
+      throw new BadRequestError("Registration token has expired");
+
+    const newUser = await prisma.user.update({
+      where: { userEmail: email },
       data: {
-        userEmail: params.userEmail,
-        userFirstName: params.userFirstName,
-        userLastName: params.userLastName,
+        userFullName: params.userFullName,
         userDisplayName: params.userDisplayName,
         userPhone: params.userPhone,
         userPassword: hashedPassword,
+        registrationLinks: {
+          update: {
+            where: { userRegistrationLinkToken: token },
+            data: { userRegistrationLinkUsed: true },
+          },
+        },
         userRole: {
           connectOrCreate: {
             where: {
@@ -55,24 +72,7 @@ export class AuthenticationService {
             },
           },
         },
-        userStatus: "PENDING",
-      },
-    });
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-
-    const otpHash = await bcrypt.hash(otp, 10);
-
-    await prisma.otpLogs.create({
-      data: {
-        otpLogUser: {
-          connect: {
-            userId: newUser.userId,
-          },
-        },
-        otpLogHash: otpHash,
-        otpLogExpiry: otpExpires,
+        userStatus: "ACTIVE",
       },
     });
 
@@ -83,25 +83,25 @@ export class AuthenticationService {
     //   `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p><br><br>Best Regards,<br>The Urbannest Team`
     // );
 
-    const mailOptions = {
-      from: {
-        address: MAIL_USER as string,
-        name: "Urbannest Support",
-      },
-      to: params.userEmail,
-      subject: "Verify your Email for Urbannest",
-      html: `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p><br><br>Best Regards,<br>The Urbannest Team`,
-    };
+    // const mailOptions = {
+    //   from: {
+    //     address: MAIL_USER as string,
+    //     name: "Urbannest Support",
+    //   },
+    //   to: params.userEmail,
+    //   subject: "Verify your Email for Urbannest",
+    //   html: `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p><br><br>Best Regards,<br>The Urbannest Team`,
+    // };
 
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        new BadRequestError(error.message);
-      }
-    });
+    // transporter.sendMail(mailOptions, (error, info) => {
+    //   if (error) {
+    //     new BadRequestError(error.message);
+    //   }
+    // });
 
     return {
       success: true,
-      message: "Registration initiated",
+      message: "Registration completed successfully",
       data: { userId: newUser.userId },
     };
   }
@@ -185,7 +185,7 @@ export class AuthenticationService {
       token,
       user: {
         id: user.userId,
-        name: user.userDisplayName,
+        name: user.userFullName,
         role: user.userRole.roleName,
       },
     };
@@ -251,7 +251,7 @@ export class AuthenticationService {
       token,
       user: {
         id: user.userId,
-        name: user.userDisplayName,
+        name: user.userFullName,
         role: user.userRole?.roleName,
       },
     };

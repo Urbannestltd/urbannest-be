@@ -7,6 +7,7 @@ import {
   Request,
   Post,
   SuccessResponse,
+  Query,
 } from "tsoa";
 import * as express from "express";
 import { AuthenticationService } from "../services/authenticationService";
@@ -15,8 +16,8 @@ import {
   ForgotPasswordSchema,
   GoogleLoginRequest,
   GoogleLoginSchema,
-  InitiateRegistrationRequest,
-  InitiateRegistrationSchema,
+  RegisterRequest,
+  RegisterSchema,
   LoginRequest,
   LoginSchema,
   ResetPasswordRequest,
@@ -41,24 +42,25 @@ export class AuthenticationController extends Controller {
   /**
    * Initiates registration for a new user.
    */
-  @Post("initiate-registration")
-  @SuccessResponse("201", "User Created")
-  public async initiateRegistration(
-    @Body() body: InitiateRegistrationRequest
+  @Post("register")
+  @SuccessResponse("200", "Registration Successful")
+  public async register(
+    @Body() body: RegisterRequest,
+    @Query() token: string
   ): Promise<ApiResponse<any>> {
-    const validatedBody = validate(InitiateRegistrationSchema, body);
+    const validatedBody = validate(RegisterSchema, body);
 
     this.setStatus(201);
-    return this.authenticationService.initiateRegistration(validatedBody);
+    return this.authenticationService.register(validatedBody, token);
   }
 
-  @Post("verify-otp")
-  @SuccessResponse("200", "Account Verified")
-  public async verifyOtp(@Body() body: VerifyOtpRequest) {
-    const validatedBody = validate(VerifyOtpSchema, body);
+  // @Post("verify-otp")
+  // @SuccessResponse("200", "Account Verified")
+  // public async verifyOtp(@Body() body: VerifyOtpRequest) {
+  //   const validatedBody = validate(VerifyOtpSchema, body);
 
-    return this.authenticationService.verifyOtp(validatedBody);
-  }
+  //   return this.authenticationService.verifyOtp(validatedBody);
+  // }
 
   @Post("login")
   @SuccessResponse("200", "Login Successful")
