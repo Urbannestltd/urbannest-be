@@ -16,7 +16,6 @@ export const RegisterSchema = z.object({
 export interface RegisterRequest {
   userPassword: string;
   userFullName?: string;
-  userDisplayName?: string;
   userPhone?: string;
   userRoleName: string;
 }

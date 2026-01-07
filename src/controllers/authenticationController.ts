@@ -70,13 +70,13 @@ export class AuthenticationController extends Controller {
     return this.authenticationService.login(validatedBody);
   }
 
-  @Post("google-login")
-  @SuccessResponse("200", "Google Login Successful")
-  public async googleLogin(@Body() body: GoogleLoginRequest) {
-    const validatedBody = validate(GoogleLoginSchema, body);
+  // @Post("google-login")
+  // @SuccessResponse("200", "Google Login Successful")
+  // public async googleLogin(@Body() body: GoogleLoginRequest) {
+  //   const validatedBody = validate(GoogleLoginSchema, body);
 
-    return this.authenticationService.loginWithGoogle(validatedBody);
-  }
+  // return this.authenticationService.loginWithGoogle(validatedBody);
+  // }
 
   @Post("forgot-password")
   @SuccessResponse("200", "Email Sent")
