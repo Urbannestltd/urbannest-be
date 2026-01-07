@@ -53,7 +53,6 @@ export class AuthenticationService {
       where: { userEmail: email },
       data: {
         userFullName: params.userFullName,
-        userDisplayName: params.userDisplayName,
         userPhone: params.userPhone,
         userPassword: hashedPassword,
         registrationLinks: {
@@ -191,71 +190,69 @@ export class AuthenticationService {
     };
   }
 
-  public async loginWithGoogle(params: GoogleLoginRequest) {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: params.idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+  // public async loginWithGoogle(params: GoogleLoginRequest) {
+  //   const ticket = await googleClient.verifyIdToken({
+  //     idToken: params.idToken,
+  //     audience: process.env.GOOGLE_CLIENT_ID,
+  //   });
 
-    const payload = ticket.getPayload();
-    if (!payload || !payload.email) {
-      throw new BadRequestError("Invalid Google Token");
-    }
+  //   const payload = ticket.getPayload();
+  //   if (!payload || !payload.email) {
+  //     throw new BadRequestError("Invalid Google Token");
+  //   }
 
-    console.log(payload);
+  //   console.log(payload);
 
-    const { email, sub: googleId, given_name, family_name, name } = payload;
+  //   const { email, sub: googleId, given_name, family_name, name } = payload;
 
-    let user = await prisma.user.findUnique({
-      where: { userEmail: email },
-      include: { userRole: true },
-    });
+  //   let user = await prisma.user.findUnique({
+  //     where: { userEmail: email },
+  //     include: { userRole: true },
+  //   });
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          userEmail: email,
-          userFirstName: given_name || "",
-          userLastName: family_name || "",
-          userDisplayName: name || email.split("@")[0],
-          userStatus: "ACTIVE",
-          userGoogleId: googleId,
-          userRole: {
-            connectOrCreate: {
-              where: { roleName: "TENANT" },
-              create: { roleName: "TENANT" },
-            },
-          },
-        },
-        include: { userRole: true },
-      });
-    } else if (!user.userGoogleId) {
-      user = await prisma.user.update({
-        where: { userId: user.userId },
-        data: { userGoogleId: googleId },
-        include: { userRole: true },
-      });
-    }
+  //   if (!user) {
+  //     user = await prisma.user.create({
+  //       data: {
+  //         userEmail: email,
+  //         userFullName: name || `${given_name} ${family_name}`,
+  //         userStatus: "ACTIVE",
+  //         userGoogleId: googleId,
+  //         userRole: {
+  //           connectOrCreate: {
+  //             where: { roleName: "TENANT" },
+  //             create: { roleName: "TENANT" },
+  //           },
+  //         },
+  //       },
+  //       include: { userRole: true },
+  //     });
+  //   } else if (!user.userGoogleId) {
+  //     user = await prisma.user.update({
+  //       where: { userId: user.userId },
+  //       data: { userGoogleId: googleId },
+  //       include: { userRole: true },
+  //     });
+  //   }
 
-    const token = jwt.sign(
-      {
-        userId: user.userId,
-        email: user.userEmail,
-        role: user.userRole?.roleName,
-      },
-      JWTSECRET || "secret",
-      { expiresIn: "1h" }
-    );
+  //   const token = jwt.sign(
+  //     {
+  //       userId: user?.userId,
+  //       email: user?.userEmail ?? "",
+  //       role: user?.userRole?.roleName ?? "",
+  //     },
+  //     JWTSECRET || "secret",
+  //     { expiresIn: "1h" }
+  //   );
 
-    return {
-      token,
-      user: {
-        id: user.userId,
-        name: user.userFullName,
-        role: user.userRole?.roleName,
-      },
-    };
-  }
+  //   return {
+  //     token,
+  //     user: {
+  //       id: user.userId,
+  //       name: user.userFullName,
+  //       role: user.userRole?.roleName,
+  //     },
+  //   };
+  // }
 
   public async forgotPassword(params: ForgotPasswordRequest) {
     const user = await prisma.user.findUnique({
