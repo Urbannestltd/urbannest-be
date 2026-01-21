@@ -12,3 +12,8 @@ export const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 export const MAIL_USER = process.env.MAIL_USER || "";
 export const MAIL_PASS = process.env.MAIL_PASS || "";
 export const BASE_URL = process.env.URL || "http://localhost:3000";
+export const VTPASS_PUBLIC_KEY = process.env.VTPASS_PUBLIC_KEY || "";
+export const VTPASS_SECRET_KEY = process.env.VTPASS_SECRET_KEY || "";
+export const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || "";
+export const VTPASS_BASE_URL =
+  process.env.VTPASS_BASE_URL || "https://sandbox.vtpass.com/api";

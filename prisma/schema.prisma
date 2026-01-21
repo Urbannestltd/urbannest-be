@@ -3,28 +3,88 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-model user {
-  userId          String   @id @default(uuid())
-  userFirstName   String?
-  userFullName    String?
-  userPhone       String?
-  userEmail       String   @unique
-  userPassword    String?
-  userGoogleId    String?  @unique
-  userRole        role     @relation(fields: [userRoleId], references: [roleId])
-  userRoleId      String
-  userStatus      String   @default("PENDING")
-  userCreatedAt   DateTime @default(now())
-  userUpdatedAt   DateTime @updatedAt
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+}
 
-  otpLogs otpLogs[]
+enum RoleType {
+  ADMIN
+  LANDLORD
+  TENANT
+  VENDOR
+}
+
+enum PropertyType {
+  MULTI_UNIT
+  SINGLE_FAMILY
+  COMMERCIAL
+}
+
+enum UnitStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum LeaseStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  FAILED
+}
+
+enum PaymentType {
+  RENT
+  UTILITY_BILL
+  UTILITY_TOKEN
+  SERVICE_CHARGE
+}
+
+enum UtilityType {
+  ELECTRICITY
+  WATER
+  SERVICE_CHARGE
+  WASTE
+  INTERNET
+}
+
+model user {
+  userId        String   @id @default(uuid())
+  userFirstName String?
+  userFullName  String?
+  userPhone     String?
+  userEmail     String   @unique
+  userPassword  String?
+  userGoogleId  String?  @unique
+  userRole      role     @relation(fields: [userRoleId], references: [roleId])
+  userRoleId    String
+  userStatus    String   @default("PENDING")
+  userCreatedAt DateTime @default(now())
+  userUpdatedAt DateTime @updatedAt
+
+  ownedProperties property[]       @relation("landlordProperties")
+  leases          lease[]          @relation("tenantLeases")
+  utilityProfiles utilityProfile[]
+  payments        payment[]
+
+  otpLogs             otpLogs[]
   passwordResetTokens passwordReset[]
-  registrationLinks userRegistrationLink[]
+  registrationLinks   userRegistrationLink[]
+
+  @@map("user")
 }
 
 model role {
@@ -63,10 +123,10 @@ model userRegistrationLink {
   userRegistrationLinkToken     String   @unique
   userRegistrationLinkExpiresAt DateTime
 
-  userRegistrationLinkUserId    String
-  userRegistrationLinkUser      user     @relation(fields: [userRegistrationLinkUserId], references: [userId], onDelete: Cascade)
+  userRegistrationLinkUserId String
+  userRegistrationLinkUser   user   @relation(fields: [userRegistrationLinkUserId], references: [userId], onDelete: Cascade)
 
-  userRegistrationLinkUsed      Boolean  @default(false)
+  userRegistrationLinkUsed      Boolean @default(false)
   userRegistrationLinkIpAddress String?
 
   userRegistrationLinkCreatedAt DateTime @default(now())
@@ -77,15 +137,140 @@ model passwordReset {
   passwordResetId        String   @id @default(uuid())
   passwordResetToken     String   @unique
   passwordResetExpiresAt DateTime
-  
-  
-  passwordResetUserId    String
-  passwordResetUser      user     @relation(fields: [passwordResetUserId], references: [userId], onDelete: Cascade)
 
-  passwordResetUsed      Boolean  @default(false) 
+  passwordResetUserId String
+  passwordResetUser   user   @relation(fields: [passwordResetUserId], references: [userId], onDelete: Cascade)
+
+  passwordResetUsed      Boolean @default(false)
   passwordResetIpAddress String?
-  
+
   passwordResetCreatedAt DateTime @default(now())
   passwordResetUpdatedAt DateTime @updatedAt
 }
 
+model property {
+  id      String       @id @default(uuid()) @map("property_id")
+  name    String?      @map("name")
+  address String       @map("address")
+  city    String       @map("city")
+  state   String       @map("state")
+  zip     String       @map("zip_code")
+  type    PropertyType @default(MULTI_UNIT) @map("type")
+
+  landlordId String @map("landlord_id")
+  landlord   user   @relation("landlordProperties", fields: [landlordId], references: [userId])
+
+  units unit[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("properties")
+}
+
+// 2. THE UNIT (The specific Flat/Apartment)
+model unit {
+  id        String     @id @default(uuid()) @map("unit_id")
+  name      String     @map("name") // "Apt 4B"
+  bedrooms  Int        @default(1) @map("bedrooms")
+  bathrooms Float      @default(1.0) @map("bathrooms")
+  status    UnitStatus @default(AVAILABLE) @map("status")
+
+  propertyId String   @map("property_id")
+  property   property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  leases lease[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("units")
+}
+
+model lease {
+  id          String      @id @default(uuid()) @map("lease_id")
+  startDate   DateTime    @map("start_date")
+  endDate     DateTime    @map("end_date")
+  rentAmount  Float       @map("rent_amount")
+  status      LeaseStatus @default(ACTIVE) @map("status")
+  documentUrl String?     @map("document_url")
+
+  // Relations
+  unitId String @map("unit_id")
+  unit   unit   @relation(fields: [unitId], references: [id])
+
+  tenantId String @map("tenant_id")
+  tenant   user   @relation("tenantLeases", fields: [tenantId], references: [userId])
+
+  payments     payment[]
+  utilityBills utilityBill[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("leases")
+}
+
+model utilityProfile {
+  id         String      @id @default(uuid()) @map("id")
+  type       UtilityType @map("type")
+  provider   String?     @map("provider")
+  identifier String      @map("identifier")
+  label      String?     @map("label")
+
+  userId String @map("user_id")
+  user   user   @relation(fields: [userId], references: [userId])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("utility_profiles")
+}
+
+model utilityBill {
+  id          String        @id @default(uuid()) @map("id")
+  type        UtilityType   @map("type")
+  amount      Float         @map("amount")
+  dueDate     DateTime      @map("due_date")
+  status      PaymentStatus @default(PENDING) @map("status")
+  description String?       @map("description")
+
+  leaseId String @map("lease_id")
+  lease   lease  @relation(fields: [leaseId], references: [id])
+
+  paymentId String?  @unique @map("payment_id")
+  payment   payment? @relation(fields: [paymentId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("utility_bills")
+}
+
+model payment {
+  id        String        @id @default(uuid()) @map("payment_id")
+  amount    Float         @map("amount")
+  dueDate   DateTime?     @map("due_date")
+  paidDate  DateTime?     @map("paid_date")
+  status    PaymentStatus @default(PENDING) @map("status")
+  reference String        @unique @map("reference")
+  type      PaymentType   @default(RENT) @map("type")
+
+  utilityType  UtilityType? @map("utility_type")
+  utilityToken String?      @map("utility_token")
+  meterNo      String?      @map("utility_meter_no")
+
+  metadata Json? @map("metadata")
+
+  // Relations
+  userId String @map("user_id")
+  user   user   @relation(fields: [userId], references: [userId])
+
+  leaseId String? @map("lease_id")
+  lease   lease?  @relation(fields: [leaseId], references: [id])
+
+  utilityBill utilityBill?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("payments")
+}

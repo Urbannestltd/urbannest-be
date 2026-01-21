@@ -8,7 +8,7 @@ import bcrypt from "bcrypt";
 
 export class AdminService {
   public async createUser(
-    params: AdminCreateUserRequest
+    params: AdminCreateUserRequest,
   ): Promise<ApiResponse<any>> {
     // check if user exists
     const userExists = await prisma.user.findUnique({
@@ -22,7 +22,7 @@ export class AdminService {
     // generate bcrypt hash with email as prefix then '$'
     const token: string = `${params.userEmail}$${bcrypt.hashSync(
       Math.floor(100000 + Math.random() * 900000).toString(),
-      10
+      10,
     )}`;
     await prisma.user.upsert({
       where: { userEmail: params.userEmail },
@@ -31,7 +31,7 @@ export class AdminService {
           create: {
             userRegistrationLinkToken: token,
             userRegistrationLinkExpiresAt: new Date(
-              Date.now() + 24 * 60 * 60 * 1000
+              Date.now() + 24 * 60 * 60 * 1000,
             ),
           },
         },
@@ -43,7 +43,7 @@ export class AdminService {
           create: {
             userRegistrationLinkToken: token,
             userRegistrationLinkExpiresAt: new Date(
-              Date.now() + 24 * 60 * 60 * 1000
+              Date.now() + 24 * 60 * 60 * 1000,
             ),
           },
         },
@@ -67,7 +67,7 @@ export class AdminService {
       },
       to: params.userEmail,
       subject: "Complete your Urbannest Registration",
-      html: `<p>Click <a href="${BASE_URL}/auth/register?token=${token}">here</a> to complete your registration.<br><br>Please note this link expires in 24 hours, and remember to not share this URL with anyone.<br><br>Best Regards,<br>The Urbannest Team</p>`,
+      html: `<p>Click <a href="${BASE_URL}/auth?token=${token}">here</a> to complete your registration.<br><br>Please note this link expires in 24 hours, and remember to not share this URL with anyone.<br><br>Best Regards,<br>The Urbannest Team</p>`,
     };
 
     transporter.sendMail(mailOptions, (error, info) => {
