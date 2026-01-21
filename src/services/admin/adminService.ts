@@ -5,8 +5,11 @@ import { AdminCreateUserRequest } from "../../dtos/admin/admin";
 import { ApiResponse } from "../../dtos/apiResponse";
 import { BadRequestError } from "../../utils/apiError";
 import bcrypt from "bcrypt";
+import { ZeptoMailService } from "../external/zeptoMailService";
+import { EMAIL_TEMPLATES } from "../../config/emailTemplates";
 
 export class AdminService {
+  private zeptoMailService = new ZeptoMailService();
   public async createUser(
     params: AdminCreateUserRequest,
   ): Promise<ApiResponse<any>> {
@@ -60,21 +63,31 @@ export class AdminService {
       },
     });
 
-    const mailOptions = {
-      from: {
-        address: MAIL_USER as string,
-        name: "Urbannest Support",
+    this.zeptoMailService.sendTemplateEmail(
+      { email: params.userEmail, name: "Tenant" },
+      EMAIL_TEMPLATES.REGISTER_LINK,
+      {
+        Link: `${BASE_URL}/auth?token=${token}`,
+        valid_time: "24 hours",
+        support_id: "support@urbannesttech.com",
       },
-      to: params.userEmail,
-      subject: "Complete your Urbannest Registration",
-      html: `<p>Click <a href="${BASE_URL}/auth?token=${token}">here</a> to complete your registration.<br><br>Please note this link expires in 24 hours, and remember to not share this URL with anyone.<br><br>Best Regards,<br>The Urbannest Team</p>`,
-    };
+    );
 
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        new BadRequestError(error.message);
-      }
-    });
+    // const mailOptions = {
+    //   from: {
+    //     address: MAIL_USER as string,
+    //     name: "Urbannest Support",
+    //   },
+    //   to: params.userEmail,
+    //   subject: "Complete your Urbannest Registration",
+    //   html: `<p>Click <a href="${BASE_URL}/auth?token=${token}">here</a> to complete your registration.<br><br>Please note this link expires in 24 hours, and remember to not share this URL with anyone.<br><br>Best Regards,<br>The Urbannest Team</p>`,
+    // };
+
+    // transporter.sendMail(mailOptions, (error, info) => {
+    //   if (error) {
+    //     new BadRequestError(error.message);
+    //   }
+    // });
 
     return {
       success: true,
