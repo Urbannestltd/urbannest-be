@@ -9,10 +9,8 @@ export class VTPassService {
       baseURL: process.env.VTPASS_BASE_URL || "https://sandbox.vtpass.com/api",
       headers: {
         // VTPass typically uses Basic Auth or specific headers. Check their docs.
-        // "api-key": process.env.VTPASS_API_KEY,
-        // "secret-key": process.env.VTPASS_SECRET_KEY,
-        "api-key": "93349993edf2fac37f65d15869f5735f",
-        "secret-key": "SK_440838ba50b729f71a279bfc562550a9c7b72af9b34",
+        "api-key": process.env.VTPASS_API_KEY,
+        "secret-key": process.env.VTPASS_SECRET_KEY,
         "Content-Type": "application/json",
       },
     });

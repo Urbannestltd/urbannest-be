@@ -157,12 +157,12 @@ export class AuthenticationService {
       include: { userRole: true },
     });
 
-    // if (
-    //   !user ||
-    //   !(await bcrypt.compare(params.password, user.userPassword ?? ""))
-    // ) {
-    //   throw new UnauthorizedError("Invalid email or password");
-    // }
+    if (
+      !user ||
+      !(await bcrypt.compare(params.password, user.userPassword ?? ""))
+    ) {
+      throw new UnauthorizedError("Invalid email or password");
+    }
 
     if (user?.userStatus !== "ACTIVE") {
       throw new UnauthorizedError(
