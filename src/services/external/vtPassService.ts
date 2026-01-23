@@ -9,8 +9,10 @@ export class VTPassService {
       baseURL: process.env.VTPASS_BASE_URL || "https://sandbox.vtpass.com/api",
       headers: {
         // VTPass typically uses Basic Auth or specific headers. Check their docs.
-        "api-key": process.env.VTPASS_API_KEY,
-        "secret-key": process.env.VTPASS_SECRET_KEY,
+        // "api-key": process.env.VTPASS_API_KEY,
+        // "secret-key": process.env.VTPASS_SECRET_KEY,
+        "api-key": "93349993edf2fac37f65d15869f5735f",
+        "secret-key": "SK_440838ba50b729f71a279bfc562550a9c7b72af9b34",
         "Content-Type": "application/json",
       },
     });
@@ -25,31 +27,50 @@ export class VTPassService {
     type?: string,
   ) {
     try {
-      // VTPass endpoint to verify meter/smartcard
       const response = await this.client.post("/merchant-verify", {
-        serviceID, // e.g. "ikeja-electric-prepaid"
-        billersCode, // The Meter Number
-        type, // Optional: Some services need "prepaid" vs "postpaid"
+        serviceID,
+        billersCode,
+        type,
       });
 
+      // 1. Check for General Failure (Code not 000)
       if (response.data.code !== "000") {
         throw new Error(
           response.data.response_description || "Invalid Meter Number",
         );
       }
 
-      // Return the Customer Name (e.g., "John Doe")
+      // 2. Check for Specific "Wrong Biller" Failure
+      // Use ?. to safely access content in case it's missing
+      if (response.data.content?.WrongBillersCode) {
+        throw new Error(
+          `Invalid Meter Number, or this meter does not belong to ${serviceID}`,
+        );
+      }
+
       return {
         customerName: response.data.content.Customer_Name,
         address: response.data.content.Address,
         valid: true,
       };
     } catch (error: any) {
+      // Log full details for the developer
       console.error(
         "VTPass Verify Error:",
         error.response?.data || error.message,
       );
-      throw new BadRequestError("Could not verify meter number.");
+
+      // EXTRACT THE SPECIFIC MESSAGE
+      // Priority 1: The error description returned directly by VTPass API (if request failed with 400/500)
+      // Priority 2: The manual error message we threw above (e.g. "Invalid Meter Number...")
+      // Priority 3: A generic fallback
+      const message =
+        error.response?.data?.response_description ||
+        error.message ||
+        "Could not verify meter number.";
+
+      // Throw the specific message to the controller
+      throw new BadRequestError(message);
     }
   }
 
@@ -60,6 +81,7 @@ export class VTPassService {
     requestId: string,
     serviceID: string,
     billersCode: string,
+    variation_code: string,
     amount: number,
     phone: string,
   ) {
@@ -69,6 +91,7 @@ export class VTPassService {
         serviceID,
         billersCode,
         amount,
+        variation_code,
         phone, // Customer phone number
       });
 

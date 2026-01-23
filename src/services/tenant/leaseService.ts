@@ -37,7 +37,7 @@ export class LeaseService {
     // 3. Calculate Logic (Days Remaining)
     const today = new Date();
     const daysRemaining = Math.ceil(
-      (lease.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      (lease.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     // 4. Return Clean DTO
@@ -48,6 +48,7 @@ export class LeaseService {
       property: {
         name: property.name,
         unit: unit.name,
+        unitId: unit.id,
         address: property.address,
         fullAddress: `${property.address}, ${unit.name}, ${property.city}`,
       },

@@ -8,6 +8,7 @@ export interface LeaseResponse {
   property: {
     name: string | null; // "Sunset Heights"
     unit: string; // "Apt 4B"
+    unitId: string;
     address: string; // "123 Main St"
     fullAddress: string; // "123 Main St, Apt 4B, Lagos"
   };

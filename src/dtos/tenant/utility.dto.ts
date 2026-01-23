@@ -19,6 +19,7 @@ export const PurchaseUtilitySchema = z.object({
 
 export interface PurchaseUtilityRequest {
   serviceID: string;
+  type: string;
   meterNumber: string;
   amount: number;
   saveMeter?: boolean;

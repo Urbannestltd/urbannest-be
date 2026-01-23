@@ -10,48 +10,63 @@ import { PaymentType, PaymentStatus } from "@prisma/client";
 export class RentService {
   /**
    * INITIATE RENT PROCESS
-   * Determines if this is a "New Lease" or "Renewal" and prepares the transaction.
+   * Handles New Leases, Extensions, and Early Renewals intelligently.
    */
   public async initiateRent(userId: string, params: InitiateRentRequest) {
     let leaseId: string | null = null;
-    let actionType = "RENT_RENEWAL"; // Default assumption
+    let actionType = "RENT_RENEWAL";
 
     // ====================================================
-    // 1. VALIDATE BUSINESS LOGIC
+    // 1. DETERMINE SCENARIO & VALIDATE
     // ====================================================
 
-    // SCENARIO A: NEW MOVE-IN
     if (params.unitId) {
-      // Check if unit exists
+      // Fetch the unit to check its status
       const unit = await prisma.unit.findUnique({
         where: { id: params.unitId },
       });
       if (!unit) throw new NotFoundError("Target unit not found.");
 
-      // Check if unit is actually available
-      if (unit.status !== "AVAILABLE") {
-        throw new BadRequestError(
-          "This unit is already occupied or under maintenance.",
-        );
-      }
-
-      actionType = "NEW_LEASE";
-      leaseId = null; // No lease exists yet
-    }
-
-    // SCENARIO B: RENEWAL / EXTENSION
-    else {
-      // Find the user's current lease (Active or recently Expired)
-      const currentLease = await prisma.lease.findFirst({
+      // CHECK: Is this user ALREADY the tenant of this unit?
+      const existingLease = await prisma.lease.findFirst({
         where: {
+          unitId: params.unitId,
           tenantId: userId,
           status: { in: ["ACTIVE", "EXPIRED"] },
         },
       });
 
+      // SCENARIO A: SELF-RENEWAL (User passed the ID of their own home)
+      if (existingLease) {
+        actionType = "RENT_RENEWAL";
+        leaseId = existingLease.id;
+      }
+
+      // SCENARIO B: NEW MOVE-IN (User wants a NEW, DIFFERENT unit)
+      else {
+        // Strictly enforce availability for new tenants
+        if (unit.status !== "AVAILABLE") {
+          throw new BadRequestError("This unit is already occupied.");
+        }
+        actionType = "NEW_LEASE";
+        leaseId = null;
+      }
+    }
+
+    // SCENARIO C: GENERIC RENEWAL (No unitId passed)
+    else {
+      // Find the latest lease for this user (Active or recently Expired)
+      const currentLease = await prisma.lease.findFirst({
+        where: {
+          tenantId: userId,
+          status: { in: ["ACTIVE", "EXPIRED"] },
+        },
+        orderBy: { endDate: "desc" }, // Pick the one furthest in the future
+      });
+
       if (!currentLease) {
         throw new NotFoundError(
-          "No existing lease found to renew. Please select a unit to move into.",
+          "No active lease found. Please select a unit to move into.",
         );
       }
 
@@ -66,15 +81,14 @@ export class RentService {
     const user = await prisma.user.findUnique({ where: { userId: userId } });
     if (!user) throw new NotFoundError("User profile error.");
 
-    // Generate unique reference
     const reference = `RENT-${userId.substring(0, 5)}-${Date.now()}`;
 
-    // Metadata: This is crucial. We pack the instructions for the Verify step here.
+    // Pack instructions for the Verification step
     const metadata = {
-      action: actionType, // "NEW_LEASE" or "RENT_RENEWAL"
-      targetUnitId: params.unitId, // Only present for New Lease
-      durationValue: params.durationValue, // e.g., 1
-      durationUnit: params.durationUnit, // e.g., "YEAR"
+      action: actionType,
+      targetUnitId: params.unitId,
+      durationValue: params.durationValue,
+      durationUnit: params.durationUnit,
     };
 
     try {
@@ -88,6 +102,7 @@ export class RentService {
           custom_fields: [
             { display_name: "Payment Type", value: "RENT" },
             { display_name: "Action", value: actionType },
+            { display_name: "Lease ID", value: leaseId || "New Lease" },
           ],
         },
       });
