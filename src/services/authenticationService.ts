@@ -26,7 +26,7 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 export class AuthenticationService {
   public async register(
     params: RegisterRequest,
-    token: string
+    token: string,
   ): Promise<ApiResponse<any>> {
     const hashedPassword = await bcrypt.hash(params.userPassword, 10);
 
@@ -164,9 +164,9 @@ export class AuthenticationService {
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    if (user.userStatus !== "ACTIVE") {
+    if (user?.userStatus !== "ACTIVE") {
       throw new UnauthorizedError(
-        "Account is not active. Please verify your email."
+        "Account is not active. Please verify your email.",
       );
     }
 
@@ -177,7 +177,7 @@ export class AuthenticationService {
         role: user.userRole.roleName,
       },
       process.env.JWT_SECRET || "secret",
-      { expiresIn: "1h" }
+      { expiresIn: "1h" },
     );
 
     return {

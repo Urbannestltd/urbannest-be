@@ -14,6 +14,7 @@ import { UtilityService } from "../../services/tenant/utilityService";
 import {
   VerifyMeterSchema,
   PurchaseUtilitySchema,
+  PurchaseUtilityRequest,
 } from "../../dtos/tenant/utility.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
@@ -47,14 +48,21 @@ export class UtilityController extends Controller {
    */
   @Post("purchase")
   @Security("jwt")
-  public async purchaseUtility(@Request() req: any, @Body() body: any) {
+  public async purchaseUtility(
+    @Request() req: any,
+    @Body() body: PurchaseUtilityRequest, // <--- FIXED: Explicit Type
+  ) {
+    // 1. Validate Business Rules (Min amount, etc.)
     validate(PurchaseUtilitySchema, body);
-    const result = await this.utilityService.initiatePurchase(
-      req.user.userId,
-      body,
-    );
+
+    // 2. Call Service
+    const userId = req.user.userId;
+    const result = await this.utilityService.initiatePurchase(userId, body);
+
+    // 3. Return Paystack URL
     return successResponse(result, "Payment initialized");
   }
+
   @Get("saved-meters")
   @Security("jwt")
   public async getSavedMeters(@Request() req: any) {

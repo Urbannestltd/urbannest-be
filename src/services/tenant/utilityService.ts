@@ -8,7 +8,7 @@ import {
   UtilityType,
   utilityProfile,
 } from "@prisma/client";
-import { NotFoundError } from "../../utils/apiError";
+import { BadRequestError, NotFoundError } from "../../utils/apiError";
 
 export class UtilityService {
   private vtpass = new VTPassService();
@@ -34,7 +34,7 @@ export class UtilityService {
     params: PurchaseUtilityRequest,
   ) {
     const user = await prisma.user.findUnique({ where: { userId: userId } });
-    if (!user) throw new Error("User not found");
+    if (!user) throw new BadRequestError("User not found");
 
     // A. Validate with VTPass one last time (Safety Check)
     // Optional: Skipping to save API calls, but recommended in high-risk apps
@@ -67,6 +67,7 @@ export class UtilityService {
       action: "UTILITY_PURCHASE",
       serviceID: params.serviceID,
       meterNumber: params.meterNumber,
+      type: params.type,
       phone: user.userPhone || "08000000000", // VTPass requires phone
     };
 
