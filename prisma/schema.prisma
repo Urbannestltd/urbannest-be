@@ -61,6 +61,70 @@ enum UtilityType {
   INTERNET
 }
 
+enum VisitorType {
+  GUEST // Friends, Family
+  DELIVERY // Jumia, DHL, Food
+  SERVICE_PROVIDER // Plumber, Cleaner, IT Support
+}
+
+enum InviteFrequency {
+  ONE_OFF
+  WHOLE_DAY
+  RECURRING
+}
+
+enum InviteStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  COMPLETED
+}
+
+enum SupportCategory {
+  BILLING
+  ACCOUNT_ISSUE
+  APP_BUG
+  DISPUTE
+  OTHER
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SupportPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  HVAC // Heating, Ventilation, AC
+  APPLIANCE
+  STRUCTURAL // Walls, Windows, Roof
+  PEST_CONTROL
+  OTHER
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
 model user {
   userId        String   @id @default(uuid())
   userFirstName String?
@@ -83,6 +147,13 @@ model user {
   otpLogs             otpLogs[]
   passwordResetTokens passwordReset[]
   registrationLinks   userRegistrationLink[]
+  visitorInvites      VisitorInvite[]
+
+  assignedTickets     MaintenanceRequest[] @relation("AssignedTickets")
+  sentMessages        MaintenanceMessage[]
+  supportTickets      SupportTicket[]
+  supportMessages     SupportMessage[]
+  maintenanceRequests MaintenanceRequest[]
 
   @@map("user")
 }
@@ -181,8 +252,10 @@ model unit {
 
   leases lease[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  visitorInvites      VisitorInvite[]
+  maintenanceRequests MaintenanceRequest[]
 
   @@map("units")
 }
@@ -273,4 +346,114 @@ model payment {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("payments")
+}
+
+model VisitorInvite {
+  id       String @id @default(uuid())
+  tenantId String
+  unitId   String
+
+  visitorName  String
+  visitorPhone String?
+
+  accessCode String @unique
+
+  // TIME CONTROL
+  validFrom  DateTime // Start of the window (e.g. 9:00 AM)
+  validUntil DateTime // End of the window (e.g. 5:00 PM)
+
+  // CATEGORIZATION
+  type      VisitorType     @default(GUEST) // Who is it?
+  frequency InviteFrequency @default(ONE_OFF) // One-off or Recurring?
+
+  status InviteStatus @default(ACTIVE)
+
+  // Relations
+  tenant user @relation(fields: [tenantId], references: [userId])
+  unit   unit @relation(fields: [unitId], references: [id])
+
+  createdAt    DateTime  @default(now())
+  checkedInAt  DateTime?
+  checkedOutAt DateTime?
+
+  @@index([accessCode])
+}
+
+model SupportTicket {
+  id       String @id @default(uuid())
+  tenantId String
+
+  category SupportCategory
+  subject  String
+  status   SupportStatus   @default(OPEN)
+  priority SupportPriority @default(LOW)
+
+  messages SupportMessage[]
+
+  // Relations
+  tenant user @relation(fields: [tenantId], references: [userId])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SupportMessage {
+  id       String @id @default(uuid())
+  ticketId String
+  senderId String // Tenant or Admin ID
+
+  message     String
+  attachments String[] // URL strings
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id])
+  sender user          @relation(fields: [senderId], references: [userId])
+
+  createdAt DateTime @default(now())
+}
+
+model MaintenanceRequest {
+  id       String @id @default(uuid())
+  tenantId String
+  unitId   String
+
+  category MaintenanceCategory
+  priority MaintenancePriority @default(MEDIUM)
+  status   MaintenanceStatus   @default(PENDING)
+
+  description String
+  attachments String[] // Array of Image/Video URLs
+
+  // Relations
+  tenant user @relation(fields: [tenantId], references: [userId])
+  unit   unit @relation(fields: [unitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignedToId String? // ID of the Facility Manager/Vendor handling this
+
+  messages MaintenanceMessage[] // Relation to chat history
+
+  // Relation for assignment
+  assignedTo user? @relation("AssignedTickets", fields: [assignedToId], references: [userId])
+
+  @@index([unitId])
+  @@index([status])
+}
+
+// New Model: Chat Messages
+model MaintenanceMessage {
+  id       String @id @default(uuid())
+  ticketId String
+  senderId String // Could be Tenant OR Manager
+
+  message     String
+  attachments String[] // Images/Videos sent in chat
+
+  // Relations
+  ticket MaintenanceRequest @relation(fields: [ticketId], references: [id])
+  sender user               @relation(fields: [senderId], references: [userId])
+
+  createdAt DateTime  @default(now())
+  readAt    DateTime? // To show "Read" receipts
 }

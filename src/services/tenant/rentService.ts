@@ -140,8 +140,6 @@ export class RentService {
     const history = await prisma.payment.findMany({
       where: {
         userId,
-        type: PaymentType.RENT,
-        status: PaymentStatus.PAID,
       },
       orderBy: { createdAt: "desc" },
       include: {
