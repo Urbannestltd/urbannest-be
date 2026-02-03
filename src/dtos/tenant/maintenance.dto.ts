@@ -10,6 +10,7 @@ export const CreateMaintenanceSchema = z.object({
     "PEST_CONTROL",
     "OTHER",
   ]),
+  subject: z.string().min(3, "Subject is required"),
   description: z
     .string()
     .min(10, "Please provide more details about the issue."),
@@ -53,6 +54,7 @@ export const UpdateMaintenanceSchema = z.object({
       "OTHER",
     ])
     .optional(),
+  subject: z.string().min(3).optional(),
   description: z.string().min(5).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "EMERGENCY"]).optional(),
   // We generally don't overwrite attachments on edit,
@@ -69,6 +71,7 @@ export interface UpdateMaintenanceRequest {
     | "STRUCTURAL"
     | "PEST_CONTROL"
     | "OTHER";
+  subject?: string;
   description?: string;
   priority?: "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY";
   attachments?: string[];

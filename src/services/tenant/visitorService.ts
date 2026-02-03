@@ -50,7 +50,7 @@ export class VisitorService {
         frequency: params.frequency as InviteFrequency,
         validFrom: new Date(params.startDate),
         validUntil: new Date(params.endDate),
-        status: InviteStatus.ACTIVE,
+        status: InviteStatus.UPCOMING,
       },
     });
 
@@ -99,7 +99,7 @@ export class VisitorService {
         validFrom: new Date(params.startDate),
         validUntil: new Date(params.endDate),
         type: params.type,
-        status: InviteStatus.ACTIVE,
+        status: InviteStatus.UPCOMING,
       });
     }
 
@@ -230,6 +230,7 @@ export class VisitorService {
 
         // Display Info
         visitorName: record.visitorName,
+        visitorPhone: record.visitorPhone || "-",
         groupName: record.group?.name || null, // e.g., "Project Team Meeting" or null
         isGroupInvite: !!record.groupId,
 
