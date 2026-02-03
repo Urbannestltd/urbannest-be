@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import {
   AddMessageRequest,
   CreateMaintenanceRequest,
+  UpdateMaintenanceRequest,
 } from "../../dtos/tenant/maintenance.dto";
 import { BadRequestError, NotFoundError } from "../../utils/apiError";
 import {
@@ -153,5 +154,48 @@ export class MaintenanceService {
         },
       },
     });
+  }
+
+  /**
+   * 5. UPDATE REQUEST (Edit)
+   * Only allowed if status is PENDING.
+   */
+  public async updateRequest(
+    ticketId: string,
+    userId: string,
+    params: UpdateMaintenanceRequest,
+  ) {
+    // A. Fetch existing ticket
+    const ticket = await prisma.maintenanceRequest.findUnique({
+      where: { id: ticketId },
+    });
+
+    if (!ticket) throw new NotFoundError("Maintenance request not found.");
+
+    // B. Authorization Check
+    if (ticket.tenantId !== userId) {
+      throw new BadRequestError("You can only edit your own requests.");
+    }
+
+    // C. Business Logic Check
+    // Prevent edits if work has already started
+    if (ticket.status !== "PENDING") {
+      throw new BadRequestError(
+        `Cannot edit request because it is already ${ticket.status}. Please send a message instead.`,
+      );
+    }
+
+    // D. Perform Update
+    const updatedTicket = await prisma.maintenanceRequest.update({
+      where: { id: ticketId },
+      data: {
+        category: params.category || ticket.category, // Keep old if not provided
+        description: params.description || ticket.description,
+        priority: params.priority || ticket.priority,
+        attachments: params.attachments || ticket.attachments, // Replaces images
+      },
+    });
+
+    return updatedTicket;
   }
 }

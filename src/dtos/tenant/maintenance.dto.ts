@@ -40,3 +40,36 @@ export interface AddMessageRequest {
   message: string;
   attachments?: string[];
 }
+
+export const UpdateMaintenanceSchema = z.object({
+  category: z
+    .enum([
+      "PLUMBING",
+      "ELECTRICAL",
+      "HVAC",
+      "APPLIANCE",
+      "STRUCTURAL",
+      "PEST_CONTROL",
+      "OTHER",
+    ])
+    .optional(),
+  description: z.string().min(5).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "EMERGENCY"]).optional(),
+  // We generally don't overwrite attachments on edit,
+  // we usually just add more via the message flow, but we can allow it here.
+  attachments: z.array(z.string().url()).optional(),
+});
+
+export interface UpdateMaintenanceRequest {
+  category?:
+    | "PLUMBING"
+    | "ELECTRICAL"
+    | "HVAC"
+    | "APPLIANCE"
+    | "STRUCTURAL"
+    | "PEST_CONTROL"
+    | "OTHER";
+  description?: string;
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY";
+  attachments?: string[];
+}

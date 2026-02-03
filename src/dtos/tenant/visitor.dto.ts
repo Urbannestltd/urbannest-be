@@ -46,6 +46,8 @@ export interface CreateInviteRequest {
 export interface CreateBulkInviteRequest {
   visitors: Array<{ name: string; phone?: string }>;
   type: "GUEST" | "DELIVERY" | "SERVICE_PROVIDER";
+  unitId: string;
+  groupName: string;
   startDate: string;
   endDate: string;
 }

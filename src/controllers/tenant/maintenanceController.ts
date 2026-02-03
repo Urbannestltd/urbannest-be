@@ -8,6 +8,7 @@ import {
   Security,
   Request,
   Path,
+  Patch,
 } from "tsoa";
 import { MaintenanceService } from "../../services/tenant/maintenanceService";
 import {
@@ -15,6 +16,8 @@ import {
   CreateMaintenanceRequest,
   AddMessageRequest,
   AddMessageSchema,
+  UpdateMaintenanceRequest,
+  UpdateMaintenanceSchema,
 } from "../../dtos/tenant/maintenance.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
@@ -86,5 +89,23 @@ export class MaintenanceController extends Controller {
     // Optional: Add logic here to ensure req.user.userId is allowed to view this ticket
     const result = await this.maintenanceService.getTicketMessages(ticketId);
     return successResponse(result, "Messages retrieved");
+  }
+
+  @Patch("{ticketId}") // Uses PATCH, not PUT (Partial Update)
+  @Security("jwt")
+  public async updateRequest(
+    @Request() req: any,
+    @Path() ticketId: string,
+    @Body() body: UpdateMaintenanceRequest,
+  ) {
+    validate(UpdateMaintenanceSchema, body);
+
+    const result = await this.maintenanceService.updateRequest(
+      ticketId,
+      req.user.userId,
+      body,
+    );
+
+    return successResponse(result, "Maintenance request updated successfully");
   }
 }
