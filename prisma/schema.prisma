@@ -78,6 +78,9 @@ enum InviteStatus {
   EXPIRED
   REVOKED
   COMPLETED
+  UPCOMING
+  CHECKED_IN
+  CHECKED_OUT
 }
 
 enum SupportCategory {
@@ -154,6 +157,7 @@ model user {
   supportTickets      SupportTicket[]
   supportMessages     SupportMessage[]
   maintenanceRequests MaintenanceRequest[]
+  visitorGroups       VisitorGroup[]
 
   @@map("user")
 }
@@ -256,6 +260,7 @@ model unit {
   updatedAt           DateTime             @updatedAt @map("updated_at")
   visitorInvites      VisitorInvite[]
   maintenanceRequests MaintenanceRequest[]
+  visitorGroups       VisitorGroup[]
 
   @@map("units")
 }
@@ -348,25 +353,48 @@ model payment {
   @@map("payments")
 }
 
-model VisitorInvite {
+model VisitorGroup {
   id       String @id @default(uuid())
   tenantId String
   unitId   String
 
+  name String // e.g. "Project Team", "Birthday Bash"
+
+  // Shared Timing Constraints (The "Event" time)
+  validFrom  DateTime
+  validUntil DateTime
+
+  // Relations
+  invites VisitorInvite[] // One Group has Many Visitors
+  tenant  user            @relation(fields: [tenantId], references: [userId])
+  unit    unit            @relation(fields: [unitId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// 2. Updated Child Model
+model VisitorInvite {
+  id String @id @default(uuid())
+
+  // Keep these for fast queries (Verification doesn't need to join tables)
+  tenantId String
+  unitId   String
+
+  // === NEW: Link to the Group ===
+  groupId String?
+  group   VisitorGroup? @relation(fields: [groupId], references: [id])
+
   visitorName  String
   visitorPhone String?
+  accessCode   String  @unique
 
-  accessCode String @unique
+  // Timestamps (Copied from Group for performance, or set individually)
+  validFrom  DateTime
+  validUntil DateTime
 
-  // TIME CONTROL
-  validFrom  DateTime // Start of the window (e.g. 9:00 AM)
-  validUntil DateTime // End of the window (e.g. 5:00 PM)
-
-  // CATEGORIZATION
-  type      VisitorType     @default(GUEST) // Who is it?
-  frequency InviteFrequency @default(ONE_OFF) // One-off or Recurring?
-
-  status InviteStatus @default(ACTIVE)
+  type      VisitorType     @default(GUEST)
+  frequency InviteFrequency @default(ONE_OFF)
+  status    InviteStatus    @default(ACTIVE)
 
   // Relations
   tenant user @relation(fields: [tenantId], references: [userId])
@@ -377,7 +405,39 @@ model VisitorInvite {
   checkedOutAt DateTime?
 
   @@index([accessCode])
+  @@index([groupId]) // Index for fetching "All guests in this group"
 }
+
+// model VisitorInvite {
+//   id       String @id @default(uuid())
+//   tenantId String
+//   unitId   String
+
+//   visitorName  String
+//   visitorPhone String?
+
+//   accessCode String @unique
+
+//   // TIME CONTROL
+//   validFrom  DateTime // Start of the window (e.g. 9:00 AM)
+//   validUntil DateTime // End of the window (e.g. 5:00 PM)
+
+//   // CATEGORIZATION
+//   type      VisitorType     @default(GUEST) // Who is it?
+//   frequency InviteFrequency @default(ONE_OFF) // One-off or Recurring?
+
+//   status InviteStatus @default(ACTIVE)
+
+//   // Relations
+//   tenant user @relation(fields: [tenantId], references: [userId])
+//   unit   unit @relation(fields: [unitId], references: [id])
+
+//   createdAt    DateTime  @default(now())
+//   checkedInAt  DateTime?
+//   checkedOutAt DateTime?
+
+//   @@index([accessCode])
+// }
 
 model SupportTicket {
   id       String @id @default(uuid())
@@ -420,6 +480,7 @@ model MaintenanceRequest {
   priority MaintenancePriority @default(MEDIUM)
   status   MaintenanceStatus   @default(PENDING)
 
+  subject     String?
   description String
   attachments String[] // Array of Image/Video URLs
 

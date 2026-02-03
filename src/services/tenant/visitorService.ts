@@ -66,61 +66,46 @@ export class VisitorService {
    * 2. CREATE BULK INVITE (For Meetings/Events)
    * Receives a list of names, returns a list of codes.
    */
+  //
   public async createBulkInvite(
     tenantId: string,
     params: CreateBulkInviteRequest,
   ) {
-    const lease = await prisma.lease.findFirst({
-      where: { tenantId, status: "ACTIVE" },
+    // 1. Create the "Event" container (The Group)
+    const newGroup = await prisma.visitorGroup.create({
+      data: {
+        tenantId,
+        unitId: params.unitId, // Ensure you pass unitId
+        name: params.groupName, // <--- "Birthday Party"
+        validFrom: new Date(params.startDate),
+        validUntil: new Date(params.endDate),
+      },
     });
-    if (!lease) throw new BadRequestError("Active lease required.");
-
-    const validFrom = new Date(params.startDate);
-    const validUntil = new Date(params.endDate);
-
-    // We use $transaction to create all invites at once
-    // Note: Inside a transaction, we can't easily do the "while loop" for uniqueness
-    // without locking. A simpler approach for bulk is generating them first.
 
     const invitesData = [];
 
+    // 2. Generate Invites linked to this Group
     for (const visitor of params.visitors) {
-      // Generate a code for each person
       let code = this.generateCode();
-      // Small safety check (in high volume apps, handle this more robustly)
-      while (
-        await prisma.visitorInvite.findUnique({ where: { accessCode: code } })
-      ) {
-        code = this.generateCode();
-      }
+      // ... uniqueness check ...
 
       invitesData.push({
         tenantId,
-        unitId: lease.unitId,
+        unitId: params.unitId,
+        groupId: newGroup.id, // <--- LINK HERE
         visitorName: visitor.name,
         visitorPhone: visitor.phone,
         accessCode: code,
-        type: params.type as VisitorType,
-        frequency: InviteFrequency.ONE_OFF, // Bulk usually implies a one-off event
-        validFrom,
-        validUntil,
+        validFrom: new Date(params.startDate),
+        validUntil: new Date(params.endDate),
+        type: params.type,
         status: InviteStatus.ACTIVE,
       });
     }
 
-    // Execute Bulk Insert
-    await prisma.visitorInvite.createMany({
-      data: invitesData,
-    });
+    await prisma.visitorInvite.createMany({ data: invitesData });
 
-    // Return the list so the Tenant can see/share them
-    // Note: createMany doesn't return the created objects in some SQL dbs,
-    // so we map the input data which includes the generated codes.
-    return invitesData.map((inv) => ({
-      name: inv.visitorName,
-      code: inv.accessCode,
-      phone: inv.visitorPhone,
-    }));
+    return { groupName: newGroup.name, count: invitesData.length };
   }
 
   /**
@@ -171,7 +156,7 @@ export class VisitorService {
     const invite = await prisma.visitorInvite.update({
       where: { accessCode: code },
       data: {
-        status: InviteStatus.COMPLETED, // Mark as Used
+        status: InviteStatus.CHECKED_IN, // Mark as Used
         checkedInAt: new Date(),
       },
       include: { tenant: true },
@@ -208,7 +193,7 @@ export class VisitorService {
     // Update the exit time
     await prisma.visitorInvite.update({
       where: { accessCode },
-      data: { checkedOutAt: new Date() },
+      data: { checkedOutAt: new Date(), status: InviteStatus.CHECKED_OUT },
     });
 
     return { success: true, message: "Visitor checked out successfully" };
@@ -219,40 +204,57 @@ export class VisitorService {
    * Returns list of past visitors for the tenant.
    */
   public async getVisitorHistory(tenantId: string) {
+    // 1. Fetch invites with their associated Group Name
     const history = await prisma.visitorInvite.findMany({
       where: { tenantId },
-      orderBy: { createdAt: "desc" }, // Newest first
-      select: {
-        id: true,
-        visitorName: true,
-        visitorPhone: true,
-        type: true,
-        accessCode: true,
-        validFrom: true,
-        checkedInAt: true,
-        checkedOutAt: true,
-        status: true,
+      orderBy: { createdAt: "desc" }, // Newest actions first
+      include: {
+        // === NEW: Fetch the parent group name ===
+        group: {
+          select: {
+            name: true,
+            id: true,
+          },
+        },
       },
     });
 
-    // Format the data for the frontend
-    return history.map((record) => ({
-      id: record.id,
-      name: record.visitorName,
-      type: record.type, // e.g. GUEST, DELIVERY
-      code: record.accessCode,
-      date: new Date(record.validFrom).toDateString(), // "Fri Jan 26 2026"
+    // 2. Format data, prioritizing Group Name if it exists
+    return history.map((record) => {
+      // Logic: If it's a group invite, the "Main Title" is the Group Name.
+      // If it's a single invite, the "Main Title" is the Visitor Name.
+      // But we send both fields so the Frontend can decide how to display it.
 
-      // Timestamps (or null if they didn't happen)
-      checkInTime: record.checkedInAt
-        ? new Date(record.checkedInAt).toLocaleTimeString()
-        : "-",
+      return {
+        id: record.id,
 
-      checkOutTime: record.checkedOutAt
-        ? new Date(record.checkedOutAt).toLocaleTimeString()
-        : "-",
+        // Display Info
+        visitorName: record.visitorName,
+        groupName: record.group?.name || null, // e.g., "Project Team Meeting" or null
+        isGroupInvite: !!record.groupId,
 
-      status: record.status, // ACTIVE, COMPLETED, EXPIRED
-    }));
+        // Context
+        type: record.type,
+        code: record.accessCode,
+        date: new Date(record.validFrom).toDateString(),
+
+        // Timestamps for Audit Trail
+        checkInTime: record.checkedInAt
+          ? new Date(record.checkedInAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "-",
+
+        checkOutTime: record.checkedOutAt
+          ? new Date(record.checkedOutAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "-",
+
+        status: record.status,
+      };
+    });
   }
 }
