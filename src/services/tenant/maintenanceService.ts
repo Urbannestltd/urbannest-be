@@ -189,6 +189,7 @@ export class MaintenanceService {
     const updatedTicket = await prisma.maintenanceRequest.update({
       where: { id: ticketId },
       data: {
+        subject: params.subject || ticket.subject,
         category: params.category || ticket.category, // Keep old if not provided
         description: params.description || ticket.description,
         priority: params.priority || ticket.priority,
