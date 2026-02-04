@@ -204,58 +204,89 @@ export class VisitorService {
    * Returns list of past visitors for the tenant.
    */
   public async getVisitorHistory(tenantId: string) {
-    // 1. Fetch invites with their associated Group Name
-    const history = await prisma.visitorInvite.findMany({
+    // 1. Fetch GROUPS (and include all their visitors)
+    const groups = await prisma.visitorGroup.findMany({
       where: { tenantId },
-      orderBy: { createdAt: "desc" }, // Newest actions first
       include: {
-        // === NEW: Fetch the parent group name ===
-        group: {
-          select: {
-            name: true,
-            id: true,
-          },
+        invites: {
+          orderBy: { visitorName: "asc" }, // Sort names inside the group A-Z
         },
       },
     });
 
-    // 2. Format data, prioritizing Group Name if it exists
-    return history.map((record) => {
-      // Logic: If it's a group invite, the "Main Title" is the Group Name.
-      // If it's a single invite, the "Main Title" is the Visitor Name.
-      // But we send both fields so the Frontend can decide how to display it.
-
-      return {
-        id: record.id,
-
-        // Display Info
-        visitorName: record.visitorName,
-        visitorPhone: record.visitorPhone || "-",
-        groupName: record.group?.name || null, // e.g., "Project Team Meeting" or null
-        isGroupInvite: !!record.groupId,
-
-        // Context
-        type: record.type,
-        code: record.accessCode,
-        date: new Date(record.validFrom).toDateString(),
-
-        // Timestamps for Audit Trail
-        checkInTime: record.checkedInAt
-          ? new Date(record.checkedInAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "-",
-
-        checkOutTime: record.checkedOutAt
-          ? new Date(record.checkedOutAt).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "-",
-
-        status: record.status,
-      };
+    // 2. Fetch SOLO INVITES (Where groupId is null)
+    const soloInvites = await prisma.visitorInvite.findMany({
+      where: {
+        tenantId,
+        groupId: null, // Strictly fetch those NOT in a group
+      },
     });
+
+    // 3. Normalize Groups into a common "History Item" structure
+    const formattedGroups = groups.map((g) => ({
+      id: g.id,
+      isGroup: true,
+      title: g.name, // The Group Name (e.g., "Project Team")
+      date: new Date(g.validFrom).toDateString(),
+      rawDate: g.validFrom, // Used for sorting below
+
+      // The list of people inside this group
+      visitors: g.invites.map((invite) => ({
+        name: invite.visitorName,
+        phone: invite.visitorPhone || "-",
+        code: invite.accessCode,
+        status: invite.status,
+        checkInTime: invite.checkedInAt
+          ? new Date(invite.checkedInAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "-",
+        checkOutTime: invite.checkedOutAt
+          ? new Date(invite.checkedOutAt).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "-",
+      })),
+    }));
+
+    // 4. Normalize Solo Invites into the same structure
+    const formattedSolos = soloInvites.map((invite) => ({
+      id: invite.id,
+      isGroup: false,
+      title: invite.visitorName, // The Visitor Name
+      date: new Date(invite.validFrom).toDateString(),
+      rawDate: invite.validFrom,
+
+      // Single visitor details (sent as an array of 1 for consistent frontend logic)
+      visitors: [
+        {
+          name: invite.visitorName,
+          phone: invite.visitorPhone || "-",
+          code: invite.accessCode,
+          status: invite.status,
+          checkInTime: invite.checkedInAt
+            ? new Date(invite.checkedInAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "-",
+          checkOutTime: invite.checkedOutAt
+            ? new Date(invite.checkedOutAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "-",
+        },
+      ],
+    }));
+
+    const combinedHistory = [...formattedGroups, ...formattedSolos].sort(
+      (a, b) => b.rawDate.getTime() - a.rawDate.getTime(),
+    );
+
+    // Remove 'rawDate' before sending to frontend (optional cleanup)
+    return combinedHistory.map(({ rawDate, ...item }) => item);
   }
 }
