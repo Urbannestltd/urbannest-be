@@ -39,6 +39,7 @@ export class MaintenanceService {
       data: {
         tenantId,
         unitId: lease.unitId,
+        subject: params.subject,
         category: params.category as MaintenanceCategory,
         priority: (params.priority as MaintenancePriority) || "MEDIUM",
         description: params.description,

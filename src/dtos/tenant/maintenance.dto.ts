@@ -27,6 +27,7 @@ export interface CreateMaintenanceRequest {
     | "STRUCTURAL"
     | "PEST_CONTROL"
     | "OTHER";
+  subject: string;
   description: string;
   priority?: "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY";
   attachments?: string[];
