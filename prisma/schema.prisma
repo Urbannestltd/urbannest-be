@@ -129,18 +129,20 @@ enum MaintenanceStatus {
 }
 
 model user {
-  userId        String   @id @default(uuid())
-  userFirstName String?
-  userFullName  String?
-  userPhone     String?
-  userEmail     String   @unique
-  userPassword  String?
-  userGoogleId  String?  @unique
-  userRole      role     @relation(fields: [userRoleId], references: [roleId])
-  userRoleId    String
-  userStatus    String   @default("PENDING")
-  userCreatedAt DateTime @default(now())
-  userUpdatedAt DateTime @updatedAt
+  userId               String   @id @default(uuid())
+  userFirstName        String?
+  userFullName         String?
+  userPhone            String?
+  userEmail            String   @unique
+  userPassword         String?
+  userGoogleId         String?  @unique
+  userRole             role     @relation(fields: [userRoleId], references: [roleId])
+  userRoleId           String
+  userStatus           String   @default("PENDING")
+  userCreatedAt        DateTime @default(now())
+  userUpdatedAt        DateTime @updatedAt
+  userProfileUrl       String?
+  userEmergencyContact String?
 
   ownedProperties property[]       @relation("landlordProperties")
   leases          lease[]          @relation("tenantLeases")
@@ -158,6 +160,11 @@ model user {
   supportMessages     SupportMessage[]
   maintenanceRequests MaintenanceRequest[]
   visitorGroups       VisitorGroup[]
+
+  notificationSettings NotificationSetting?
+  reminders            Reminder[]
+
+  paymentMethods PaymentMethod[]
 
   @@map("user")
 }
@@ -517,4 +524,53 @@ model MaintenanceMessage {
 
   createdAt DateTime  @default(now())
   readAt    DateTime? // To show "Read" receipts
+}
+
+model PaymentMethod {
+  id     String @id @default(uuid())
+  userId String
+
+  // Paystack Data
+  authorizationCode String // The "Token" to charge the card later
+  last4             String // e.g., "4321"
+  cardType          String // e.g., "Visa", "Mastercard"
+  bank              String? // e.g., "GTBank"
+  expMonth          String
+  expYear           String
+
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user user @relation(fields: [userId], references: [userId])
+}
+
+model NotificationSetting {
+  id     String @id @default(uuid())
+  userId String @unique
+
+  // Matches the checkboxes in your UI
+  emailPayments    Boolean @default(true)
+  emailLease       Boolean @default(true)
+  emailMaintenance Boolean @default(true)
+  emailVisitors    Boolean @default(true)
+
+  // Future proofing for Push Notifications
+  pushPayments    Boolean @default(false)
+  pushMaintenance Boolean @default(false)
+
+  user user @relation(fields: [userId], references: [userId])
+}
+
+model Reminder {
+  id     String @id @default(uuid())
+  userId String
+
+  title       String // e.g. "Pay Rent"
+  description String?
+  dueAt       DateTime // When to remind
+
+  isSent    Boolean  @default(false) // Has the system sent the email/push yet?
+  createdAt DateTime @default(now())
+
+  user user @relation(fields: [userId], references: [userId])
 }
