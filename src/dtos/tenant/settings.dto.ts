@@ -57,3 +57,26 @@ export interface CreateReminderRequest {
   description?: string;
   dueAt: Date;
 }
+
+export const ChangePasswordSchema = z.object({
+  oldPassword: z.string().min(1, "Old password required"),
+  newPassword: z
+    .string()
+    .min(8, "New password must be at least 8 chars")
+    .regex(/[A-Z]/, "Must contain uppercase")
+    .regex(/[0-9]/, "Must contain number"),
+});
+
+export interface ChangePasswordRequest {
+  oldPassword: string;
+  newPassword: string;
+}
+
+// 2. Two-Factor Setup
+export const VerifyTwoFactorSchema = z.object({
+  otp: z.string().length(6, "OTP must be 6 digits"),
+});
+
+export interface VerifyTwoFactorRequest {
+  otp: string;
+}

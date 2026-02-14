@@ -166,6 +166,10 @@ model user {
 
   paymentMethods PaymentMethod[]
 
+  isTwoFactorEnabled Boolean @default(false)
+  twoFactorSecret    String?
+  twoFactorExpiry    DateTime?
+
   @@map("user")
 }
 

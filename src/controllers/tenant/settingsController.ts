@@ -19,6 +19,10 @@ import {
   CreateReminderSchema,
   UpdateNotificationSettingsRequest,
   UpdateNotificationSettingsSchema,
+  VerifyTwoFactorSchema,
+  VerifyTwoFactorRequest,
+  ChangePasswordSchema,
+  ChangePasswordRequest,
 } from "../../dtos/tenant/settings.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
@@ -134,5 +138,61 @@ export class SettingsController extends Controller {
       id,
     );
     return successResponse(result, "Reminder deleted");
+  }
+
+  /**
+   * Change Password
+   */
+  @Post("change-password")
+  @Security("jwt")
+  public async changePassword(
+    @Request() req: any,
+    @Body() body: ChangePasswordRequest,
+  ) {
+    validate(ChangePasswordSchema, body);
+    const result = await this.settingsService.changePassword(
+      req.user.userId,
+      body,
+    );
+    return successResponse(result, "Password changed successfully");
+  }
+
+  /**
+   * Step 1: Enable 2FA (Requests OTP)
+   */
+  @Post("2fa/enable")
+  @Security("jwt")
+  public async enableTwoFactor(@Request() req: any) {
+    const result = await this.settingsService.initiateTwoFactor(
+      req.user.userId,
+    );
+    return successResponse(result, "OTP sent to email");
+  }
+
+  /**
+   * Step 2: Confirm OTP (Actually turns it on)
+   */
+  @Post("2fa/confirm")
+  @Security("jwt")
+  public async confirmTwoFactor(
+    @Request() req: any,
+    @Body() body: VerifyTwoFactorRequest,
+  ) {
+    validate(VerifyTwoFactorSchema, body);
+    const result = await this.settingsService.confirmTwoFactor(
+      req.user.userId,
+      body.otp,
+    );
+    return successResponse(result, "2FA enabled successfully");
+  }
+
+  /**
+   * Disable 2FA
+   */
+  @Post("2fa/disable")
+  @Security("jwt")
+  public async disableTwoFactor(@Request() req: any) {
+    const result = await this.settingsService.disableTwoFactor(req.user.userId);
+    return successResponse(result, "2FA disabled");
   }
 }
