@@ -4,10 +4,14 @@ import {
   PaymentMethodResponse,
   CreateReminderRequest,
   UpdateNotificationSettingsRequest,
+  ChangePasswordRequest,
 } from "../../dtos/tenant/settings.dto";
 import { BadRequestError, NotFoundError } from "../../utils/apiError";
+import { ZeptoMailService } from "../external/zeptoMailService";
+import bcrypt from "bcrypt";
 
 export class SettingsService {
+  private emailService = new ZeptoMailService();
   /**
    * 1. GET FULL PROFILE
    * Populates the "Account Information" screen.
@@ -178,5 +182,115 @@ export class SettingsService {
     await prisma.reminder.delete({ where: { id: reminderId } });
 
     return { success: true };
+  }
+
+  /**
+   * 1. CHANGE PASSWORD
+   */
+  public async changePassword(userId: string, params: ChangePasswordRequest) {
+    const user = await prisma.user.findUnique({ where: { userId: userId } });
+    if (!user) throw new NotFoundError("User not found");
+
+    // A. Verify Old Password
+    const isValid = await bcrypt.compare(
+      params.oldPassword,
+      user.userPassword ?? "",
+    );
+    if (!isValid) throw new BadRequestError("Incorrect old password");
+
+    // B. Hash New Password
+    const hashedNew = await bcrypt.hash(params.newPassword, 10);
+
+    // C. Save
+    await prisma.user.update({
+      where: { userId: userId },
+      data: { userPassword: hashedNew },
+    });
+
+    // D. Notify (Security Best Practice)
+    await this.emailService.sendTemplateEmail(
+      {
+        email: user.userEmail,
+        name: user.userFullName?.split(" ")[0] || "User",
+      },
+      "SECURITY_PASSWORD_CHANGED",
+      { date: new Date().toLocaleString() },
+    );
+
+    return { success: true };
+  }
+
+  /**
+   * 2. INITIATE 2FA SETUP
+   * User clicks "Enable 2FA" -> We send an email with a code to confirm they have access.
+   */
+  public async initiateTwoFactor(userId: string) {
+    const user = await prisma.user.findUnique({ where: { userId: userId } });
+    if (!user) throw new NotFoundError("User not found");
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins from now
+
+    // Save OTP to DB (hashed is better, but plain for simplicity here)
+    await prisma.user.update({
+      where: { userId: userId },
+      data: {
+        twoFactorSecret: otp,
+        twoFactorExpiry: expiry,
+      },
+    });
+
+    // Send Email
+    await this.emailService.sendTemplateEmail(
+      {
+        email: user.userEmail,
+        name: user.userFullName?.split(" ")[0] || "User",
+      },
+      "SECURITY_2FA_CODE",
+      { code: otp },
+    );
+
+    return { message: "OTP sent to email" };
+  }
+
+  /**
+   * 3. CONFIRM & ENABLE 2FA
+   * User enters the code from email -> We enable the feature.
+   */
+  public async confirmTwoFactor(userId: string, otp: string) {
+    const user = await prisma.user.findUnique({ where: { userId: userId } });
+    if (!user) throw new NotFoundError("User not found");
+
+    if (user.twoFactorSecret !== otp) {
+      throw new BadRequestError("Invalid OTP");
+    }
+
+    if (!user.twoFactorExpiry || new Date() > user.twoFactorExpiry) {
+      throw new BadRequestError("OTP has expired");
+    }
+
+    // Success: Enable 2FA and clear the secret
+    await prisma.user.update({
+      where: { userId: userId },
+      data: {
+        isTwoFactorEnabled: true,
+        twoFactorSecret: null,
+        twoFactorExpiry: null,
+      },
+    });
+
+    return { success: true, message: "Two-Factor Authentication Enabled" };
+  }
+
+  /**
+   * 4. DISABLE 2FA
+   */
+  public async disableTwoFactor(userId: string) {
+    await prisma.user.update({
+      where: { userId: userId },
+      data: { isTwoFactorEnabled: false },
+    });
+    return { success: true, message: "Two-Factor Authentication Disabled" };
   }
 }
