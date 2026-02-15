@@ -20,10 +20,12 @@ import { GOOGLE_CLIENT_ID, JWTSECRET, MAIL_USER } from "../config/env";
 import { OAuth2Client } from "google-auth-library";
 import sendEmail from "../config/resend";
 import transporter from "../config/nodemailer";
+import { ZeptoMailService } from "./external/zeptoMailService";
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 export class AuthenticationService {
+  private emailService = new ZeptoMailService();
   public async register(
     params: RegisterRequest,
     token: string,
@@ -165,11 +167,48 @@ export class AuthenticationService {
     }
 
     if (user?.userStatus !== "ACTIVE") {
-      throw new UnauthorizedError(
-        "Account is not active. Please verify your email.",
-      );
+      throw new UnauthorizedError("Account is not active.");
     }
 
+    // === NEW: 2FA CHECK ===
+    if (user.isTwoFactorEnabled) {
+      // 1. Generate a random 6-digit code
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+      // 2. Save it to the database
+      await prisma.user.update({
+        where: { userId: user.userId },
+        data: {
+          twoFactorSecret: otp,
+          twoFactorExpiry: expiry,
+        },
+      });
+
+      const tempToken = jwt.sign(
+        { userId: user.userId, scope: "2FA_PENDING" },
+        process.env.JWT_SECRET || "secret",
+        { expiresIn: "5m" }, // Short life
+      );
+
+      // 3. Send the Email
+      // (Assume you have an emailService instance available)
+      await this.emailService.sendTemplateEmail(
+        { email: user.userEmail, name: user.userFullName ?? "Tenant" },
+        "LOGIN_OTP_TEMPLATE",
+        { code: otp },
+      );
+
+      // 4. Return a "Partial Login" response
+      // We do NOT return the full token yet.
+      return {
+        require2fa: true,
+        message: "OTP sent to email",
+        tempToken,
+      };
+    }
+
+    // === STANDARD LOGIN (If 2FA is OFF) ===
     const token = jwt.sign(
       {
         userId: user.userId,
@@ -181,14 +220,120 @@ export class AuthenticationService {
     );
 
     return {
+      require2fa: false,
       token,
       user: {
         id: user.userId,
         name: user.userFullName,
         role: user.userRole.roleName,
+        profilePicUrl: user.userProfileUrl,
       },
     };
   }
+
+  // Inside authService.ts
+
+  public async verifyLoginOtp(tempToken: string, otp: string) {
+    // 1. Decode the Temporary Token to get the User ID
+    let decoded: any;
+    try {
+      decoded = jwt.verify(tempToken, process.env.JWT_SECRET || "secret");
+    } catch (err) {
+      throw new UnauthorizedError("Invalid or expired 2FA session token.");
+    }
+
+    // Ensure this token is meant for 2FA, not a regular access token
+    if (decoded.scope !== "2FA_PENDING") {
+      throw new UnauthorizedError("Invalid token scope.");
+    }
+
+    const userId = decoded.userId;
+
+    // 2. Fetch User
+    const user = await prisma.user.findUnique({
+      where: { userId },
+      include: { userRole: true },
+    });
+
+    if (!user) throw new UnauthorizedError("User not found");
+
+    // 3. Validate OTP (Same as before)
+    if (user.twoFactorSecret !== otp) {
+      throw new UnauthorizedError("Invalid OTP code");
+    }
+
+    if (!user.twoFactorExpiry || new Date() > user.twoFactorExpiry) {
+      throw new UnauthorizedError("OTP has expired. Please login again.");
+    }
+
+    // 4. Clear OTP
+    await prisma.user.update({
+      where: { userId },
+      data: { twoFactorSecret: null, twoFactorExpiry: null },
+    });
+
+    // 5. Issue the REAL Access Token
+    const finalToken = jwt.sign(
+      {
+        userId: user.userId,
+        email: user.userEmail,
+        role: user.userRole.roleName,
+      },
+      process.env.JWT_SECRET || "secret",
+      { expiresIn: "1h" },
+    );
+
+    return {
+      token: finalToken,
+      user: {
+        id: user.userId,
+        name: user.userFullName,
+        role: user.userRole.roleName,
+        profilePicUrl: user.userProfileUrl,
+      },
+    };
+  }
+
+  // public async login(params: LoginRequest) {
+  //   const user = await prisma.user.findUnique({
+  //     where: { userEmail: params.email },
+  //     include: { userRole: true },
+  //   });
+
+  //   if (
+  //     !user ||
+  //     !(await bcrypt.compare(params.password, user.userPassword ?? ""))
+  //   ) {
+  //     throw new UnauthorizedError("Invalid email or password");
+  //   }
+
+  //   if (user?.userStatus !== "ACTIVE") {
+  //     throw new UnauthorizedError(
+  //       "Account is not active. Please verify your email.",
+  //     );
+  //   }
+
+  //   const token = jwt.sign(
+  //     {
+  //       userId: user.userId,
+  //       email: user.userEmail,
+  //       role: user.userRole.roleName,
+  //     },
+  //     process.env.JWT_SECRET || "secret",
+  //     { expiresIn: "1h" },
+  //   );
+
+  //   return {
+  //     token,
+  //     user: {
+  //       id: user.userId,
+  //       name: user.userFullName,
+  //       role: user.userRole.roleName,
+  //       profilePicUrl: user.userProfileUrl,
+
+  //     },
+  //   };
+  // }
 
   // public async loginWithGoogle(params: GoogleLoginRequest) {
   //   const ticket = await googleClient.verifyIdToken({
