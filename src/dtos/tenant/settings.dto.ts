@@ -79,4 +79,5 @@ export const VerifyTwoFactorSchema = z.object({
 
 export interface VerifyTwoFactorRequest {
   otp: string;
+  tempToken: string;
 }
