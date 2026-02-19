@@ -9,6 +9,7 @@ import {
   Request,
   Path,
   Patch,
+  Delete,
 } from "tsoa";
 import { MaintenanceService } from "../../services/tenant/maintenanceService";
 import {
@@ -107,5 +108,19 @@ export class MaintenanceController extends Controller {
     );
 
     return successResponse(result, "Maintenance request updated successfully");
+  }
+
+  /**
+   * Delete a Maintenance Request
+   * Constraints: User must be owner + Status must be PENDING.
+   */
+  @Delete("{requestId}")
+  @Security("jwt")
+  public async deleteRequest(@Request() req: any, @Path() requestId: string) {
+    const result = await this.maintenanceService.deleteRequest(
+      requestId,
+      req.user.userId,
+    );
+    return successResponse(result, "Request deleted");
   }
 }

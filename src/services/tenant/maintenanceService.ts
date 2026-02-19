@@ -200,4 +200,41 @@ export class MaintenanceService {
 
     return updatedTicket;
   }
+
+  /**
+   * DELETE REQUEST
+   * Only allowed if status is PENDING.
+   */
+  public async deleteRequest(requestId: string, userId: string) {
+    // 1. Fetch the request to check permissions
+    const request = await prisma.maintenanceRequest.findUnique({
+      where: { id: requestId },
+    });
+
+    if (!request) {
+      throw new NotFoundError("Maintenance request not found");
+    }
+
+    // 2. Check Ownership
+    if (request.tenantId !== userId) {
+      throw new BadRequestError("You can only delete your own requests.");
+    }
+
+    // 3. Check Status (Critical Step)
+    if (request.status !== "PENDING") {
+      throw new BadRequestError(
+        `Cannot delete this request because it is ${request.status}. Please contact the facility manager instead.`,
+      );
+    }
+
+    // 4. Perform Delete
+    await prisma.maintenanceRequest.delete({
+      where: { id: requestId },
+    });
+
+    return {
+      success: true,
+      message: "Maintenance request deleted successfully",
+    };
+  }
 }
