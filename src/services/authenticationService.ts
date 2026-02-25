@@ -345,7 +345,6 @@ export class AuthenticationService {
     // === NO 2FA (STANDARD LOGIN) ===
 
     // 1. Generate 15-minute Access Token
-    console.log("🚨🚨🚨 HIT THE NEW LOGIN SERVICE 🚨🚨🚨");
     const token = jwt.sign(
       { userId: user.userId, role: user.userRole.roleName },
       privateKey,

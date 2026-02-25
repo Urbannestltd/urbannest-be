@@ -7,6 +7,7 @@ import {
   Security,
   Request,
   Get,
+  Query,
 } from "tsoa";
 import { VisitorService } from "../../services/tenant/visitorService";
 import {
@@ -14,6 +15,7 @@ import {
   CreateBulkInviteSchema,
   CreateInviteRequest,
   CreateBulkInviteRequest,
+  VisitorPeriodFilter,
 } from "../../dtos/tenant/visitor.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
@@ -101,5 +103,23 @@ export class VisitorController extends Controller {
 
     const result = await this.visitorService.checkOutVisitor(body.accessCode);
     return successResponse(result, "Visitor checked out");
+  }
+
+  @Get("stats")
+  @Security("jwt", ["TENANT", "ADMIN"])
+  public async getVisitorStats(
+    @Request() req: any,
+    @Query() period: VisitorPeriodFilter = "TODAY",
+  ) {
+    const stats = await this.visitorService.getVisitorStats(
+      period,
+      req.user.tenantId,
+    );
+
+    return {
+      success: true,
+      message: "Visitor statistics retrieved successfully",
+      data: stats,
+    };
   }
 }

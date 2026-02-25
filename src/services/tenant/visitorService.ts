@@ -2,6 +2,8 @@ import { prisma } from "../../config/prisma";
 import {
   CreateBulkInviteRequest,
   CreateInviteRequest,
+  VisitorPeriodFilter,
+  VisitorStatsResponse,
 } from "../../dtos/tenant/visitor.dto";
 import { NotFoundError, BadRequestError } from "../../utils/apiError";
 import { ZeptoMailService } from "./../external/zeptoMailService"; // Reuse your email service
@@ -257,5 +259,54 @@ export class VisitorService {
         status: record.status,
       };
     });
+  }
+
+  public async getVisitorStats(
+    period: VisitorPeriodFilter,
+    tenantId: string,
+  ): Promise<VisitorStatsResponse> {
+    const now = new Date();
+    let startDate = new Date();
+
+    switch (period) {
+      case "TODAY":
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case "LAST_WEEK":
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "LAST_MONTH":
+        startDate.setDate(now.getDate() - 30);
+        break;
+      default:
+        startDate.setHours(0, 0, 0, 0);
+    }
+
+    const baseWhere = {
+      createdAt: {
+        gte: startDate,
+        lte: now,
+      },
+      tenantId: tenantId,
+    };
+
+    const [totalVisitors, totalScheduled, totalWalkIns] =
+      await prisma.$transaction([
+        prisma.visitorInvite.count({ where: baseWhere }),
+
+        prisma.visitorInvite.count({
+          where: { ...baseWhere, isWalkIn: false },
+        }),
+
+        prisma.visitorInvite.count({
+          where: { ...baseWhere, isWalkIn: true },
+        }),
+      ]);
+
+    return {
+      totalVisitors,
+      totalScheduled,
+      totalWalkIns,
+    };
   }
 }

@@ -6,7 +6,7 @@
   "scripts": {
     "postinstall": "prisma generate && npx tsoa spec-and-routes",
     "start": "node dist/server.js",
-    "dev": "nodemon --watch src --ext ts --exec ts-node src/app.ts",
+    "dev": "nodemon",
     "tsoa": "tsoa spec-and-routes",
     "build": "npm run tsoa && tsc"
   },

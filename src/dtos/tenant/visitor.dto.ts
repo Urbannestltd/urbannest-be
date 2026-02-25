@@ -51,3 +51,11 @@ export interface CreateBulkInviteRequest {
   startDate: string;
   endDate: string;
 }
+
+export type VisitorPeriodFilter = "TODAY" | "LAST_WEEK" | "LAST_MONTH";
+
+export interface VisitorStatsResponse {
+  totalVisitors: number;
+  totalScheduled: number;
+  totalWalkIns: number;
+}
