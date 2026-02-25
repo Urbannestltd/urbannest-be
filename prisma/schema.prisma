@@ -166,11 +166,22 @@ model user {
 
   paymentMethods PaymentMethod[]
 
-  isTwoFactorEnabled Boolean @default(false)
+  isTwoFactorEnabled Boolean   @default(false)
   twoFactorSecret    String?
   twoFactorExpiry    DateTime?
+  sessions           Session[]
 
   @@map("user")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         user     @relation(fields: [userId], references: [userId])
+  refreshToken String   @unique // Cryptographically secure 64-byte hex string
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  isValid      Boolean  @default(true)
 }
 
 model role {

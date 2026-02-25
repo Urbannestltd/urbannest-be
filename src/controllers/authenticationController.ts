@@ -32,17 +32,14 @@ import {
   VerifyTwoFactorRequest,
   VerifyTwoFactorSchema,
 } from "../dtos/tenant/settings.dto";
-
-interface Authentication {
-  id: number;
-  name: string;
-  email: string;
-}
+import { SessionService } from "../services/sessionService";
+import { RefreshTokenRequest } from "../dtos/session.dto";
 
 @Route("auth")
 @Tags("Authentication")
 export class AuthenticationController extends Controller {
   private authenticationService = new AuthenticationService();
+  private sessionService = new SessionService();
 
   /**
    * Initiates registration for a new user.
@@ -132,5 +129,33 @@ export class AuthenticationController extends Controller {
       await this.authenticationService.resetPassword(validatedBody);
 
     return await this.authenticationService.resetPassword(validatedBody);
+  }
+
+  @Post("refresh")
+  @SuccessResponse("200", "Token refreshed successfully")
+  public async refreshToken(@Body() body: RefreshTokenRequest) {
+    try {
+      const result = await this.sessionService.refreshAccessToken(
+        body.refreshToken,
+      );
+      return { success: true, data: result };
+    } catch (error: any) {
+      this.setStatus(401);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Log out a user
+   * This permanently invalidates the session in the database.
+   */
+  @Post("logout")
+  @SuccessResponse("200", "Logged out successfully")
+  public async logout(@Body() body: RefreshTokenRequest) {
+    // Note: You will need a quick helper method in your SessionService
+    // to find and invalidate the session using the refreshToken.
+    await this.sessionService.invalidateSession(body.refreshToken);
+
+    return { success: true, message: "Logged out successfully" };
   }
 }
