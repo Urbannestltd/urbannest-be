@@ -34,8 +34,10 @@ export interface DashboardOverviewResponse {
     scheduledCount: number;
     list: Array<{
       id: string;
-      name: string;
-      phone: string;
+      visitorName: string;
+      visitorPhone: string;
+      isGroupInvite: boolean;
+      groupName: string | null; // e.g., "Group Invite (groupId)"
       status: InviteStatus;
       accessType: string; // "One-off"
       timeIn: string | null; // "11:43 AM"
