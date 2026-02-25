@@ -6,6 +6,7 @@ import {
   LoginRequest,
   ResetPasswordRequest,
   VerifyOtpRequest,
+  TempTokenPayload,
 } from "../dtos/auth.dto";
 import {
   UnauthorizedError,
@@ -14,18 +15,32 @@ import {
   NotFoundError,
 } from "../utils/apiError";
 import * as jwt from "jsonwebtoken";
+import crypto from "crypto";
 import * as bcrypt from "bcrypt";
 import { ApiResponse } from "../dtos/apiResponse";
-import { GOOGLE_CLIENT_ID, JWTSECRET, MAIL_USER } from "../config/env";
+import {
+  GOOGLE_CLIENT_ID,
+  JWT_PRIVATE_KEY,
+  JWTSECRET,
+  MAIL_USER,
+} from "../config/env";
 import { OAuth2Client } from "google-auth-library";
 import sendEmail from "../config/resend";
 import transporter from "../config/nodemailer";
+import { JwtPayload } from "jsonwebtoken";
 import { ZeptoMailService } from "./external/zeptoMailService";
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 export class AuthenticationService {
   private emailService = new ZeptoMailService();
+  private get jwtSecret(): string {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error("FATAL: JWT_SECRET environment variable is not defined.");
+    }
+    return secret;
+  }
   public async register(
     params: RegisterRequest,
     token: string,
@@ -107,15 +122,19 @@ export class AuthenticationService {
     };
   }
 
-  public async verifyOtp(params: VerifyOtpRequest) {
+  public async verifyOtp(params: { email: string; otp: string }) {
     const user = await prisma.user.findUnique({
       where: { userEmail: params.email },
       select: {
         userId: true,
         otpLogs: {
           where: {
-            AND: [{ otpLogStatus: "ACTIVE", otpLogExpiry: { gt: new Date() } }],
+            otpLogStatus: "ACTIVE",
+            otpLogExpiry: { gt: new Date() },
           },
+          // Ensure we get the most recently generated OTP if multiple exist
+          orderBy: { otpLogCreatedAt: "desc" },
+          take: 1,
           select: {
             otpLogId: true,
             otpLogHash: true,
@@ -126,32 +145,131 @@ export class AuthenticationService {
 
     if (!user) throw new NotFoundError("User not found");
 
-    const otpCompare: string = user.otpLogs[0]?.otpLogHash ?? "";
+    const latestOtp = user.otpLogs[0];
 
-    const otpHashCompare = await bcrypt.compare(params.otp, otpCompare);
+    // Early return if no active OTP exists
+    if (!latestOtp) {
+      throw new BadRequestError("Invalid or Expired OTP, Please try again");
+    }
+
+    const otpHashCompare = await bcrypt.compare(
+      params.otp,
+      latestOtp.otpLogHash,
+    );
 
     if (!otpHashCompare) {
       throw new BadRequestError("Invalid or Expired OTP, Please try again");
     }
 
-    await prisma.user.update({
-      where: { userId: user.userId },
-      data: {
-        userStatus: "ACTIVE",
-      },
-    });
-
-    await prisma.otpLogs.update({
-      where: {
-        otpLogId: user.otpLogs[0]?.otpLogId ?? "",
-      },
-      data: {
-        otpLogStatus: "INACTIVE",
-      },
-    });
+    // Use a transaction to guarantee data integrity
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { userId: user.userId },
+        data: { userStatus: "ACTIVE" },
+      }),
+      prisma.otpLogs.update({
+        where: { otpLogId: latestOtp.otpLogId },
+        data: { otpLogStatus: "INACTIVE" },
+      }),
+    ]);
 
     return { success: true, message: "Account verified successfully" };
   }
+
+  // public async login(params: LoginRequest) {
+  //   const user = await prisma.user.findUnique({
+  //     where: { userEmail: params.email },
+  //     include: { userRole: true },
+  //   });
+
+  //   if (
+  //     !user ||
+  //     !(await bcrypt.compare(params.password, user.userPassword ?? ""))
+  //   ) {
+  //     throw new UnauthorizedError("Invalid email or password");
+  //   }
+
+  //   if (user?.userStatus !== "ACTIVE") {
+  //     throw new UnauthorizedError("Account is not active.");
+  //   }
+
+  //   // --- SECURITY ENFORCEMENT ---
+  //   // Extract and validate the RS256 Private Key early so we can use it for both tokens
+  //   if (!JWT_PRIVATE_KEY) {
+  //     throw new Error(
+  //       "FATAL: JWT_PRIVATE_KEY environment variable is not defined.",
+  //     );
+  //   }
+  //   const privateKey = Buffer.from(JWT_PRIVATE_KEY, "base64").toString("ascii");
+
+  //   // === NEW: 2FA CHECK ===
+  //   if (user.isTwoFactorEnabled) {
+  //     // 1. Generate a random 6-digit code
+  //     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  //     const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+  //     // 2. Save it to the database
+  //     await prisma.user.update({
+  //       where: { userId: user.userId },
+  //       data: {
+  //         twoFactorSecret: otp,
+  //         twoFactorExpiry: expiry,
+  //       },
+  //     });
+
+  //     // 3. Sign tempToken using RS256 instead of the vulnerable HS256 secret
+  //     const tempToken = jwt.sign(
+  //       { userId: user.userId, scope: "2FA_PENDING" },
+  //       privateKey,
+  //       { algorithm: "RS256", expiresIn: "5m" }, // Short life
+  //     );
+
+  //     // 4. Send the Email
+  //     await this.emailService.sendTemplateEmail(
+  //       { email: user.userEmail, name: user.userFullName ?? "Tenant" },
+  //       "LOGIN_OTP_TEMPLATE",
+  //       { code: otp },
+  //     );
+
+  //     // 5. Return a "Partial Login" response
+  //     return {
+  //       require2fa: true,
+  //       message: "OTP sent to email",
+  //       tempToken,
+  //     };
+  //   }
+
+  //   // 1. Generate 15-minute Access Token
+  //   const token = jwt.sign(
+  //     { userId: user.userId, role: user.userRole.roleName },
+  //     privateKey,
+  //     { algorithm: "RS256", expiresIn: "15m" },
+  //   );
+
+  //   // 2. Generate Cryptographically Secure Refresh Token
+  //   const refreshToken = crypto.randomBytes(64).toString("hex");
+
+  //   // 3. Create Server-Side Session
+  //   await prisma.session.create({
+  //     data: {
+  //       userId: user.userId,
+  //       refreshToken: refreshToken,
+  //     },
+  //   });
+
+  //   // 4. Return FULL payload
+  //   return {
+  //     require2fa: false,
+  //     token,
+  //     refreshToken,
+  //     user: {
+  //       id: user.userId,
+  //       name: user.userFullName,
+  //       role: user.userRole.roleName,
+  //       profilePicUrl: user.userProfileUrl,
+  //     },
+  //   };
+  // }
 
   public async login(params: LoginRequest) {
     const user = await prisma.user.findUnique({
@@ -170,37 +288,53 @@ export class AuthenticationService {
       throw new UnauthorizedError("Account is not active.");
     }
 
-    // === NEW: 2FA CHECK ===
-    if (user.isTwoFactorEnabled) {
-      // 1. Generate a random 6-digit code
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    // --- SECURITY ENFORCEMENT ---
+    if (!process.env.JWT_PRIVATE_KEY) {
+      throw new Error(
+        "FATAL: JWT_PRIVATE_KEY environment variable is not defined.",
+      );
+    }
+    const privateKey = Buffer.from(
+      process.env.JWT_PRIVATE_KEY,
+      "base64",
+    ).toString("ascii");
 
-      // 2. Save it to the database
+    // === 2FA CHECK ===
+    if (user.isTwoFactorEnabled) {
+      // 1. Generate a cryptographically secure 6-digit code
+      const otp = crypto.randomInt(100000, 1000000).toString();
+
+      // Align expiry to 5 minutes for both DB and Token
+      const expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+      // 2. Hash the OTP BEFORE saving to the database
+      const saltRounds = 10;
+      const hashedOtp = await bcrypt.hash(otp, saltRounds);
+
+      // 3. Save the HASHED secret to the database
       await prisma.user.update({
         where: { userId: user.userId },
         data: {
-          twoFactorSecret: otp,
+          twoFactorSecret: hashedOtp, // Now matches your verifyLoginOtp logic!
           twoFactorExpiry: expiry,
         },
       });
 
+      // 4. Sign tempToken using RS256
       const tempToken = jwt.sign(
         { userId: user.userId, scope: "2FA_PENDING" },
-        process.env.JWT_SECRET || "secret",
-        { expiresIn: "5m" }, // Short life
+        privateKey,
+        { algorithm: "RS256", expiresIn: "5m" }, // Matches the 5m DB expiry
       );
 
-      // 3. Send the Email
-      // (Assume you have an emailService instance available)
+      // 5. Send the Email (Send the raw 'otp', NOT the hash)
       await this.emailService.sendTemplateEmail(
         { email: user.userEmail, name: user.userFullName ?? "Tenant" },
         "LOGIN_OTP_TEMPLATE",
-        { code: otp },
+        { code: otp }, // The user gets the readable code
       );
 
-      // 4. Return a "Partial Login" response
-      // We do NOT return the full token yet.
+      // 6. Return a "Partial Login" response
       return {
         require2fa: true,
         message: "OTP sent to email",
@@ -208,20 +342,32 @@ export class AuthenticationService {
       };
     }
 
-    // === STANDARD LOGIN (If 2FA is OFF) ===
+    // === NO 2FA (STANDARD LOGIN) ===
+
+    // 1. Generate 15-minute Access Token
+    console.log("🚨🚨🚨 HIT THE NEW LOGIN SERVICE 🚨🚨🚨");
     const token = jwt.sign(
-      {
-        userId: user.userId,
-        email: user.userEmail,
-        role: user.userRole.roleName,
-      },
-      process.env.JWT_SECRET || "secret",
-      { expiresIn: "1h" },
+      { userId: user.userId, role: user.userRole.roleName },
+      privateKey,
+      { algorithm: "RS256", expiresIn: "15m" },
     );
 
+    // 2. Generate Cryptographically Secure Refresh Token
+    const refreshToken = crypto.randomBytes(64).toString("hex");
+
+    // 3. Create Server-Side Session
+    await prisma.session.create({
+      data: {
+        userId: user.userId,
+        refreshToken: refreshToken,
+      },
+    });
+
+    // 4. Return FULL payload
     return {
       require2fa: false,
       token,
+      refreshToken,
       user: {
         id: user.userId,
         name: user.userFullName,
@@ -231,25 +377,22 @@ export class AuthenticationService {
     };
   }
 
-  // Inside authService.ts
-
   public async verifyLoginOtp(tempToken: string, otp: string) {
-    // 1. Decode the Temporary Token to get the User ID
-    let decoded: any;
+    let decoded: TempTokenPayload;
+
     try {
-      decoded = jwt.verify(tempToken, process.env.JWT_SECRET || "secret");
+      // Strictly use the getter to avoid fallback to "secret"
+      decoded = jwt.verify(tempToken, this.jwtSecret) as TempTokenPayload;
     } catch (err) {
       throw new UnauthorizedError("Invalid or expired 2FA session token.");
     }
 
-    // Ensure this token is meant for 2FA, not a regular access token
     if (decoded.scope !== "2FA_PENDING") {
       throw new UnauthorizedError("Invalid token scope.");
     }
 
     const userId = decoded.userId;
 
-    // 2. Fetch User
     const user = await prisma.user.findUnique({
       where: { userId },
       include: { userRole: true },
@@ -257,30 +400,37 @@ export class AuthenticationService {
 
     if (!user) throw new UnauthorizedError("User not found");
 
-    // 3. Validate OTP (Same as before)
-    if (user.twoFactorSecret !== otp) {
-      throw new UnauthorizedError("Invalid OTP code");
-    }
-
+    // Check expiry BEFORE running expensive bcrypt operations
     if (!user.twoFactorExpiry || new Date() > user.twoFactorExpiry) {
       throw new UnauthorizedError("OTP has expired. Please login again.");
     }
 
-    // 4. Clear OTP
+    if (!user.twoFactorSecret) {
+      throw new UnauthorizedError("No active 2FA request found.");
+    }
+
+    // Hash comparison for the 2FA secret
+    const isOtpValid = await bcrypt.compare(otp, user.twoFactorSecret);
+
+    if (!isOtpValid) {
+      throw new UnauthorizedError("Invalid OTP code");
+    }
+
+    // Clear the OTP data
     await prisma.user.update({
       where: { userId },
       data: { twoFactorSecret: null, twoFactorExpiry: null },
     });
 
-    // 5. Issue the REAL Access Token
+    // Issue the REAL Access Token
     const finalToken = jwt.sign(
       {
         userId: user.userId,
         email: user.userEmail,
         role: user.userRole.roleName,
       },
-      process.env.JWT_SECRET || "secret",
-      { expiresIn: "1h" },
+      this.jwtSecret,
+      { expiresIn: "15m" },
     );
 
     return {
@@ -293,111 +443,6 @@ export class AuthenticationService {
       },
     };
   }
-
-  // public async login(params: LoginRequest) {
-  //   const user = await prisma.user.findUnique({
-  //     where: { userEmail: params.email },
-  //     include: { userRole: true },
-  //   });
-
-  //   if (
-  //     !user ||
-  //     !(await bcrypt.compare(params.password, user.userPassword ?? ""))
-  //   ) {
-  //     throw new UnauthorizedError("Invalid email or password");
-  //   }
-
-  //   if (user?.userStatus !== "ACTIVE") {
-  //     throw new UnauthorizedError(
-  //       "Account is not active. Please verify your email.",
-  //     );
-  //   }
-
-  //   const token = jwt.sign(
-  //     {
-  //       userId: user.userId,
-  //       email: user.userEmail,
-  //       role: user.userRole.roleName,
-  //     },
-  //     process.env.JWT_SECRET || "secret",
-  //     { expiresIn: "1h" },
-  //   );
-
-  //   return {
-  //     token,
-  //     user: {
-  //       id: user.userId,
-  //       name: user.userFullName,
-  //       role: user.userRole.roleName,
-  //       profilePicUrl: user.userProfileUrl,
-
-  //     },
-  //   };
-  // }
-
-  // public async loginWithGoogle(params: GoogleLoginRequest) {
-  //   const ticket = await googleClient.verifyIdToken({
-  //     idToken: params.idToken,
-  //     audience: process.env.GOOGLE_CLIENT_ID,
-  //   });
-
-  //   const payload = ticket.getPayload();
-  //   if (!payload || !payload.email) {
-  //     throw new BadRequestError("Invalid Google Token");
-  //   }
-
-  //   console.log(payload);
-
-  //   const { email, sub: googleId, given_name, family_name, name } = payload;
-
-  //   let user = await prisma.user.findUnique({
-  //     where: { userEmail: email },
-  //     include: { userRole: true },
-  //   });
-
-  //   if (!user) {
-  //     user = await prisma.user.create({
-  //       data: {
-  //         userEmail: email,
-  //         userFullName: name || `${given_name} ${family_name}`,
-  //         userStatus: "ACTIVE",
-  //         userGoogleId: googleId,
-  //         userRole: {
-  //           connectOrCreate: {
-  //             where: { roleName: "TENANT" },
-  //             create: { roleName: "TENANT" },
-  //           },
-  //         },
-  //       },
-  //       include: { userRole: true },
-  //     });
-  //   } else if (!user.userGoogleId) {
-  //     user = await prisma.user.update({
-  //       where: { userId: user.userId },
-  //       data: { userGoogleId: googleId },
-  //       include: { userRole: true },
-  //     });
-  //   }
-
-  //   const token = jwt.sign(
-  //     {
-  //       userId: user?.userId,
-  //       email: user?.userEmail ?? "",
-  //       role: user?.userRole?.roleName ?? "",
-  //     },
-  //     JWTSECRET || "secret",
-  //     { expiresIn: "1h" }
-  //   );
-
-  //   return {
-  //     token,
-  //     user: {
-  //       id: user.userId,
-  //       name: user.userFullName,
-  //       role: user.userRole?.roleName,
-  //     },
-  //   };
-  // }
 
   public async forgotPassword(params: ForgotPasswordRequest) {
     const user = await prisma.user.findUnique({

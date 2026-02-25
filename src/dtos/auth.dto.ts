@@ -1,3 +1,4 @@
+import { JwtPayload } from "jsonwebtoken";
 import { z } from "zod";
 
 export const RegisterSchema = z.object({
@@ -64,4 +65,9 @@ export const ResetPasswordSchema = z.object({
 export interface ResetPasswordRequest {
   token: string;
   newPassword: string;
+}
+
+export interface TempTokenPayload extends JwtPayload {
+  userId: string;
+  scope: string;
 }
