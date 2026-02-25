@@ -417,6 +417,7 @@ model VisitorInvite {
   type      VisitorType     @default(GUEST)
   frequency InviteFrequency @default(ONE_OFF)
   status    InviteStatus    @default(ACTIVE)
+  isWalkIn   Boolean         @default(false) // New field to identify walk-ins
 
   // Relations
   tenant user @relation(fields: [tenantId], references: [userId])
