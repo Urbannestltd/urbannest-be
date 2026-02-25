@@ -84,12 +84,15 @@ export class DashboardService {
         validFrom: { gte: todayStart, lte: todayEnd },
       },
       orderBy: { validFrom: "asc" },
+      include: { group: true },
     });
 
     const formattedVisitors = visitors.map((v) => ({
       id: v.id,
-      name: v.visitorName,
-      phone: v.visitorPhone || "-",
+      visitorName: v.visitorName,
+      visitorPhone: v.visitorPhone || "-",
+      groupName: v.group?.name ? `Group Invite (${v.groupId})` : null,
+      isGroupInvite: !!v.groupId,
       status: v.status,
       accessType: v.frequency === "ONE_OFF" ? "One-off" : "Recurring",
       timeIn: v.checkedInAt
@@ -119,9 +122,8 @@ export class DashboardService {
         total: activeCount + completedCount,
       },
       visitorsToday: {
-        walkInCount: visitors.filter((v) => v.frequency === "ONE_OFF").length, // Adjust logic based on your definition of Walk-in
-        scheduledCount: visitors.filter((v) => v.frequency !== "ONE_OFF")
-          .length,
+        walkInCount: visitors.filter((v) => v.isWalkIn).length, // Adjust logic based on your definition of Walk-in
+        scheduledCount: visitors.filter((v) => v.isWalkIn === false).length,
         list: formattedVisitors,
       },
       recentActivity: [],
