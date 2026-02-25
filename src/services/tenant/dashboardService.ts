@@ -94,6 +94,14 @@ export class DashboardService {
       groupName: v.group?.name ? `Group Invite (${v.groupId})` : null,
       isGroupInvite: !!v.groupId,
       status: v.status,
+      scheduledDate: new Date(v.validFrom).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      validUntil: new Date(v.validUntil).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
       accessType: v.frequency === "ONE_OFF" ? "One-off" : "Recurring",
       timeIn: v.checkedInAt
         ? new Date(v.checkedInAt).toLocaleTimeString([], {
