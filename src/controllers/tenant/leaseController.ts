@@ -2,8 +2,8 @@ import { Controller, Get, Route, Tags, Security, Request, Path } from "tsoa";
 import { LeaseService } from "../../services/tenant/leaseService";
 import { successResponse } from "../../utils/responseHelper";
 
-@Route("leases")
-@Tags("Lease Management")
+@Route("tenant/leases")
+@Tags("Tenant - Lease Management")
 export class LeaseController extends Controller {
   private leaseService = new LeaseService();
 

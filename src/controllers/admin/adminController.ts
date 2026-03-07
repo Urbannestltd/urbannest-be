@@ -1,5 +1,13 @@
 import * as express from "express";
-import { Body, SuccessResponse, Route, Controller, Tags, Post } from "tsoa";
+import {
+  Body,
+  SuccessResponse,
+  Route,
+  Controller,
+  Tags,
+  Post,
+  Security,
+} from "tsoa";
 import {
   AdminCreateUserRequest,
   AdminCreateUserSchema,
@@ -10,12 +18,13 @@ import { AdminService } from "../../services/admin/adminService";
 
 @Route("admin")
 @Tags("Admin")
+@Security("jwt", ["ADMIN"])
 export class AdminController extends Controller {
   private adminService = new AdminService();
   @Post("create-user")
   @SuccessResponse("201", "User Created")
   public async createUser(
-    @Body() body: AdminCreateUserRequest
+    @Body() body: AdminCreateUserRequest,
   ): Promise<ApiResponse<any>> {
     const validation = await validate(AdminCreateUserSchema, body);
 

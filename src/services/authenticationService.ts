@@ -78,16 +78,6 @@ export class AuthenticationService {
             data: { userRegistrationLinkUsed: true },
           },
         },
-        userRole: {
-          connectOrCreate: {
-            where: {
-              roleName: params.userRoleName,
-            },
-            create: {
-              roleName: params.userRoleName,
-            },
-          },
-        },
         userStatus: "ACTIVE",
       },
     });

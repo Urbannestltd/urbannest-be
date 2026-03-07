@@ -16,8 +16,8 @@ import {
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate"; // Wrapper around Zod parse
 
-@Route("rent")
-@Tags("Rent Management")
+@Route("tenant/rent")
+@Tags("Tenant - Rent Management")
 export class RentController extends Controller {
   private rentService = new RentService();
 

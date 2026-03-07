@@ -27,8 +27,8 @@ import {
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
 
-@Route("settings")
-@Tags("Account Settings")
+@Route("tenant/settings")
+@Tags("Tenant - Account Settings")
 export class SettingsController extends Controller {
   private settingsService = new SettingsService();
 
