@@ -53,10 +53,10 @@ export class AdminService {
         userRole: {
           connectOrCreate: {
             where: {
-              roleName: "TENANT",
+              roleName: params.userRole,
             },
             create: {
-              roleName: "TENANT",
+              roleName: params.userRole ? params.userRole : "TENANT",
             },
           },
         },

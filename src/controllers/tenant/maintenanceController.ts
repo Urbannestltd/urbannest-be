@@ -23,8 +23,8 @@ import {
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
 
-@Route("maintenance")
-@Tags("Maintenance Requests")
+@Route("tenant/maintenance")
+@Tags("Tenant - Maintenance Requests")
 export class MaintenanceController extends Controller {
   private maintenanceService = new MaintenanceService();
 

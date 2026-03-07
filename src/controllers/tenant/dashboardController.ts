@@ -2,8 +2,8 @@ import { Controller, Get, Route, Tags, Security, Request, Query } from "tsoa";
 import { DashboardService } from "../../services/tenant/dashboardService";
 import { successResponse } from "../../utils/responseHelper";
 
-@Route("dashboard")
-@Tags("Dashboard")
+@Route("tenant/dashboard")
+@Tags("Tenant - Dashboard")
 export class DashboardController extends Controller {
   private service = new DashboardService();
 

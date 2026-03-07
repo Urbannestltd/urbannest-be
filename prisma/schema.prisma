@@ -269,6 +269,8 @@ model property {
 model unit {
   id        String     @id @default(uuid()) @map("unit_id")
   name      String     @map("name") // "Apt 4B"
+  floor     String?    @map("floor") // e.g., "First Floor", "Second Floor"
+  baseRent  Float?     @map("base_rent") // Expected rent (e.g., 2000000)
   bedrooms  Int        @default(1) @map("bedrooms")
   bathrooms Float      @default(1.0) @map("bathrooms")
   status    UnitStatus @default(AVAILABLE) @map("status")
@@ -430,37 +432,6 @@ model VisitorInvite {
   @@index([accessCode])
   @@index([groupId]) // Index for fetching "All guests in this group"
 }
-
-// model VisitorInvite {
-//   id       String @id @default(uuid())
-//   tenantId String
-//   unitId   String
-
-//   visitorName  String
-//   visitorPhone String?
-
-//   accessCode String @unique
-
-//   // TIME CONTROL
-//   validFrom  DateTime // Start of the window (e.g. 9:00 AM)
-//   validUntil DateTime // End of the window (e.g. 5:00 PM)
-
-//   // CATEGORIZATION
-//   type      VisitorType     @default(GUEST) // Who is it?
-//   frequency InviteFrequency @default(ONE_OFF) // One-off or Recurring?
-
-//   status InviteStatus @default(ACTIVE)
-
-//   // Relations
-//   tenant user @relation(fields: [tenantId], references: [userId])
-//   unit   unit @relation(fields: [unitId], references: [id])
-
-//   createdAt    DateTime  @default(now())
-//   checkedInAt  DateTime?
-//   checkedOutAt DateTime?
-
-//   @@index([accessCode])
-// }
 
 model SupportTicket {
   id       String @id @default(uuid())

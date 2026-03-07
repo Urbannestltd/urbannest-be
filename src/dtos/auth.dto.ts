@@ -18,7 +18,6 @@ export interface RegisterRequest {
   userPassword: string;
   userFullName?: string;
   userPhone?: string;
-  userRoleName: string;
 }
 
 export const VerifyOtpSchema = z.object({

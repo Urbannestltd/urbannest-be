@@ -21,8 +21,8 @@ import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
 import { VerifyCodeSchema } from "../../dtos/tenant/visitor.dto";
 
-@Route("visitors")
-@Tags("Visitor Management")
+@Route("tenant/visitors")
+@Tags("Tenant - Visitor Management")
 export class VisitorController extends Controller {
   private visitorService = new VisitorService();
 

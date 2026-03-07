@@ -19,8 +19,8 @@ import {
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
 
-@Route("utilities")
-@Tags("Utility Bills & Vending")
+@Route("tenant/utilities")
+@Tags("Tenant - Utility Bills & Vending")
 export class UtilityController extends Controller {
   private utilityService = new UtilityService();
 

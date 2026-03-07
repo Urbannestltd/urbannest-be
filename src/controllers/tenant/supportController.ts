@@ -19,8 +19,8 @@ import {
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
 
-@Route("support")
-@Tags("Support Tickets")
+@Route("tenant/support")
+@Tags("Tenant - Support Tickets")
 export class SupportController extends Controller {
   private supportService = new SupportService();
 

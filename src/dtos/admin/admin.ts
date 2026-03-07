@@ -2,10 +2,14 @@ import { z } from "zod";
 
 export const AdminCreateUserSchema = z.object({
   userEmail: z.email(),
+  userRole: z
+    .enum(["TENANT", "LANDLORD", "ADMIN", "FACILITY_MANAGER"])
+    .optional(),
 });
 
 export interface AdminCreateUserRequest {
   userEmail: string;
+  userRole?: "TENANT" | "LANDLORD" | "ADMIN" | "FACILITY_MANAGER";
 }
 
 export const AdminGetUsersSchema = z.object({
