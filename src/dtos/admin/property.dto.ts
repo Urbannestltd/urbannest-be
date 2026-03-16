@@ -1,4 +1,4 @@
-import { PropertyType } from "@prisma/client";
+import { PropertyType, RoleType } from "@prisma/client";
 
 export interface CreatePropertyAdminDto {
   name?: string;
@@ -18,4 +18,19 @@ export interface CreateUnitAdminDto {
   bedrooms?: number;
   bathrooms?: number;
   status?: "AVAILABLE" | "OCCUPIED" | "MAINTENANCE";
+}
+
+export type PropertyRole = "LANDLORD" | "FACILITY_MANAGER" | "TENANT";
+
+// 2. The DTO used by your Controller
+export interface ManageMemberDto {
+  userId: string;
+  role: PropertyRole;
+
+  // Required ONLY if role === "TENANT"
+  unitId?: string;
+
+  // Optional Lease Details
+  rentAmount?: number;
+  leaseMonths?: number;
 }

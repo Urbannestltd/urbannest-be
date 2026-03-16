@@ -1,5 +1,8 @@
 import { prisma } from "../../config/prisma";
-import { CreatePropertyAdminDto } from "../../dtos/admin/property.dto";
+import {
+  CreatePropertyAdminDto,
+  ManageMemberDto,
+} from "../../dtos/admin/property.dto";
 
 export class AdminPropertyService {
   public async createProperty(data: CreatePropertyAdminDto) {
@@ -80,7 +83,7 @@ export class AdminPropertyService {
         name: property.name,
         address: `${property.address}, ${property.city}`,
         type: property.type,
-        landlord: property.landlord.userFullName,
+        landlord: property.landlord?.userFullName,
         stats: {
           totalUnits,
           occupiedUnits,
@@ -91,5 +94,93 @@ export class AdminPropertyService {
         },
       };
     });
+  }
+
+  public async assignMember(propertyId: string, data: ManageMemberDto) {
+    const user = await prisma.user.findUnique({
+      where: { userId: data.userId },
+    });
+    if (!user) throw new Error("User not found");
+
+    if (data.role === "LANDLORD") {
+      return await prisma.property.update({
+        where: { id: propertyId },
+        data: { landlordId: data.userId },
+      });
+    }
+
+    if (data.role === "FACILITY_MANAGER") {
+      return await prisma.property.update({
+        where: { id: propertyId },
+        data: { facilityManagerId: data.userId },
+      });
+    }
+
+    if (data.role === "TENANT") {
+      if (!data.unitId)
+        throw new Error("unitId is required to assign a tenant.");
+
+      const unit = await prisma.unit.findUnique({ where: { id: data.unitId } });
+      if (!unit) throw new Error("Unit not found");
+
+      // Calculate lease dates (Default 1 year if not provided)
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + (data.leaseMonths || 12));
+
+      // Create an active lease to officially make them a tenant of this unit
+      return await prisma.lease.create({
+        data: {
+          unitId: data.unitId,
+          tenantId: data.userId,
+          startDate,
+          endDate,
+          rentAmount: data.rentAmount || unit.baseRent || 0,
+          status: "ACTIVE",
+        },
+      });
+    }
+
+    throw new Error("Invalid role specified");
+  }
+
+  // --- REMOVE MEMBER ---
+  public async removeMember(propertyId: string, data: ManageMemberDto) {
+    if (data.role === "LANDLORD") {
+      return await prisma.property.update({
+        where: { id: propertyId },
+        data: { landlordId: null }, // Disconnect landlord
+      });
+    }
+
+    if (data.role === "FACILITY_MANAGER") {
+      return await prisma.property.update({
+        where: { id: propertyId },
+        data: { facilityManagerId: null }, // Disconnect facility manager
+      });
+    }
+
+    if (data.role === "TENANT") {
+      if (!data.unitId)
+        throw new Error("unitId is required to remove a tenant.");
+
+      // Find the active lease for this tenant in this unit
+      const activeLease = await prisma.lease.findFirst({
+        where: {
+          unitId: data.unitId,
+          tenantId: data.userId,
+          status: "ACTIVE",
+        },
+      });
+
+      if (!activeLease)
+        throw new Error("No active lease found for this tenant in this unit.");
+
+      // Terminate the lease to "remove" the tenant
+      return await prisma.lease.update({
+        where: { id: activeLease.id },
+        data: { status: "TERMINATED" },
+      });
+    }
   }
 }
