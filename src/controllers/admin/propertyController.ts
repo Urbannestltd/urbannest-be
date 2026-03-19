@@ -3,6 +3,7 @@ import { AdminPropertyService } from "../../services/admin/propertyService";
 import {
   CreatePropertyAdminDto,
   ManageMemberDto,
+  UpdatePropertyAdminDto,
 } from "../../dtos/admin/property.dto";
 
 @Route("admin/properties")
@@ -21,13 +22,24 @@ export class AdminPropertyController {
     };
   }
 
-  @Get("/")
-  public async getAllProperties() {
-    const properties = await this.propertyService.getPropertiesOverview();
+  // @Get("/")
+  // public async getAllProperties() {
+  //   const properties = await this.propertyService.getPropertiesOverview();
+  //   return {
+  //     success: true,
+  //     message: "Properties retrieved successfully",
+  //     data: properties,
+  //   };
+  // }
+
+  @Get("{propertyId}")
+  public async getPropertyDetails(@Path() propertyId: string) {
+    const propertyDetails =
+      await this.propertyService.getPropertyDetailsOverview(propertyId);
     return {
       success: true,
-      message: "Properties retrieved successfully",
-      data: properties,
+      message: "Property details retrieved successfully",
+      data: propertyDetails,
     };
   }
 
@@ -52,6 +64,22 @@ export class AdminPropertyController {
     return {
       success: true,
       message: `${body.role} removed successfully`,
+    };
+  }
+
+  @Put("{propertyId}")
+  public async updateProperty(
+    @Path() propertyId: string,
+    @Body() body: UpdatePropertyAdminDto,
+  ) {
+    const updatedProperty = await this.propertyService.updateProperty(
+      propertyId,
+      body,
+    );
+    return {
+      success: true,
+      message: "Property updated successfully",
+      data: updatedProperty,
     };
   }
 }

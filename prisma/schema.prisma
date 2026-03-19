@@ -115,6 +115,8 @@ enum MaintenanceCategory {
   APPLIANCE
   STRUCTURAL
   PEST_CONTROL
+  CLEANING
+  SAFETY_SECURITY
   OTHER
 }
 
@@ -128,7 +130,9 @@ enum MaintenancePriority {
 enum MaintenanceStatus {
   PENDING
   IN_PROGRESS
+  WORK_SCHEDULED
   RESOLVED
+  FIXED
   CANCELLED
 }
 
@@ -164,6 +168,10 @@ model user {
   passwordResetTokens passwordReset[]
   registrationLinks   userRegistrationLink[]
   visitorInvites      VisitorInvite[]
+
+  dateOfBirth DateTime?
+  occupation  String?
+  employer    String?
 
   assignedTickets     MaintenanceRequest[] @relation("AssignedTickets")
   sentMessages        MaintenanceMessage[]
@@ -273,13 +281,21 @@ model passwordReset {
 // ==========================================
 
 model property {
-  id      String       @id @default(uuid())
+  id      String  @id @default(uuid())
   name    String?
   address String
-  city    String
   state   String
-  zip     String
-  type    PropertyType @default(MULTI_UNIT)
+
+  // Made optional because they aren't on the new UI
+  city String?
+  zip  String?
+
+  type PropertyType @default(MULTI_UNIT)
+
+  // --- NEW UI FIELDS ---
+  price     Float?
+  amenities String[] // e.g. ["Gym", "Elevator"]
+  images    String[] // Array of image URLs
 
   landlordId String?
   landlord   user?   @relation("landlordProperties", fields: [landlordId], references: [userId])
@@ -344,6 +360,9 @@ model lease {
 
   payments     payment[]
   utilityBills utilityBill[]
+
+  serviceCharge   Float?  @map("service_charge")
+  moveOutNotice   String? @map("move_out_notice") // e.g., "1 month"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

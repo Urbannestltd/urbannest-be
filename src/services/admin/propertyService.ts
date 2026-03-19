@@ -1,99 +1,198 @@
+import { UnitStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import {
   CreatePropertyAdminDto,
   ManageMemberDto,
+  PropertyDetailsResponseDto,
+  UpdatePropertyAdminDto,
 } from "../../dtos/admin/property.dto";
 
 export class AdminPropertyService {
   public async createProperty(data: CreatePropertyAdminDto) {
-    // Verify the assigned landlord actually exists and has the LANDLORD role
-    const landlord = await prisma.user.findFirst({
-      where: {
-        userId: data.landlordId,
-        userRole: { roleName: "LANDLORD" },
+    // 1. Create the base property record with the new UI fields
+    const property = await prisma.property.create({
+      data: {
+        name: data.name,
+        type: data.type,
+        price: data.price,
+        address: data.address,
+        state: data.state,
+        city: data.city,
+        zip: data.zip,
+        amenities: data.amenities || [],
+        images: data.images || [],
       },
     });
 
-    if (!landlord) {
-      throw new Error("Invalid Landlord ID or user is not a Landlord.");
+    // 2. Auto-Generate the Units!
+    if (data.noOfFloors > 0 && data.noOfUnitsPerFloor > 0) {
+      const unitsToCreate = [];
+
+      for (let floor = 1; floor <= data.noOfFloors; floor++) {
+        for (let unitNum = 1; unitNum <= data.noOfUnitsPerFloor; unitNum++) {
+          const floorName =
+            floor === 1
+              ? "First Floor"
+              : floor === 2
+                ? "Second Floor"
+                : floor === 3
+                  ? "Third Floor"
+                  : `Floor ${floor}`;
+
+          unitsToCreate.push({
+            propertyId: property.id,
+            name: `Unit ${unitNum}`,
+            floor: floorName,
+            baseRent: data.price || 0,
+            status: UnitStatus.AVAILABLE,
+          });
+        }
+      }
+
+      await prisma.unit.createMany({
+        data: unitsToCreate,
+      });
     }
 
-    return await prisma.property.create({
-      data: {
-        name: data.name,
-        address: data.address,
-        city: data.city,
-        state: data.state,
-        zip: data.zip,
-        type: data.type,
-        landlordId: data.landlordId,
+    // 3. Return the property with the unit count
+    return await prisma.property.findUnique({
+      where: { id: property.id },
+      include: {
+        _count: { select: { units: true } },
       },
     });
   }
 
   // --- 2. VIEW PROPERTIES (With Dashboard Aggregations!) ---
-  public async getPropertiesOverview() {
-    const properties = await prisma.property.findMany({
+  // --- GET SINGLE PROPERTY DETAILS (OVERVIEW TAB) ---
+  public async getPropertyDetailsOverview(
+    propertyId: string,
+  ): Promise<PropertyDetailsResponseDto> {
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+
+    // 1. Fetch the core property data and its relations
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
       include: {
-        landlord: {
-          select: { userFullName: true, userEmail: true, userPhone: true },
-        },
+        facilityManager: true,
+        landlord: true,
         units: {
           include: {
             leases: { where: { status: "ACTIVE" } },
-            maintenanceRequests: {
-              where: { status: { in: ["PENDING", "IN_PROGRESS"] } },
-            },
+            maintenanceRequests: true,
           },
         },
       },
     });
 
-    // Now we map through the properties to calculate the dashboard stats (Occupancy, Revenue, Complaints)
-    return properties.map((property) => {
-      const totalUnits = property.units.length;
+    if (!property) throw new Error("Property not found");
 
-      // 1. Calculate Occupancy
-      const occupiedUnits = property.units.filter(
-        (u) => u.status === "OCCUPIED",
+    // 2. Calculate Top Stats
+    const totalUnits = property.units.length;
+
+    // Dynamically calculate the number of floors by looking at unique floor names
+    const uniqueFloors = new Set(
+      property.units.map((u) => u.floor).filter(Boolean),
+    );
+    const noOfFloors = uniqueFloors.size;
+
+    // 3. Calculate Health Bars (Occupancy & Complaints)
+    const occupiedUnits = property.units.filter(
+      (u) => u.leases.length > 0,
+    ).length;
+    const occupancyRate =
+      totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
+
+    let totalComplaints = 0;
+    let unresolvedComplaints = 0;
+
+    property.units.forEach((unit) => {
+      totalComplaints += unit.maintenanceRequests.length;
+      unresolvedComplaints += unit.maintenanceRequests.filter(
+        (req) => req.status === "PENDING" || req.status === "IN_PROGRESS",
       ).length;
-      const occupancyRate =
-        totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
-
-      // 2. Calculate Active Complaints (Maintenance Requests)
-      const totalComplaints = property.units.reduce(
-        (sum, unit) => sum + unit.maintenanceRequests.length,
-        0,
-      );
-
-      // 3. Calculate Expected Income (Sum of active lease rent amounts)
-      const expectedIncome = property.units.reduce((sum, unit) => {
-        const activeLease = unit.leases[0]; // Assuming 1 active lease per unit
-        return sum + (activeLease?.rentAmount || 0);
-      }, 0);
-
-      // 4. Calculate Total Tenants (Members)
-      const totalTenants = property.units.reduce(
-        (sum, unit) => sum + unit.leases.length,
-        0,
-      );
-
-      return {
-        id: property.id,
-        name: property.name,
-        address: `${property.address}, ${property.city}`,
-        type: property.type,
-        landlord: property.landlord?.userFullName,
-        stats: {
-          totalUnits,
-          occupiedUnits,
-          occupancyRate: `${occupancyRate}%`,
-          totalComplaints,
-          expectedMonthlyIncome: expectedIncome,
-          totalTenants,
-        },
-      };
     });
+
+    const complaintsPercentage =
+      totalComplaints === 0
+        ? 0
+        : Math.round((unresolvedComplaints / totalComplaints) * 100);
+
+    // 4. Calculate Rental Revenue Chart Data (Current Year)
+    // Find all PAID rent payments tied to leases that belong to this property's units
+    const payments = await prisma.payment.findMany({
+      where: {
+        status: "PAID",
+        type: "RENT",
+        paidDate: { gte: startOfYear },
+        lease: { unit: { propertyId: propertyId } },
+      },
+      select: { amount: true, paidDate: true },
+    });
+
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    const rentalRevenue = monthNames.map((month) => ({ month, revenue: 0 }));
+
+    payments.forEach((payment) => {
+      if (payment.paidDate) {
+        const monthIndex = payment.paidDate.getMonth();
+        rentalRevenue[monthIndex]!.revenue += payment.amount;
+      }
+    });
+
+    // 5. Construct the final response matching the UI exactly
+    return {
+      id: property.id,
+      name: property.name,
+      address: `${property.address}, ${property.state}`,
+      lastUpdated: property.updatedAt,
+
+      // Details Card
+      rentalPrice: property.price || 0,
+      noOfFloors,
+      noOfUnits: totalUnits,
+      listedOn: property.createdAt,
+      occupancyRate: `${occupancyRate}%`,
+      complaintsPercentage: `${complaintsPercentage}%`,
+
+      // Content
+      images: property.images,
+      amenities: property.amenities,
+
+      // People
+      facilityManager: property.facilityManager
+        ? {
+            name: property.facilityManager.userFullName || "Unknown",
+            email: property.facilityManager.userEmail,
+            photoUrl: property.facilityManager.userProfileUrl,
+          }
+        : null,
+
+      landlord: property.landlord
+        ? {
+            name: property.landlord.userFullName || "Unknown",
+            email: property.landlord.userEmail,
+            photoUrl: property.landlord.userProfileUrl,
+          }
+        : null,
+
+      // Chart
+      rentalRevenue,
+    };
   }
 
   public async assignMember(propertyId: string, data: ManageMemberDto) {
@@ -182,5 +281,50 @@ export class AdminPropertyService {
         data: { status: "TERMINATED" },
       });
     }
+  }
+
+  // --- UPDATE PROPERTY ---
+  public async updateProperty(
+    propertyId: string,
+    data: UpdatePropertyAdminDto,
+  ) {
+    // 1. Verify property exists
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+    });
+    if (!property) throw new Error("Property not found");
+
+    // 2. Update the property details
+    const updatedProperty = await prisma.property.update({
+      where: { id: propertyId },
+      data: {
+        name: data.name !== undefined ? data.name : property.name,
+        price: data.price !== undefined ? data.price : property.price,
+        address: data.address !== undefined ? data.address : property.address,
+        state: data.state !== undefined ? data.state : property.state,
+        city: data.city !== undefined ? data.city : property.city,
+        zip: data.zip !== undefined ? data.zip : property.zip,
+
+        // Prisma replaces the entire array for PostgreSQL string arrays
+        amenities:
+          data.amenities !== undefined ? data.amenities : property.amenities,
+        images: data.images !== undefined ? data.images : property.images,
+      },
+    });
+
+    // 3. Smart feature: If the price changed, cascade it to VACANT units
+    if (data.price !== undefined && data.price !== property.price) {
+      await prisma.unit.updateMany({
+        where: {
+          propertyId: propertyId,
+          status: "AVAILABLE", // Only update vacant units! Active tenants keep their lease price.
+        },
+        data: {
+          baseRent: data.price,
+        },
+      });
+    }
+
+    return updatedProperty;
   }
 }
