@@ -8,6 +8,10 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ==========================================
+// ENUMS
+// ==========================================
+
 enum UserStatus {
   PENDING
   ACTIVE
@@ -62,9 +66,9 @@ enum UtilityType {
 }
 
 enum VisitorType {
-  GUEST // Friends, Family
-  DELIVERY // Jumia, DHL, Food
-  SERVICE_PROVIDER // Plumber, Cleaner, IT Support
+  GUEST
+  DELIVERY
+  SERVICE_PROVIDER
 }
 
 enum InviteFrequency {
@@ -107,10 +111,12 @@ enum SupportPriority {
 enum MaintenanceCategory {
   PLUMBING
   ELECTRICAL
-  HVAC // Heating, Ventilation, AC
+  HVAC
   APPLIANCE
-  STRUCTURAL // Walls, Windows, Roof
+  STRUCTURAL
   PEST_CONTROL
+  CLEANING
+  SAFETY_SECURITY
   OTHER
 }
 
@@ -124,9 +130,15 @@ enum MaintenancePriority {
 enum MaintenanceStatus {
   PENDING
   IN_PROGRESS
+  WORK_SCHEDULED
   RESOLVED
+  FIXED
   CANCELLED
 }
+
+// ==========================================
+// IDENTITY & ACCESS MANAGEMENT
+// ==========================================
 
 model user {
   userId               String   @id @default(uuid())
@@ -144,7 +156,10 @@ model user {
   userProfileUrl       String?
   userEmergencyContact String?
 
-  ownedProperties property[]       @relation("landlordProperties")
+  // ownedProperties property[] @relation("landlordProperties")
+  ownedUnits   unit[] @relation("landlordUnits")
+  managedUnits unit[] @relation("managedUnits")
+
   leases          lease[]          @relation("tenantLeases")
   utilityProfiles utilityProfile[]
   payments        payment[]
@@ -153,6 +168,10 @@ model user {
   passwordResetTokens passwordReset[]
   registrationLinks   userRegistrationLink[]
   visitorInvites      VisitorInvite[]
+
+  dateOfBirth DateTime?
+  occupation  String?
+  employer    String?
 
   assignedTickets     MaintenanceRequest[] @relation("AssignedTickets")
   sentMessages        MaintenanceMessage[]
@@ -166,22 +185,28 @@ model user {
 
   paymentMethods PaymentMethod[]
 
+  properties        property[] @relation("landlordProperties")
+  managedProperties property[] @relation("managedProperties")
+
   isTwoFactorEnabled Boolean   @default(false)
   twoFactorSecret    String?
   twoFactorExpiry    DateTime?
   sessions           Session[]
 
+  @@index([userRoleId])
   @@map("user")
 }
 
 model Session {
   id           String   @id @default(uuid())
   userId       String
-  user         user     @relation(fields: [userId], references: [userId])
-  refreshToken String   @unique // Cryptographically secure 64-byte hex string
+  user         user     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  refreshToken String   @unique
   createdAt    DateTime @default(now())
   lastActiveAt DateTime @default(now())
   isValid      Boolean  @default(true)
+
+  @@index([userId])
 }
 
 model role {
@@ -208,11 +233,13 @@ model otpLogs {
   otpLogId        String   @id @default(uuid())
   otpLogHash      String
   otpLogUserId    String
-  otpLogUser      user     @relation(fields: [otpLogUserId], references: [userId])
+  otpLogUser      user     @relation(fields: [otpLogUserId], references: [userId], onDelete: Cascade)
   otpLogStatus    String   @default("ACTIVE")
   otpLogExpiry    DateTime
   otpLogCreatedAt DateTime @default(now())
   otpLogUpdatedAt DateTime @updatedAt
+
+  @@index([otpLogUserId])
 }
 
 model userRegistrationLink {
@@ -228,6 +255,8 @@ model userRegistrationLink {
 
   userRegistrationLinkCreatedAt DateTime @default(now())
   userRegistrationLinkUpdatedAt DateTime @updatedAt
+
+  @@index([userRegistrationLinkUserId])
 }
 
 model passwordReset {
@@ -243,185 +272,240 @@ model passwordReset {
 
   passwordResetCreatedAt DateTime @default(now())
   passwordResetUpdatedAt DateTime @updatedAt
+
+  @@index([passwordResetUserId])
 }
 
-model property {
-  id      String       @id @default(uuid()) @map("property_id")
-  name    String?      @map("name")
-  address String       @map("address")
-  city    String       @map("city")
-  state   String       @map("state")
-  zip     String       @map("zip_code")
-  type    PropertyType @default(MULTI_UNIT) @map("type")
+// ==========================================
+// CORE REAL ESTATE
+// ==========================================
 
-  landlordId String @map("landlord_id")
-  landlord   user   @relation("landlordProperties", fields: [landlordId], references: [userId])
+model property {
+  id      String  @id @default(uuid())
+  name    String?
+  address String
+  state   String
+
+  // Made optional because they aren't on the new UI
+  city String?
+  zip  String?
+
+  type PropertyType @default(MULTI_UNIT)
+
+  // --- NEW UI FIELDS ---
+  price     Float?
+  amenities String[] // e.g. ["Gym", "Elevator"]
+  images    String[] // Array of image URLs
+
+  landlordId String?
+  landlord   user?   @relation("landlordProperties", fields: [landlordId], references: [userId])
+
+  facilityManagerId String?
+  facilityManager   user?   @relation("managedProperties", fields: [facilityManagerId], references: [userId])
 
   units unit[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@index([landlordId])
   @@map("properties")
 }
 
-// 2. THE UNIT (The specific Flat/Apartment)
 model unit {
-  id        String     @id @default(uuid()) @map("unit_id")
-  name      String     @map("name") // "Apt 4B"
-  floor     String?    @map("floor") // e.g., "First Floor", "Second Floor"
-  baseRent  Float?     @map("base_rent") // Expected rent (e.g., 2000000)
-  bedrooms  Int        @default(1) @map("bedrooms")
-  bathrooms Float      @default(1.0) @map("bathrooms")
-  status    UnitStatus @default(AVAILABLE) @map("status")
+  id        String     @id @default(uuid())
+  name      String
+  floor     String?
+  baseRent  Float?
+  bedrooms  Int        @default(1)
+  bathrooms Float      @default(1.0)
+  status    UnitStatus @default(AVAILABLE)
 
-  propertyId String   @map("property_id")
+  propertyId String
   property   property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
-  leases lease[]
+  landlordId String?
+  landlord   user?   @relation("landlordUnits", fields: [landlordId], references: [userId])
 
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @updatedAt @map("updated_at")
+  facilityManagerId String?
+  facilityManager   user?   @relation("managedUnits", fields: [facilityManagerId], references: [userId])
+
+  leases              lease[]
   visitorInvites      VisitorInvite[]
   maintenanceRequests MaintenanceRequest[]
   visitorGroups       VisitorGroup[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([landlordId])
+  @@index([facilityManagerId])
   @@map("units")
 }
 
 model lease {
-  id          String      @id @default(uuid()) @map("lease_id")
-  startDate   DateTime    @map("start_date")
-  endDate     DateTime    @map("end_date")
-  rentAmount  Float       @map("rent_amount")
-  status      LeaseStatus @default(ACTIVE) @map("status")
-  documentUrl String?     @map("document_url")
+  id          String      @id @default(uuid())
+  startDate   DateTime
+  endDate     DateTime
+  rentAmount  Float
+  status      LeaseStatus @default(ACTIVE)
+  documentUrl String?
 
-  // Relations
-  unitId String @map("unit_id")
+  unitId String
   unit   unit   @relation(fields: [unitId], references: [id])
 
-  tenantId String @map("tenant_id")
+  tenantId String
   tenant   user   @relation("tenantLeases", fields: [tenantId], references: [userId])
 
   payments     payment[]
   utilityBills utilityBill[]
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  serviceCharge   Float?  @map("service_charge")
+  moveOutNotice   String? @map("move_out_notice") // e.g., "1 month"
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([unitId])
+  @@index([tenantId])
   @@map("leases")
 }
 
-model utilityProfile {
-  id         String      @id @default(uuid()) @map("id")
-  type       UtilityType @map("type")
-  provider   String?     @map("provider")
-  identifier String      @map("identifier")
-  label      String?     @map("label")
+// ==========================================
+// FINANCIALS & BILLING
+// ==========================================
 
-  userId String @map("user_id")
+model utilityProfile {
+  id         String      @id @default(uuid())
+  type       UtilityType
+  provider   String?
+  identifier String
+  label      String?
+
+  userId String
   user   user   @relation(fields: [userId], references: [userId])
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now())
 
+  @@index([userId])
   @@map("utility_profiles")
 }
 
 model utilityBill {
-  id          String        @id @default(uuid()) @map("id")
-  type        UtilityType   @map("type")
-  amount      Float         @map("amount")
-  dueDate     DateTime      @map("due_date")
-  status      PaymentStatus @default(PENDING) @map("status")
-  description String?       @map("description")
+  id          String        @id @default(uuid())
+  type        UtilityType
+  amount      Float
+  dueDate     DateTime
+  status      PaymentStatus @default(PENDING)
+  description String?
 
-  leaseId String @map("lease_id")
+  leaseId String
   lease   lease  @relation(fields: [leaseId], references: [id])
 
-  paymentId String?  @unique @map("payment_id")
+  paymentId String?  @unique
   payment   payment? @relation(fields: [paymentId], references: [id])
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now())
 
+  @@index([leaseId])
   @@map("utility_bills")
 }
 
 model payment {
-  id        String        @id @default(uuid()) @map("payment_id")
-  amount    Float         @map("amount")
-  dueDate   DateTime?     @map("due_date")
-  paidDate  DateTime?     @map("paid_date")
-  status    PaymentStatus @default(PENDING) @map("status")
-  reference String        @unique @map("reference")
-  type      PaymentType   @default(RENT) @map("type")
+  id        String        @id @default(uuid())
+  amount    Float
+  dueDate   DateTime?
+  paidDate  DateTime?
+  status    PaymentStatus @default(PENDING)
+  reference String        @unique
+  type      PaymentType   @default(RENT)
 
-  utilityType  UtilityType? @map("utility_type")
-  utilityToken String?      @map("utility_token")
-  meterNo      String?      @map("utility_meter_no")
+  utilityType  UtilityType?
+  utilityToken String?
+  meterNo      String?
 
-  metadata Json? @map("metadata")
+  metadata Json?
 
-  // Relations
-  userId String @map("user_id")
+  userId String
   user   user   @relation(fields: [userId], references: [userId])
 
-  leaseId String? @map("lease_id")
+  leaseId String?
   lease   lease?  @relation(fields: [leaseId], references: [id])
 
   utilityBill utilityBill?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@index([userId])
+  @@index([leaseId])
   @@map("payments")
 }
+
+model PaymentMethod {
+  id     String @id @default(uuid())
+  userId String
+
+  authorizationCode String
+  last4             String
+  cardType          String
+  bank              String?
+  expMonth          String
+  expYear           String
+
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user user @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ==========================================
+// ACCESS CONTROL (GATEHOUSE)
+// ==========================================
 
 model VisitorGroup {
   id       String @id @default(uuid())
   tenantId String
   unitId   String
 
-  name String // e.g. "Project Team", "Birthday Bash"
-
-  // Shared Timing Constraints (The "Event" time)
+  name       String
   validFrom  DateTime
   validUntil DateTime
 
-  // Relations
-  invites VisitorInvite[] // One Group has Many Visitors
+  invites VisitorInvite[]
   tenant  user            @relation(fields: [tenantId], references: [userId])
   unit    unit            @relation(fields: [unitId], references: [id])
 
   createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([unitId])
 }
 
-// 2. Updated Child Model
 model VisitorInvite {
   id String @id @default(uuid())
 
-  // Keep these for fast queries (Verification doesn't need to join tables)
   tenantId String
   unitId   String
+  groupId  String?
 
-  // === NEW: Link to the Group ===
-  groupId String?
-  group   VisitorGroup? @relation(fields: [groupId], references: [id])
+  group VisitorGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   visitorName  String
   visitorPhone String?
   accessCode   String  @unique
 
-  // Timestamps (Copied from Group for performance, or set individually)
   validFrom  DateTime
   validUntil DateTime
 
   type      VisitorType     @default(GUEST)
   frequency InviteFrequency @default(ONE_OFF)
   status    InviteStatus    @default(ACTIVE)
-  isWalkIn   Boolean         @default(false) // New field to identify walk-ins
+  isWalkIn  Boolean         @default(false)
 
-  // Relations
   tenant user @relation(fields: [tenantId], references: [userId])
   unit   unit @relation(fields: [unitId], references: [id])
 
@@ -430,8 +514,14 @@ model VisitorInvite {
   checkedOutAt DateTime?
 
   @@index([accessCode])
-  @@index([groupId]) // Index for fetching "All guests in this group"
+  @@index([groupId])
+  @@index([tenantId])
+  @@index([unitId])
 }
+
+// ==========================================
+// FACILITY OPERATIONS & SUPPORT
+// ==========================================
 
 model SupportTicket {
   id       String @id @default(uuid())
@@ -444,25 +534,29 @@ model SupportTicket {
 
   messages SupportMessage[]
 
-  // Relations
   tenant user @relation(fields: [tenantId], references: [userId])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 model SupportMessage {
   id       String @id @default(uuid())
   ticketId String
-  senderId String // Tenant or Admin ID
+  senderId String
 
   message     String
-  attachments String[] // URL strings
+  attachments String[]
 
-  ticket SupportTicket @relation(fields: [ticketId], references: [id])
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   sender user          @relation(fields: [senderId], references: [userId])
 
   createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([senderId])
 }
 
 model MaintenanceRequest {
@@ -476,88 +570,74 @@ model MaintenanceRequest {
 
   subject     String?
   description String
-  attachments String[] // Array of Image/Video URLs
+  attachments String[]
 
-  // Relations
   tenant user @relation(fields: [tenantId], references: [userId])
   unit   unit @relation(fields: [unitId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  assignedToId String? // ID of the Facility Manager/Vendor handling this
+  assignedToId String?
+  assignedTo   user?   @relation("AssignedTickets", fields: [assignedToId], references: [userId])
 
-  messages MaintenanceMessage[] // Relation to chat history
-
-  // Relation for assignment
-  assignedTo user? @relation("AssignedTickets", fields: [assignedToId], references: [userId])
+  messages MaintenanceMessage[]
 
   @@index([unitId])
+  @@index([tenantId])
+  @@index([assignedToId])
   @@index([status])
 }
 
-// New Model: Chat Messages
 model MaintenanceMessage {
   id       String @id @default(uuid())
   ticketId String
-  senderId String // Could be Tenant OR Manager
+  senderId String
 
   message     String
-  attachments String[] // Images/Videos sent in chat
+  attachments String[]
 
-  // Relations
-  ticket MaintenanceRequest @relation(fields: [ticketId], references: [id])
+  ticket MaintenanceRequest @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   sender user               @relation(fields: [senderId], references: [userId])
 
   createdAt DateTime  @default(now())
-  readAt    DateTime? // To show "Read" receipts
+  readAt    DateTime?
+
+  @@index([ticketId])
+  @@index([senderId])
 }
 
-model PaymentMethod {
-  id     String @id @default(uuid())
-  userId String
-
-  // Paystack Data
-  authorizationCode String // The "Token" to charge the card later
-  last4             String // e.g., "4321"
-  cardType          String // e.g., "Visa", "Mastercard"
-  bank              String? // e.g., "GTBank"
-  expMonth          String
-  expYear           String
-
-  isDefault Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  user user @relation(fields: [userId], references: [userId])
-}
+// ==========================================
+// USER PREFERENCES & UTILS
+// ==========================================
 
 model NotificationSetting {
   id     String @id @default(uuid())
   userId String @unique
 
-  // Matches the checkboxes in your UI
   emailPayments    Boolean @default(true)
   emailLease       Boolean @default(true)
   emailMaintenance Boolean @default(true)
   emailVisitors    Boolean @default(true)
 
-  // Future proofing for Push Notifications
   pushPayments    Boolean @default(false)
   pushMaintenance Boolean @default(false)
 
-  user user @relation(fields: [userId], references: [userId])
+  user user @relation(fields: [userId], references: [userId], onDelete: Cascade)
 }
 
 model Reminder {
   id     String @id @default(uuid())
   userId String
 
-  title       String // e.g. "Pay Rent"
+  title       String
   description String?
-  dueAt       DateTime // When to remind
+  dueAt       DateTime
 
-  isSent    Boolean  @default(false) // Has the system sent the email/push yet?
+  isSent    Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user user @relation(fields: [userId], references: [userId])
+  user user @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
 }

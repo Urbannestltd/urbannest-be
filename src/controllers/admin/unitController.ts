@@ -30,4 +30,14 @@ export class AdminUnitController {
       data: unitData,
     };
   }
+
+  @Get("{tenantId}")
+  public async getTenantProfile(@Path() tenantId: string) {
+    const profile = await this.unitService.getTenantProfile(tenantId);
+    return {
+      success: true,
+      message: "Tenant profile retrieved successfully",
+      data: profile,
+    };
+  }
 }
