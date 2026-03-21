@@ -22,15 +22,15 @@ export class AdminPropertyController {
     };
   }
 
-  // @Get("/")
-  // public async getAllProperties() {
-  //   const properties = await this.propertyService.getPropertiesOverview();
-  //   return {
-  //     success: true,
-  //     message: "Properties retrieved successfully",
-  //     data: properties,
-  //   };
-  // }
+  @Get("/")
+  public async getAllProperties() {
+    const properties = await this.propertyService.getProperties();
+    return {
+      success: true,
+      message: "Properties retrieved successfully",
+      data: properties,
+    };
+  }
 
   @Get("{propertyId}")
   public async getPropertyDetails(@Path() propertyId: string) {
