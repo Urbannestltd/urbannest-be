@@ -63,6 +63,14 @@ export class AdminPropertyService {
     });
   }
 
+  public async getProperties() {
+    return await prisma.property.findMany({
+      include: {
+        _count: { select: { units: true } },
+      },
+    });
+  }
+
   // --- 2. VIEW PROPERTIES (With Dashboard Aggregations!) ---
   // --- GET SINGLE PROPERTY DETAILS (OVERVIEW TAB) ---
   public async getPropertyDetailsOverview(
