@@ -2,6 +2,7 @@ import { UnitStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { CreateUnitAdminDto } from "../../dtos/admin/property.dto";
 import { TenantProfileResponseDto } from "../../dtos/admin/tenant.dto";
+import { BadRequestError } from "../../utils/apiError";
 
 export class AdminUnitService {
   // --- 1. ADD UNIT TO PROPERTY ---
@@ -209,7 +210,7 @@ export class AdminUnitService {
       },
     });
 
-    if (!tenant) throw new Error("Tenant not found");
+    if (!tenant) throw new BadRequestError("Tenant not found");
 
     // 1. Separate Active Lease from History
     const activeLease = tenant.leases.find((l) => l.status === "ACTIVE");

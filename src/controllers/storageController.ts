@@ -15,7 +15,7 @@ export class StorageController extends Controller {
   @Security("jwt")
   public async getUploadUrl(
     @Request() req: any,
-    @Body() body: { filename: string; folder: "maintenance" | "support" },
+    @Body() body: { filename: string; folder: string },
   ) {
     const userId = req.user.userId;
     // Create a clean path: maintenance/user-123/176930000_leak.jpg
