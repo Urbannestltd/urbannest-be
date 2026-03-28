@@ -152,6 +152,7 @@ export class AdminUnitService {
         rentAmount: activeLease?.rentAmount || unit.baseRent || 0,
 
         // Tenant Details
+        tenantId: tenant ? tenant.userId : null,
         tenantName: tenant ? tenant.userFullName : null,
         tenantProfilePic: tenant ? tenant.userProfileUrl : null,
         moveInDate: activeLease ? activeLease.startDate : null,
