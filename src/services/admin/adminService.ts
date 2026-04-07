@@ -50,6 +50,7 @@ export class AdminService {
             ),
           },
         },
+        managedProperties: {},
         userRole: {
           connectOrCreate: {
             where: {

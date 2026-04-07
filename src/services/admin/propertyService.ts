@@ -25,11 +25,13 @@ export class AdminPropertyService {
     });
 
     // 2. Auto-Generate the Units!
-    if (data.noOfFloors > 0 && data.noOfUnitsPerFloor > 0) {
+    const floors = data.noOfFloors ?? 0;
+    const unitsPerFloor = data.noOfUnitsPerFloor ?? 0;
+    if (floors > 0 && unitsPerFloor > 0) {
       const unitsToCreate = [];
 
-      for (let floor = 1; floor <= data.noOfFloors; floor++) {
-        for (let unitNum = 1; unitNum <= data.noOfUnitsPerFloor; unitNum++) {
+      for (let floor = 1; floor <= floors; floor++) {
+        for (let unitNum = 1; unitNum <= unitsPerFloor; unitNum++) {
           const floorName =
             floor === 1
               ? "First Floor"
@@ -68,6 +70,7 @@ export class AdminPropertyService {
       include: {
         _count: { select: { units: true } },
       },
+      orderBy: { updatedAt: "desc" },
     });
   }
 
@@ -85,6 +88,7 @@ export class AdminPropertyService {
       include: {
         facilityManager: true,
         landlord: true,
+        agent: true,
         units: {
           include: {
             leases: { where: { status: "ACTIVE" } },
@@ -195,6 +199,14 @@ export class AdminPropertyService {
             name: property.landlord.userFullName || "Unknown",
             email: property.landlord.userEmail,
             photoUrl: property.landlord.userProfileUrl,
+          }
+        : null,
+
+      agent: property.agent
+        ? {
+            name: property.agent.userFullName || "Unknown",
+            email: property.agent.userEmail,
+            photoUrl: property.agent.userProfileUrl,
           }
         : null,
 
