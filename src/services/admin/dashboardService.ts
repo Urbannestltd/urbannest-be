@@ -2,6 +2,8 @@ import { prisma } from "../../config/prisma";
 import {
   DashboardMetricsDto,
   TenantStatusDto,
+  PropertyOverviewItemDto,
+  PropertyOverviewResponseDto,
 } from "../../dtos/admin/dashboard.dto";
 
 export class AdminDashboardService {
@@ -84,7 +86,123 @@ export class AdminDashboardService {
     };
   }
 
-  // --- 2. GET TENANT STATUS LIST ---
+  // --- 2. GET PROPERTY OVERVIEW TABLE ---
+  public async getPropertyOverview(): Promise<PropertyOverviewResponseDto> {
+    const properties = await prisma.property.findMany({
+      include: {
+        facilityManager: {
+          select: {
+            userId: true,
+            userFullName: true,
+            userProfileUrl: true,
+          },
+        },
+        units: {
+          include: {
+            leases: {
+              where: { status: "ACTIVE" },
+              select: {
+                endDate: true,
+                payments: {
+                  where: { type: "RENT" },
+                  select: { amount: true, status: true },
+                },
+              },
+            },
+            maintenanceRequests: {
+              where: { status: { notIn: ["RESOLVED", "FIXED", "CANCELLED"] } },
+              select: { priority: true },
+            },
+          },
+        },
+      },
+    });
+
+    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    const mapped: PropertyOverviewItemDto[] = properties.map((property) => {
+      // Column 1: Property name
+      const propertyName = property.name ?? property.address;
+
+      // Column 2: Occupancy %
+      const totalUnits = property.units.length;
+      const occupiedUnits = property.units.filter(
+        (u) => u.leases.length > 0
+      ).length;
+      const occupancyPercent =
+        totalUnits === 0
+          ? 0
+          : Math.round((occupiedUnits / totalUnits) * 100);
+
+      // Column 3: Tenant summary + Column 4: Arrears
+      // A lease is "defaulting" if it has at least one OVERDUE rent payment
+      let activeTenants = 0;
+      let defaultingLeases = 0;
+      let arrears = 0;
+
+      property.units.forEach((unit) => {
+        unit.leases.forEach((lease) => {
+          activeTenants += 1;
+          const hasOverdue = lease.payments.some((p) => p.status === "OVERDUE");
+          if (hasOverdue) defaultingLeases += 1;
+          lease.payments.forEach((payment) => {
+            if (payment.status === "OVERDUE") arrears += payment.amount;
+          });
+        });
+      });
+
+      // Column 5: Open maintenance
+      const openMaintenance = property.units.reduce(
+        (sum, u) => sum + u.maintenanceRequests.length,
+        0
+      );
+
+      // Column 6: FM assigned
+      const facilityManager = property.facilityManager
+        ? {
+            id: property.facilityManager.userId,
+            name: property.facilityManager.userFullName ?? "Unknown",
+            photoUrl: property.facilityManager.userProfileUrl,
+          }
+        : null;
+
+      // Column 7: Alerts
+      const alerts: string[] = [];
+
+      const hasEmergency = property.units.some((u) =>
+        u.maintenanceRequests.some((r) => r.priority === "EMERGENCY")
+      );
+      if (hasEmergency) alerts.push("Emergency maintenance");
+
+      const hasExpiringLease = property.units.some((u) =>
+        u.leases.some((l) => new Date(l.endDate) <= thirtyDaysFromNow)
+      );
+      if (hasExpiringLease) alerts.push("Lease expiring soon");
+
+      if (arrears > 0) alerts.push("High arrears");
+
+      return {
+        propertyId: property.id,
+        propertyName,
+        occupancyPercent,
+        tenantSummary: {
+          active: activeTenants - defaultingLeases,
+          defaulting: defaultingLeases,
+        },
+        arrears,
+        openMaintenance,
+        facilityManager,
+        alerts,
+      };
+    });
+
+    return {
+      properties: mapped,
+      totalProperties: properties.length,
+    };
+  }
+
+  // --- 3. GET TENANT STATUS LIST ---
   public async getTenantStatuses(): Promise<TenantStatusDto[]> {
     // Fetch tenants with their active leases and checking for overdue payments
     const tenants = await prisma.user.findMany({

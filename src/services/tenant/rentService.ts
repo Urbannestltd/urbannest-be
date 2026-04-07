@@ -153,7 +153,7 @@ export class RentService {
       paymentId: p.id,
       amount: p.amount,
       date: p.paidDate || p.createdAt,
-      status: "PAID",
+      status: p.status,
       reference: p.reference,
       description: p.lease ? `Rent for ${p.lease.unit.name}` : "Lease Payment",
     }));

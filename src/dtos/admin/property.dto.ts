@@ -1,8 +1,10 @@
-import { PropertyType, RoleType, UnitStatus } from "@prisma/client";
+import { PropertyType, UnitStatus } from "@prisma/client";
+
+export type ActivePropertyType = Extract<PropertyType, "COMMERCIAL" | "RESIDENTIAL">;
 
 export interface CreatePropertyAdminDto {
   name?: string;
-  type: PropertyType;
+  type: ActivePropertyType;
   price?: number;
   address: string;
   state: string;
@@ -15,9 +17,9 @@ export interface CreatePropertyAdminDto {
   amenities?: string[];
   images?: string[];
 
-  // Used for auto-generating units
-  noOfFloors: number;
-  noOfUnitsPerFloor: number;
+  // Used for auto-generating units (optional — RESIDENTIAL may have just 1 unit)
+  noOfFloors?: number;
+  noOfUnitsPerFloor?: number;
 }
 
 export type PropertyRole = "LANDLORD" | "FACILITY_MANAGER" | "TENANT";
@@ -82,6 +84,7 @@ export interface PropertyDetailsResponseDto {
     photoUrl: string | null;
   } | null;
   landlord: { name: string; email: string; photoUrl: string | null } | null;
+  agent: { name: string; email: string; photoUrl: string | null } | null;
 
   // Revenue Chart
   rentalRevenue: { month: string; revenue: number }[];

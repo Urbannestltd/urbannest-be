@@ -271,7 +271,7 @@ export class AuthenticationService {
       !user ||
       !(await bcrypt.compare(params.password, user.userPassword ?? ""))
     ) {
-      throw new UnauthorizedError("Invalid email or password");
+      throw new BadRequestError("Invalid email or password");
     }
 
     if (user?.userStatus !== "ACTIVE") {

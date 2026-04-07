@@ -9,6 +9,8 @@ export const AdminCreateUserSchema = z.object({
 
 export interface AdminCreateUserRequest {
   userEmail: string;
+  unitId?: string;
+  propertyId?: string;
   userRole?: "TENANT" | "LANDLORD" | "ADMIN" | "FACILITY_MANAGER";
 }
 

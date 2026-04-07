@@ -23,12 +23,14 @@ enum RoleType {
   LANDLORD
   TENANT
   VENDOR
+  AGENT
 }
 
 enum PropertyType {
   MULTI_UNIT
   SINGLE_FAMILY
   COMMERCIAL
+  RESIDENTIAL
 }
 
 enum UnitStatus {
@@ -187,6 +189,7 @@ model user {
 
   properties        property[] @relation("landlordProperties")
   managedProperties property[] @relation("managedProperties")
+  agentedProperties property[] @relation("agentProperties")
 
   isTwoFactorEnabled Boolean   @default(false)
   twoFactorSecret    String?
@@ -303,12 +306,16 @@ model property {
   facilityManagerId String?
   facilityManager   user?   @relation("managedProperties", fields: [facilityManagerId], references: [userId])
 
+  agentId String?
+  agent   user?   @relation("agentProperties", fields: [agentId], references: [userId])
+
   units unit[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([landlordId])
+  @@index([agentId])
   @@map("properties")
 }
 

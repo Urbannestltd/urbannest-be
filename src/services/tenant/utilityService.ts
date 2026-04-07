@@ -75,6 +75,7 @@ export class UtilityService {
       email: user.userEmail,
       amount: params.amount * 100,
       reference,
+      callback_url: `${process.env.FRONTEND_URL}/payment/verify`,
       metadata,
     });
 
