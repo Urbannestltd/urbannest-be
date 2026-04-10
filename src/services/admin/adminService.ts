@@ -96,4 +96,49 @@ export class AdminService {
       data: { userEmail: params.userEmail },
     };
   }
+
+  public async suspendUser(userId: string): Promise<void> {
+    const user = await prisma.user.findUnique({ where: { userId } });
+    if (!user) throw new BadRequestError("User not found");
+
+    await prisma.user.update({
+      where: { userId },
+      data: { userStatus: "BLOCKED" },
+    });
+  }
+
+  public async activateUser(userId: string): Promise<void> {
+    const user = await prisma.user.findUnique({ where: { userId } });
+    if (!user) throw new BadRequestError("User not found");
+
+    await prisma.user.update({
+      where: { userId },
+      data: { userStatus: "ACTIVE" },
+    });
+  }
+
+  public async getUserActivityLogs(userId: string): Promise<
+    {
+      id: string;
+      userId: string;
+      action: string;
+      description: string;
+      ipAddress: string | null;
+      createdAt: Date;
+    }[]
+  > {
+    const logs = await prisma.activityLog.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return logs.map((log) => ({
+      id: log.id,
+      userId: log.userId,
+      action: log.action,
+      description: log.description,
+      ipAddress: log.ipAddress,
+      createdAt: log.createdAt,
+    }));
+  }
 }

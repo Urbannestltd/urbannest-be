@@ -1,4 +1,5 @@
 import { PrismaClient, MaintenanceStatus } from "@prisma/client";
+import { logActivity } from "../../utils/activityLogger";
 import {
   AddCommentDto,
   TicketDetailResponseDto,
@@ -45,6 +46,34 @@ export class AdminTicketService {
 
     if (!ticket) throw new Error("Ticket not found");
 
+    const messages = ticket.messages;
+
+    // Build timeline
+    const timeline: { event: string; timestamp: Date }[] = [
+      { event: "Ticket submitted", timestamp: ticket.createdAt },
+    ];
+
+    for (const msg of messages) {
+      const isSystem = msg.message.startsWith("System:");
+      timeline.push({
+        event: isSystem ? msg.message.replace("System: ", "") : `Response from ${msg.sender.userFullName || "Unknown User"}`,
+        timestamp: msg.createdAt,
+      });
+    }
+
+    // Response metrics
+    const firstMessage = messages[0];
+    const timeToFirstResponseMinutes = firstMessage
+      ? Math.round((firstMessage.createdAt.getTime() - ticket.createdAt.getTime()) / 60000)
+      : null;
+
+    const resolutionMessage = messages.find(
+      (msg) => msg.message.startsWith("System:") && (msg.message.includes("RESOLVED") || msg.message.includes("FIXED")),
+    );
+    const timeToResolutionMinutes = resolutionMessage
+      ? Math.round((resolutionMessage.createdAt.getTime() - ticket.createdAt.getTime()) / 60000)
+      : null;
+
     return {
       id: ticket.id,
       subject: ticket.subject || "No Subject provided",
@@ -54,13 +83,20 @@ export class AdminTicketService {
       description: ticket.description,
       images: ticket.attachments || [],
 
-      activity: ticket.messages.map((msg) => ({
+      activity: messages.map((msg) => ({
         id: msg.id,
         senderName: msg.sender.userFullName || "Unknown User",
         message: msg.message,
         timestamp: msg.createdAt,
-        isSystemMessage: false, // You could add logic here later if you create system-generated messages
+        isSystemMessage: msg.message.startsWith("System:"),
       })),
+
+      responseMetrics: {
+        timeToFirstResponseMinutes,
+        timeToResolutionMinutes,
+      },
+
+      timeline,
     };
   }
 
@@ -95,7 +131,7 @@ export class AdminTicketService {
       data: { status: data.status },
     });
 
-    // Optional but highly recommended: Automatically add a system message to the chat log!
+    // Automatically add a system message to the chat log
     await prisma.maintenanceMessage.create({
       data: {
         ticketId: ticketId,
@@ -103,6 +139,13 @@ export class AdminTicketService {
         message: `System: Status updated to ${data.status}`,
         attachments: [],
       },
+    });
+
+    await logActivity({
+      userId: data.adminId,
+      action: "TICKET_STATUS_UPDATED",
+      description: `Ticket ${ticketId} status changed to ${data.status}`,
+      metadata: { ticketId, status: data.status },
     });
 
     return updatedTicket;
