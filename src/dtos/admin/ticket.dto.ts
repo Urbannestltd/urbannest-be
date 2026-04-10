@@ -23,7 +23,19 @@ export interface TicketDetailResponseDto {
     senderName: string;
     message: string;
     timestamp: Date;
-    isSystemMessage: boolean; // Useful if you want to log "Status updated to Fixed"
+    isSystemMessage: boolean;
+  }[];
+
+  // Response time metrics
+  responseMetrics: {
+    timeToFirstResponseMinutes: number | null;
+    timeToResolutionMinutes: number | null;
+  };
+
+  // Ordered event timeline
+  timeline: {
+    event: string;
+    timestamp: Date;
   }[];
 }
 

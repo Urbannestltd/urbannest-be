@@ -29,6 +29,7 @@ import sendEmail from "../config/resend";
 import transporter from "../config/nodemailer";
 import { JwtPayload } from "jsonwebtoken";
 import { ZeptoMailService } from "./external/zeptoMailService";
+import { logActivity } from "../utils/activityLogger";
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -352,7 +353,14 @@ export class AuthenticationService {
       },
     });
 
-    // 4. Return FULL payload
+    // 4. Log activity
+    await logActivity({
+      userId: user.userId,
+      action: "LOGIN",
+      description: "User logged in successfully",
+    });
+
+    // 5. Return FULL payload
     return {
       require2fa: false,
       token,

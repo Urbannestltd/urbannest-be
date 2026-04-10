@@ -1,4 +1,4 @@
-import { PropertyType, UnitStatus } from "@prisma/client";
+import { PropertyType, UnitStatus, UnitType } from "@prisma/client";
 
 export type ActivePropertyType = Extract<PropertyType, "COMMERCIAL" | "RESIDENTIAL">;
 
@@ -30,7 +30,8 @@ export interface CreateUnitAdminDto {
   baseRent?: number; // e.g., 2000000
   bedrooms?: number;
   bathrooms?: number;
-  status?: UnitStatus; // "AVAILABLE" or "OCCUPIED"
+  type?: UnitType;
+  status?: UnitStatus;
 }
 
 // 2. The DTO used by your Controller

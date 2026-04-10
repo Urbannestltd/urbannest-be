@@ -3,6 +3,7 @@ import { paystackClient } from "../utils/paystackClient";
 import { NotFoundError, BadRequestError } from "../utils/apiError";
 import { PaymentStatus, UnitStatus, LeaseStatus } from "@prisma/client";
 import { VTPassService } from "./external/vtPassService";
+import { logActivity } from "../utils/activityLogger";
 
 export class PaymentService {
   private vtpass = new VTPassService();
@@ -190,6 +191,13 @@ export class PaymentService {
           paidDate: new Date(),
           leaseId: finalLeaseId,
         },
+      });
+
+      await logActivity({
+        userId: payment.userId,
+        action: "PAYMENT_VERIFIED",
+        description: `Payment of ₦${payment.amount} verified (ref: ${reference})`,
+        metadata: { reference, amount: payment.amount },
       });
 
       return {

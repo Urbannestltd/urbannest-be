@@ -20,6 +20,7 @@ export class AdminUnitService {
         baseRent: data.baseRent || 0,
         bedrooms: data.bedrooms || 1,
         bathrooms: data.bathrooms || 1,
+        type: data.type || null,
         status: data.status || UnitStatus.AVAILABLE,
       },
     });

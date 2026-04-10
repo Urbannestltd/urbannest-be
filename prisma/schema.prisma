@@ -39,6 +39,16 @@ enum UnitStatus {
   MAINTENANCE
 }
 
+enum UnitType {
+  ONE_BEDROOM
+  TWO_BEDROOM
+  THREE_BEDROOM
+  MAISONETTE
+  STUDIO
+  DUPLEX
+  PENTHOUSE
+}
+
 enum LeaseStatus {
   ACTIVE
   EXPIRED
@@ -138,6 +148,14 @@ enum MaintenanceStatus {
   CANCELLED
 }
 
+enum ExpenseCategory {
+  MAINTENANCE
+  UTILITIES
+  INSURANCE
+  LEGAL
+  OTHER
+}
+
 // ==========================================
 // IDENTITY & ACCESS MANAGEMENT
 // ==========================================
@@ -195,6 +213,7 @@ model user {
   twoFactorSecret    String?
   twoFactorExpiry    DateTime?
   sessions           Session[]
+  activityLogs       ActivityLog[]
 
   @@index([userRoleId])
   @@map("user")
@@ -309,7 +328,8 @@ model property {
   agentId String?
   agent   user?   @relation("agentProperties", fields: [agentId], references: [userId])
 
-  units unit[]
+  units    unit[]
+  expenses Expense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -326,6 +346,7 @@ model unit {
   baseRent  Float?
   bedrooms  Int        @default(1)
   bathrooms Float      @default(1.0)
+  type      UnitType?
   status    UnitStatus @default(AVAILABLE)
 
   propertyId String
@@ -341,6 +362,7 @@ model unit {
   visitorInvites      VisitorInvite[]
   maintenanceRequests MaintenanceRequest[]
   visitorGroups       VisitorGroup[]
+  expenses            Expense[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -612,6 +634,49 @@ model MaintenanceMessage {
 
   @@index([ticketId])
   @@index([senderId])
+}
+
+// ==========================================
+// FINANCIALS
+// ==========================================
+
+model Expense {
+  id          String          @id @default(uuid())
+  amount      Float
+  category    ExpenseCategory
+  description String
+  date        DateTime        @default(now())
+
+  propertyId String?
+  property   property? @relation(fields: [propertyId], references: [id])
+  unitId     String?
+  unit       unit?     @relation(fields: [unitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([propertyId])
+  @@index([unitId])
+  @@map("expenses")
+}
+
+// ==========================================
+// AUDIT
+// ==========================================
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        user     @relation(fields: [userId], references: [userId])
+  action      String
+  description String
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
 }
 
 // ==========================================

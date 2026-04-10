@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "UnitType" AS ENUM ('ONE_BEDROOM', 'TWO_BEDROOM', 'THREE_BEDROOM', 'MAISONETTE', 'STUDIO', 'DUPLEX', 'PENTHOUSE');
+
+-- AlterTable
+ALTER TABLE "units" ADD COLUMN     "type" "UnitType";

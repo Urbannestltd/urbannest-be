@@ -1,6 +1,9 @@
 import * as express from "express";
 import {
   Body,
+  Get,
+  Path,
+  Put,
   SuccessResponse,
   Route,
   Controller,
@@ -30,5 +33,23 @@ export class AdminController extends Controller {
 
     this.setStatus(201);
     return this.adminService.createUser(validation);
+  }
+
+  @Put("users/{userId}/suspend")
+  public async suspendUser(@Path() userId: string) {
+    await this.adminService.suspendUser(userId);
+    return { success: true, message: "User suspended successfully" };
+  }
+
+  @Put("users/{userId}/activate")
+  public async activateUser(@Path() userId: string) {
+    await this.adminService.activateUser(userId);
+    return { success: true, message: "User activated successfully" };
+  }
+
+  @Get("users/{userId}/activity")
+  public async getUserActivity(@Path() userId: string) {
+    const logs = await this.adminService.getUserActivityLogs(userId);
+    return { success: true, message: "Activity logs retrieved", data: logs };
   }
 }
