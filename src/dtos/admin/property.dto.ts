@@ -1,6 +1,6 @@
 import { PropertyType, UnitStatus, UnitType } from "@prisma/client";
 
-export type ActivePropertyType = Extract<PropertyType, "COMMERCIAL" | "RESIDENTIAL">;
+export type ActivePropertyType = "COMMERCIAL" | "RESIDENTIAL";
 
 export interface CreatePropertyAdminDto {
   name?: string;

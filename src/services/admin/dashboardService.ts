@@ -113,6 +113,9 @@ export class AdminDashboardService {
               where: { status: { notIn: ["RESOLVED", "FIXED", "CANCELLED"] } },
               select: { priority: true },
             },
+            _count: {
+              select: { maintenanceRequests: true },
+            },
           },
         },
       },
@@ -151,11 +154,19 @@ export class AdminDashboardService {
         });
       });
 
-      // Column 5: Open maintenance
+      // Column 5: Open maintenance + % of total
       const openMaintenance = property.units.reduce(
         (sum, u) => sum + u.maintenanceRequests.length,
         0
       );
+      const totalMaintenance = property.units.reduce(
+        (sum, u) => sum + u._count.maintenanceRequests,
+        0
+      );
+      const openMaintenancePercent =
+        totalMaintenance === 0
+          ? 0
+          : Math.round((openMaintenance / totalMaintenance) * 100);
 
       // Column 6: FM assigned
       const facilityManager = property.facilityManager
@@ -191,6 +202,7 @@ export class AdminDashboardService {
         },
         arrears,
         openMaintenance,
+        openMaintenancePercent,
         facilityManager,
         alerts,
       };
