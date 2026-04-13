@@ -35,6 +35,7 @@ export interface PropertyOverviewItemDto {
   };
   arrears: number;
   openMaintenance: number;
+  openMaintenancePercent: number;
   facilityManager: FacilityManagerSummaryDto | null;
   alerts: string[];
 }
