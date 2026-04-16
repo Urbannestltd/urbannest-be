@@ -1,4 +1,4 @@
-import { Body, Get, Path, Post, Put, Route, Security, Tags } from "tsoa";
+import { Body, Delete, Get, Path, Post, Put, Route, Security, Tags } from "tsoa";
 import { AdminPropertyService } from "../../services/admin/propertyService";
 import {
   CreatePropertyAdminDto,
@@ -65,6 +65,12 @@ export class AdminPropertyController {
       success: true,
       message: `${body.role} removed successfully`,
     };
+  }
+
+  @Delete("{propertyId}")
+  public async deleteProperty(@Path() propertyId: string) {
+    await this.propertyService.deleteProperty(propertyId);
+    return { success: true, message: "Property deleted successfully" };
   }
 
   @Put("{propertyId}")

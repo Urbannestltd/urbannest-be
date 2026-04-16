@@ -1,4 +1,4 @@
-import { PropertyType, UnitStatus, UnitType } from "@prisma/client";
+import { UnitStatus, UnitType } from "@prisma/client";
 
 export type ActivePropertyType = "COMMERCIAL" | "RESIDENTIAL";
 
@@ -58,6 +58,10 @@ export interface UpdatePropertyAdminDto {
   // Arrays
   amenities?: string[];
   images?: string[];
+
+  // Unit structure
+  noOfFloors?: number;
+  noOfUnitsPerFloor?: number;
 }
 
 export interface PropertyDetailsResponseDto {

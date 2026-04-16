@@ -97,7 +97,14 @@ export class AdminService {
     };
   }
 
-  public async suspendUser(userId: string): Promise<void> {
+  public async suspendUser(
+    userId: string,
+    requestingAdminId: string,
+  ): Promise<void> {
+    if (userId === requestingAdminId) {
+      throw new BadRequestError("You cannot suspend your own account");
+    }
+
     const user = await prisma.user.findUnique({ where: { userId } });
     if (!user) throw new BadRequestError("User not found");
 
@@ -107,7 +114,14 @@ export class AdminService {
     });
   }
 
-  public async activateUser(userId: string): Promise<void> {
+  public async activateUser(
+    userId: string,
+    requestingAdminId: string,
+  ): Promise<void> {
+    if (userId === requestingAdminId) {
+      throw new BadRequestError("You cannot activate your own account");
+    }
+
     const user = await prisma.user.findUnique({ where: { userId } });
     if (!user) throw new BadRequestError("User not found");
 
@@ -115,6 +129,29 @@ export class AdminService {
       where: { userId },
       data: { userStatus: "ACTIVE" },
     });
+  }
+
+  public async getAllUsers(excludeAdminId: string) {
+    const users = await prisma.user.findMany({
+      where: { userId: { not: excludeAdminId } },
+      include: { userRole: true, leases: true },
+      orderBy: { userCreatedAt: "desc" },
+    });
+
+    return users.map((u) => ({
+      id: u.userId,
+      fullName: u.userFullName,
+      email: u.userEmail,
+      phone: u.userPhone,
+      role: u.userRole.roleName,
+      status: u.userStatus,
+      profileUrl: u.userProfileUrl,
+      dateOfBirth: u.dateOfBirth,
+      occupation: u.occupation,
+      employer: u.employer,
+      emergencyContact: u.userEmergencyContact,
+      createdAt: u.userCreatedAt,
+    }));
   }
 
   public async getUserActivityLogs(userId: string): Promise<

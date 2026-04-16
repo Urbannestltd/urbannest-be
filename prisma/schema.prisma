@@ -37,6 +37,7 @@ enum UnitStatus {
   AVAILABLE
   OCCUPIED
   MAINTENANCE
+  DELETED
 }
 
 enum UnitType {
@@ -331,6 +332,7 @@ model property {
   units    unit[]
   expenses Expense[]
 
+  isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

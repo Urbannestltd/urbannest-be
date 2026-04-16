@@ -1,4 +1,4 @@
-import { Body, Get, Path, Post, Route, Security, Tags } from "tsoa";
+import { Body, Delete, Get, Path, Post, Route, Security, Tags } from "tsoa";
 import { AdminUnitService } from "../../services/admin/unitService";
 import { CreateUnitAdminDto } from "../../dtos/admin/property.dto";
 
@@ -29,6 +29,12 @@ export class AdminUnitController {
       message: "Units retrieved successfully",
       data: unitData,
     };
+  }
+
+  @Delete("{unitId}")
+  public async deleteUnit(@Path() unitId: string) {
+    await this.unitService.deleteUnit(unitId);
+    return { success: true, message: "Unit deleted successfully" };
   }
 
   @Get("{tenantId}")

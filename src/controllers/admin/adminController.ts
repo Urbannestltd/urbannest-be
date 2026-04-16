@@ -1,4 +1,3 @@
-import * as express from "express";
 import {
   Body,
   Get,
@@ -10,6 +9,7 @@ import {
   Tags,
   Post,
   Security,
+  Request,
 } from "tsoa";
 import {
   AdminCreateUserRequest,
@@ -35,15 +35,27 @@ export class AdminController extends Controller {
     return this.adminService.createUser(validation);
   }
 
+  @Get("users")
+  public async getAllUsers(@Request() req: any) {
+    const data = await this.adminService.getAllUsers(req.user.userId);
+    return { success: true, message: "Users retrieved", data };
+  }
+
   @Put("users/{userId}/suspend")
-  public async suspendUser(@Path() userId: string) {
-    await this.adminService.suspendUser(userId);
+  public async suspendUser(
+    @Path() userId: string,
+    @Request() req: any,
+  ) {
+    await this.adminService.suspendUser(userId, req.user.userId);
     return { success: true, message: "User suspended successfully" };
   }
 
   @Put("users/{userId}/activate")
-  public async activateUser(@Path() userId: string) {
-    await this.adminService.activateUser(userId);
+  public async activateUser(
+    @Path() userId: string,
+    @Request() req: any,
+  ) {
+    await this.adminService.activateUser(userId, req.user.userId);
     return { success: true, message: "User activated successfully" };
   }
 

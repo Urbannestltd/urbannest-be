@@ -1,11 +1,19 @@
-import { MaintenanceCategory, MaintenanceStatus } from "@prisma/client";
+import { MaintenanceStatus } from "@prisma/client";
 
 export interface TicketListResponseDto {
   id: string;
   subject: string;
+  priority: string;
   category: string;
   dateSubmitted: Date;
   status: string;
+  assignedTo: { id: string; name: string | null } | null;
+
+  // SLA tracking
+  responseTimeMinutes: number | null; // null = no response yet
+  projectedFixDeadline: Date;         // createdAt + SLA window for this priority
+  isResponseLate: boolean;            // first response exceeded SLA response window
+  isFixLate: boolean;                 // still open past the fix deadline
 }
 
 export interface TicketDetailResponseDto {

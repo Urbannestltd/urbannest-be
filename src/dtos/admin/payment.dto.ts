@@ -31,3 +31,15 @@ export interface AdminGetPaymentsQuery {
   endDate?: string;
   type?: PaymentType;
 }
+
+export interface FinancialMetricsDto {
+  totalExpectedRevenue: number;  // sum of rentAmount on all ACTIVE leases
+  totalCollected: number;        // sum of all PAID payments (all types)
+  outstandingAmount: number;     // sum of all OVERDUE payment amounts
+  defaultingTenants: number;     // distinct tenants with >= 1 OVERDUE payment
+  collectedBreakdown: {
+    rent: number;
+    serviceCharge: number;
+    utilityBills: number;
+  };
+}
