@@ -150,7 +150,7 @@ export class AdminPaymentService {
 
     return {
       totalExpectedRevenue: expectedRevenue._sum.rentAmount ?? 0,
-      totalCollected: rent + serviceCharge + utilityBills,
+      totalCollected: rent,
       outstandingAmount: outstanding._sum.amount ?? 0,
       defaultingTenants,
       collectedBreakdown: { rent, serviceCharge, utilityBills },

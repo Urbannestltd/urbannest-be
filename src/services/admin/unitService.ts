@@ -1,5 +1,6 @@
 import { UnitStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma";
+import { normalizeFloor } from "./propertyService";
 import { CreateUnitAdminDto } from "../../dtos/admin/property.dto";
 import { TenantProfileResponseDto } from "../../dtos/admin/tenant.dto";
 import { BadRequestError } from "../../utils/apiError";
@@ -158,10 +159,11 @@ export class AdminUnitService {
         }
       }
 
+      const floor = normalizeFloor(unit.floor);
       return {
         id: unit.id,
         name: unit.name,
-        floor: unit.floor || "Unassigned",
+        floor,
         status: unit.status, // "AVAILABLE" (Vacant) or "OCCUPIED"
         rentAmount: activeLease?.rentAmount || unit.baseRent || 0,
 

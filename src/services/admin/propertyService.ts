@@ -1,5 +1,22 @@
 import { UnitStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma";
+
+// Normalises raw floor strings to a canonical "Floor N" form so that
+// "7", "Floor 7", "Seventh Floor" etc. all map to the same bucket.
+const WORD_TO_NUM: Record<string, number> = {
+  first: 1, second: 2, third: 3, fourth: 4, fifth: 5,
+  sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10,
+};
+
+export function normalizeFloor(raw: string | null | undefined): string {
+  if (!raw) return "Unassigned";
+  const s = raw.trim();
+  if (/^Floor \d+$/i.test(s)) return `Floor ${parseInt(s.split(" ")[1]!)}`;
+  if (/^\d+$/.test(s)) return `Floor ${parseInt(s)}`;
+  const lower = s.toLowerCase().replace(/\s*floor\s*/g, "").trim();
+  if (WORD_TO_NUM[lower]) return `Floor ${WORD_TO_NUM[lower]}`;
+  return s;
+}
 import {
   CreatePropertyAdminDto,
   ManageMemberDto,
@@ -378,25 +395,20 @@ export class AdminPropertyService {
     // 4. Reconcile unit count if floor/unit structure was changed
     if (data.noOfFloors !== undefined || data.noOfUnitsPerFloor !== undefined) {
       const existingUnits = await prisma.unit.findMany({
-        where: { propertyId },
-        select: { id: true, status: true },
+        where: { propertyId, status: { not: UnitStatus.DELETED } },
+        select: { id: true, status: true, floor: true },
         orderBy: { createdAt: "asc" },
       });
 
       const currentCount = existingUnits.length;
 
-      // Derive the target totals — fall back to current floor/unit counts if only one side changed
-      const uniqueFloors = new Set(
-        (
-          await prisma.unit.findMany({
-            where: { propertyId },
-            select: { floor: true },
-          })
-        )
-          .map((u) => u.floor)
-          .filter(Boolean),
-      );
-      const currentFloors = uniqueFloors.size || 1;
+      // Derive the target totals — fall back to current floor/unit counts if only one side changed.
+      // Normalise floor names before counting so "Floor 1" and "First Floor" and "1" all count as one.
+      const floorNames = existingUnits
+        .map((u: any) => u.floor)
+        .filter(Boolean)
+        .map((f: string) => normalizeFloor(f));
+      const currentFloors = new Set(floorNames).size || 1;
       const currentUnitsPerFloor =
         currentFloors > 0 ? Math.ceil(currentCount / currentFloors) : currentCount;
 
