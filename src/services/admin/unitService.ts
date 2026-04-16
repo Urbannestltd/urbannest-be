@@ -99,9 +99,22 @@ export class AdminUnitService {
   //   };
   // }
 
+  public async deleteUnit(unitId: string) {
+    const unit = await prisma.unit.findUnique({ where: { id: unitId } });
+    if (!unit) throw new BadRequestError("Unit not found");
+    if (unit.status === UnitStatus.DELETED) {
+      throw new BadRequestError("Unit is already deleted");
+    }
+
+    await prisma.unit.update({
+      where: { id: unitId },
+      data: { status: UnitStatus.DELETED },
+    });
+  }
+
   public async getUnitsByProperty(propertyId: string) {
     const units = await prisma.unit.findMany({
-      where: { propertyId },
+      where: { propertyId, status: { not: UnitStatus.DELETED } },
       include: {
         leases: {
           where: { status: "ACTIVE" },

@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import {
   AdminGetPaymentsQuery,
   AdminPaymentListItemDto,
+  FinancialMetricsDto,
 } from "../../dtos/admin/payment.dto";
 
 export class AdminPaymentService {
@@ -76,6 +77,84 @@ export class AdminPaymentService {
           }
         : null,
     }));
+  }
+
+  public async getFinancialMetrics(propertyId?: string): Promise<FinancialMetricsDto> {
+    const propertyFilter = propertyId
+      ? { lease: { unit: { propertyId } } }
+      : {};
+
+    const leaseFilter = propertyId
+      ? { status: "ACTIVE" as const, unit: { propertyId } }
+      : { status: "ACTIVE" as const };
+
+    const [
+      expectedRevenue,
+      collectedRent,
+      collectedServiceCharge,
+      collectedUtility,
+      outstanding,
+      defaultingTenants,
+    ] = await Promise.all([
+      // Expected: sum of rentAmount on all active leases
+      prisma.lease.aggregate({
+        _sum: { rentAmount: true },
+        where: leaseFilter,
+      }),
+
+      // Collected: PAID rent payments
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: "PAID", type: "RENT", ...propertyFilter },
+      }),
+
+      // Collected: PAID service charge payments
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: "PAID", type: "SERVICE_CHARGE", ...propertyFilter },
+      }),
+
+      // Collected: PAID utility bill payments
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: "PAID",
+          type: { in: ["UTILITY_BILL", "UTILITY_TOKEN"] },
+          ...propertyFilter,
+        },
+      }),
+
+      // Outstanding: sum of all OVERDUE payment amounts
+      prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { status: "OVERDUE", ...propertyFilter },
+      }),
+
+      // Defaulting: distinct tenants with at least one OVERDUE payment
+      prisma.user.count({
+        where: {
+          userRole: { roleName: "TENANT" },
+          payments: {
+            some: {
+              status: "OVERDUE",
+              ...(propertyId ? { lease: { unit: { propertyId } } } : {}),
+            },
+          },
+        },
+      }),
+    ]);
+
+    const rent = collectedRent._sum.amount ?? 0;
+    const serviceCharge = collectedServiceCharge._sum.amount ?? 0;
+    const utilityBills = collectedUtility._sum.amount ?? 0;
+
+    return {
+      totalExpectedRevenue: expectedRevenue._sum.rentAmount ?? 0,
+      totalCollected: rent + serviceCharge + utilityBills,
+      outstandingAmount: outstanding._sum.amount ?? 0,
+      defaultingTenants,
+      collectedBreakdown: { rent, serviceCharge, utilityBills },
+    };
   }
 
   public async generateCsvExport(

@@ -32,19 +32,11 @@ export class AdminPropertyService {
 
       for (let floor = 1; floor <= floors; floor++) {
         for (let unitNum = 1; unitNum <= unitsPerFloor; unitNum++) {
-          const floorName =
-            floor === 1
-              ? "First Floor"
-              : floor === 2
-                ? "Second Floor"
-                : floor === 3
-                  ? "Third Floor"
-                  : `Floor ${floor}`;
-
+          const globalUnitNum = (floor - 1) * unitsPerFloor + unitNum;
           unitsToCreate.push({
             propertyId: property.id,
-            name: `Unit ${unitNum}`,
-            floor: floorName,
+            name: `Unit ${globalUnitNum}`,
+            floor: `Floor ${floor}`,
             baseRent: data.price || 0,
             status: UnitStatus.AVAILABLE,
           });
@@ -65,12 +57,49 @@ export class AdminPropertyService {
     });
   }
 
+  public async deleteProperty(propertyId: string) {
+    const property = await prisma.property.findUnique({
+      where: { id: propertyId },
+    });
+    if (!property) throw new Error("Property not found");
+
+    await prisma.$transaction([
+      prisma.unit.updateMany({
+        where: { propertyId, status: { not: UnitStatus.DELETED } },
+        data: { status: UnitStatus.DELETED },
+      }),
+      prisma.property.update({
+        where: { id: propertyId },
+        data: { isDeleted: true },
+      }),
+    ]);
+  }
+
   public async getProperties() {
-    return await prisma.property.findMany({
+    const properties = await prisma.property.findMany({
+      where: { isDeleted: false },
       include: {
-        _count: { select: { units: true } },
+        units: {
+          where: { status: { not: UnitStatus.DELETED } },
+          select: {
+            leases: {
+              where: { status: "ACTIVE" },
+              select: { id: true },
+            },
+          },
+        },
       },
       orderBy: { updatedAt: "desc" },
+    });
+
+    return properties.map((p) => {
+      const totalUnits = p.units.length;
+      const occupiedUnits = p.units.filter((u) => u.leases.length > 0).length;
+      const occupancyPercent =
+        totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
+
+      const { units, ...rest } = p;
+      return { ...rest, totalUnits, occupancyPercent };
     });
   }
 
@@ -90,6 +119,7 @@ export class AdminPropertyService {
         landlord: true,
         agent: true,
         units: {
+          where: { status: { not: UnitStatus.DELETED } },
           include: {
             leases: { where: { status: "ACTIVE" } },
             maintenanceRequests: true,
@@ -343,6 +373,69 @@ export class AdminPropertyService {
           baseRent: data.price,
         },
       });
+    }
+
+    // 4. Reconcile unit count if floor/unit structure was changed
+    if (data.noOfFloors !== undefined || data.noOfUnitsPerFloor !== undefined) {
+      const existingUnits = await prisma.unit.findMany({
+        where: { propertyId },
+        select: { id: true, status: true },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const currentCount = existingUnits.length;
+
+      // Derive the target totals — fall back to current floor/unit counts if only one side changed
+      const uniqueFloors = new Set(
+        (
+          await prisma.unit.findMany({
+            where: { propertyId },
+            select: { floor: true },
+          })
+        )
+          .map((u) => u.floor)
+          .filter(Boolean),
+      );
+      const currentFloors = uniqueFloors.size || 1;
+      const currentUnitsPerFloor =
+        currentFloors > 0 ? Math.ceil(currentCount / currentFloors) : currentCount;
+
+      const targetFloors = data.noOfFloors ?? currentFloors;
+      const targetUnitsPerFloor = data.noOfUnitsPerFloor ?? currentUnitsPerFloor;
+      const targetTotal = targetFloors * targetUnitsPerFloor;
+
+      if (targetTotal > currentCount) {
+        // Expand: create the missing units
+        const unitsToCreate = [];
+        let globalUnitNum = currentCount + 1;
+        for (let floor = 1; floor <= targetFloors; floor++) {
+          for (let u = 1; u <= targetUnitsPerFloor; u++) {
+            const thisUnitNum = (floor - 1) * targetUnitsPerFloor + u;
+            if (thisUnitNum > currentCount) {
+              unitsToCreate.push({
+                propertyId,
+                name: `Unit ${globalUnitNum}`,
+                floor: `Floor ${floor}`,
+                baseRent: updatedProperty.price || 0,
+                status: UnitStatus.AVAILABLE,
+              });
+              globalUnitNum++;
+            }
+          }
+        }
+        await prisma.unit.createMany({ data: unitsToCreate });
+      } else if (targetTotal < currentCount) {
+        // Shrink: delete only AVAILABLE units (newest first), never touch occupied units
+        const deletableIds = existingUnits
+          .filter((u) => u.status === "AVAILABLE")
+          .reverse()
+          .slice(0, currentCount - targetTotal)
+          .map((u) => u.id);
+
+        if (deletableIds.length > 0) {
+          await prisma.unit.deleteMany({ where: { id: { in: deletableIds } } });
+        }
+      }
     }
 
     return updatedProperty;

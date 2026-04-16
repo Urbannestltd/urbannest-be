@@ -89,6 +89,7 @@ export class AdminDashboardService {
   // --- 2. GET PROPERTY OVERVIEW TABLE ---
   public async getPropertyOverview(): Promise<PropertyOverviewResponseDto> {
     const properties = await prisma.property.findMany({
+      where: { isDeleted: false },
       include: {
         facilityManager: {
           select: {
@@ -98,6 +99,7 @@ export class AdminDashboardService {
           },
         },
         units: {
+          where: { status: { not: "DELETED" } },
           include: {
             leases: {
               where: { status: "ACTIVE" },

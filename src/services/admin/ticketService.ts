@@ -1,5 +1,4 @@
 import { PrismaClient, MaintenanceStatus } from "@prisma/client";
-import { logActivity } from "../../utils/activityLogger";
 import {
   AddCommentDto,
   TicketDetailResponseDto,
@@ -10,6 +9,14 @@ import {
 const prisma = new PrismaClient();
 
 export class AdminTicketService {
+  // SLA windows by priority (in hours)
+  private readonly SLA = {
+    EMERGENCY: { responseHours: 1,  fixHours: 4   },
+    HIGH:      { responseHours: 4,  fixHours: 24  },
+    MEDIUM:    { responseHours: 24, fixHours: 72  },
+    LOW:       { responseHours: 72, fixHours: 168 },
+  };
+
   // --- 1. GET ALL TICKETS FOR A PROPERTY ---
   public async getPropertyTickets(
     propertyId: string,
@@ -19,15 +26,60 @@ export class AdminTicketService {
         unit: { propertyId: propertyId },
       },
       orderBy: { createdAt: "desc" },
+      include: {
+        assignedTo: true,
+        messages: {
+          orderBy: { createdAt: "asc" },
+          take: 1,
+        },
+      },
     });
 
-    return tickets.map((ticket) => ({
-      id: ticket.id,
-      subject: ticket.subject || "No Subject provided",
-      category: ticket.category,
-      dateSubmitted: ticket.createdAt,
-      status: ticket.status,
-    }));
+    const now = new Date();
+
+    return tickets.map((ticket) => {
+      const sla = this.SLA[ticket.priority] ?? this.SLA.MEDIUM;
+      const projectedFixDeadline = new Date(
+        ticket.createdAt.getTime() + sla.fixHours * 60 * 60 * 1000,
+      );
+      const responseDeadline = new Date(
+        ticket.createdAt.getTime() + sla.responseHours * 60 * 60 * 1000,
+      );
+
+      const firstMessage = ticket.messages[0] ?? null;
+      const responseTimeMinutes = firstMessage
+        ? Math.round(
+            (firstMessage.createdAt.getTime() - ticket.createdAt.getTime()) /
+              60000,
+          )
+        : null;
+
+      const isResolved = ["RESOLVED", "FIXED", "CANCELLED"].includes(
+        ticket.status,
+      );
+
+      const isResponseLate = firstMessage
+        ? firstMessage.createdAt > responseDeadline
+        : !isResolved && now > responseDeadline;
+
+      const isFixLate = !isResolved && now > projectedFixDeadline;
+
+      return {
+        id: ticket.id,
+        subject: ticket.subject || "No Subject provided",
+        priority: ticket.priority,
+        category: ticket.category,
+        dateSubmitted: ticket.createdAt,
+        status: ticket.status,
+        assignedTo: ticket.assignedTo
+          ? { id: ticket.assignedTo.userId, name: ticket.assignedTo.userFullName }
+          : null,
+        responseTimeMinutes,
+        projectedFixDeadline,
+        isResponseLate,
+        isFixLate,
+      };
+    });
   }
 
   // --- 2. GET SINGLE TICKET DETAILS (FOR THE MODAL) ---
@@ -56,7 +108,9 @@ export class AdminTicketService {
     for (const msg of messages) {
       const isSystem = msg.message.startsWith("System:");
       timeline.push({
-        event: isSystem ? msg.message.replace("System: ", "") : `Response from ${msg.sender.userFullName || "Unknown User"}`,
+        event: isSystem
+          ? msg.message.replace("System: ", "")
+          : `Response from ${msg.sender.userFullName || "Unknown User"}`,
         timestamp: msg.createdAt,
       });
     }
@@ -64,14 +118,22 @@ export class AdminTicketService {
     // Response metrics
     const firstMessage = messages[0];
     const timeToFirstResponseMinutes = firstMessage
-      ? Math.round((firstMessage.createdAt.getTime() - ticket.createdAt.getTime()) / 60000)
+      ? Math.round(
+          (firstMessage.createdAt.getTime() - ticket.createdAt.getTime()) /
+            60000,
+        )
       : null;
 
     const resolutionMessage = messages.find(
-      (msg) => msg.message.startsWith("System:") && (msg.message.includes("RESOLVED") || msg.message.includes("FIXED")),
+      (msg) =>
+        msg.message.startsWith("System:") &&
+        (msg.message.includes("RESOLVED") || msg.message.includes("FIXED")),
     );
     const timeToResolutionMinutes = resolutionMessage
-      ? Math.round((resolutionMessage.createdAt.getTime() - ticket.createdAt.getTime()) / 60000)
+      ? Math.round(
+          (resolutionMessage.createdAt.getTime() - ticket.createdAt.getTime()) /
+            60000,
+        )
       : null;
 
     return {
@@ -139,13 +201,6 @@ export class AdminTicketService {
         message: `System: Status updated to ${data.status}`,
         attachments: [],
       },
-    });
-
-    await logActivity({
-      userId: data.adminId,
-      action: "TICKET_STATUS_UPDATED",
-      description: `Ticket ${ticketId} status changed to ${data.status}`,
-      metadata: { ticketId, status: data.status },
     });
 
     return updatedTicket;

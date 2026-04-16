@@ -3,6 +3,7 @@ import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { requestLogger } from "./middlewares/requestLogger";
+import { activityLoggerMiddleware } from "./middlewares/activityLoggerMiddleware";
 import { notFoundHandler } from "./middlewares/notFoundHandler";
 import { errorHandler } from "./middlewares/errorHandler";
 import swaggerUi from "swagger-ui-express";
@@ -61,6 +62,7 @@ app.post(
 
 app.use(express.json());
 app.use(requestLogger);
+app.use(activityLoggerMiddleware);
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 

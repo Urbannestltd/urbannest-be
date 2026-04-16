@@ -9,6 +9,12 @@ import { AdminPaymentService } from "../../services/admin/paymentService";
 export class AdminPaymentController {
   private paymentService = new AdminPaymentService();
 
+  @Get("/metrics")
+  public async getFinancialMetrics(@Query() propertyId?: string) {
+    const metrics = await this.paymentService.getFinancialMetrics(propertyId);
+    return { success: true, message: "Financial metrics retrieved", data: metrics };
+  }
+
   @Get("/")
   public async getAllPayments(
     @Query() propertyId?: string,
