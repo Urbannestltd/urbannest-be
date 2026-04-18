@@ -1,6 +1,7 @@
 import { PrismaClient, UnitStatus, LeaseStatus } from "@prisma/client";
 import {
   CreateLeaseDto,
+  LeaseDetailDto,
   UpdateLeaseDto,
   RenewLeaseDto,
 } from "../../dtos/admin/lease.dto";
@@ -51,6 +52,45 @@ export class AdminLeaseService {
     ]);
 
     return newLease;
+  }
+
+  // --- GET LEASE BY ID ---
+  public async getLeaseById(leaseId: string): Promise<LeaseDetailDto> {
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: {
+        tenant: {
+          select: { userId: true, userFullName: true, userPhone: true },
+        },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            property: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!lease) throw new BadRequestError("Lease not found.");
+
+    return {
+      id: lease.id,
+      status: lease.status,
+      rentAmount: lease.rentAmount,
+      serviceCharge: lease.serviceCharge ?? null,
+      startDate: lease.startDate,
+      endDate: lease.endDate,
+      moveOutNotice: lease.moveOutNotice ?? null,
+      documentUrl: lease.documentUrl ?? null,
+      tenant: lease.tenant
+        ? { id: lease.tenant.userId, name: lease.tenant.userFullName, phone: lease.tenant.userPhone }
+        : null,
+      unit: lease.unit ? { id: lease.unit.id, name: lease.unit.name } : null,
+      property: lease.unit?.property
+        ? { id: lease.unit.property.id, name: lease.unit.property.name }
+        : null,
+    };
   }
 
   // --- EDIT ACTIVE LEASE ---

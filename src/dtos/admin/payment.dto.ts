@@ -1,4 +1,4 @@
-import { PaymentType } from "@prisma/client";
+import { PaymentStatus, PaymentType } from "@prisma/client";
 
 export interface AdminPaymentListItemDto {
   id: string;
@@ -27,6 +27,7 @@ export interface AdminPaymentListItemDto {
 export interface AdminGetPaymentsQuery {
   propertyId?: string;
   tenantId?: string;
+  status?: PaymentStatus;
   startDate?: string;
   endDate?: string;
   type?: PaymentType;

@@ -49,6 +49,7 @@ export interface ManageMemberDto {
 
 export interface UpdatePropertyAdminDto {
   name?: string;
+  type?: ActivePropertyType;
   price?: number;
   address?: string;
   state?: string;

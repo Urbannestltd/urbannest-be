@@ -366,6 +366,7 @@ export class AdminPropertyService {
       where: { id: propertyId },
       data: {
         name: data.name !== undefined ? data.name : property.name,
+        type: data.type !== undefined ? data.type : property.type,
         price: data.price !== undefined ? data.price : property.price,
         address: data.address !== undefined ? data.address : property.address,
         state: data.state !== undefined ? data.state : property.state,

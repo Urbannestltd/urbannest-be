@@ -1,6 +1,6 @@
 import * as express from "express";
 import { Get, Query, Request, Route, Security, Tags } from "tsoa";
-import { PaymentType } from "@prisma/client";
+import { PaymentStatus, PaymentType } from "@prisma/client";
 import { AdminPaymentService } from "../../services/admin/paymentService";
 
 @Route("admin/payments")
@@ -19,6 +19,7 @@ export class AdminPaymentController {
   public async getAllPayments(
     @Query() propertyId?: string,
     @Query() tenantId?: string,
+    @Query() status?: PaymentStatus,
     @Query() startDate?: string,
     @Query() endDate?: string,
     @Query() type?: PaymentType,
@@ -26,6 +27,7 @@ export class AdminPaymentController {
     const payments = await this.paymentService.getAllPayments({
       propertyId,
       tenantId,
+      status,
       startDate,
       endDate,
       type,

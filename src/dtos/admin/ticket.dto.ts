@@ -27,6 +27,10 @@ export interface TicketDetailResponseDto {
   description: string;
   images: string[];
 
+  unit: { id: string; name: string } | null;
+  property: { id: string; name: string | null } | null;
+  tenant: { name: string | null; phone: string | null } | null;
+
   // Activity & Comments
   activity: {
     id: string;

@@ -110,9 +110,19 @@ export class AdminTicketService {
     const ticket = await prisma.maintenanceRequest.findUnique({
       where: { id: ticketId },
       include: {
+        tenant: {
+          select: { userFullName: true, userPhone: true },
+        },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            property: { select: { id: true, name: true } },
+          },
+        },
         messages: {
           include: { sender: true },
-          orderBy: { createdAt: "asc" }, // Oldest to newest for chat flow
+          orderBy: { createdAt: "asc" },
         },
       },
     });
@@ -165,6 +175,14 @@ export class AdminTicketService {
       category: ticket.category,
       description: ticket.description,
       images: ticket.attachments || [],
+
+      unit: ticket.unit ? { id: ticket.unit.id, name: ticket.unit.name } : null,
+      property: ticket.unit?.property
+        ? { id: ticket.unit.property.id, name: ticket.unit.property.name }
+        : null,
+      tenant: ticket.tenant
+        ? { name: ticket.tenant.userFullName, phone: ticket.tenant.userPhone }
+        : null,
 
       activity: messages.map((msg) => ({
         id: msg.id,
