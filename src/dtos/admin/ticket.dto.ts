@@ -8,6 +8,8 @@ export interface TicketListResponseDto {
   dateSubmitted: Date;
   status: string;
   assignedTo: { id: string; name: string | null } | null;
+  unit: { id: string; name: string } | null;
+  property: { id: string; name: string | null } | null;
 
   // SLA tracking
   responseTimeMinutes: number | null; // null = no response yet
