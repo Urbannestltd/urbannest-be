@@ -17,69 +17,90 @@ export class AdminTicketService {
     LOW:       { responseHours: 72, fixHours: 168 },
   };
 
+  // --- SHARED: maps a raw maintenanceRequest (with includes) to TicketListResponseDto ---
+  private mapTicket(ticket: any, now: Date): TicketListResponseDto {
+    const sla = this.SLA[ticket.priority as keyof typeof this.SLA] ?? this.SLA.MEDIUM;
+    const projectedFixDeadline = new Date(
+      ticket.createdAt.getTime() + sla.fixHours * 60 * 60 * 1000,
+    );
+    const responseDeadline = new Date(
+      ticket.createdAt.getTime() + sla.responseHours * 60 * 60 * 1000,
+    );
+
+    const firstMessage = ticket.messages[0] ?? null;
+    const responseTimeMinutes = firstMessage
+      ? Math.round(
+          (firstMessage.createdAt.getTime() - ticket.createdAt.getTime()) / 60000,
+        )
+      : null;
+
+    const isResolved = ["RESOLVED", "FIXED", "CANCELLED"].includes(ticket.status);
+    const isResponseLate = firstMessage
+      ? firstMessage.createdAt > responseDeadline
+      : !isResolved && now > responseDeadline;
+    const isFixLate = !isResolved && now > projectedFixDeadline;
+
+    return {
+      id: ticket.id,
+      subject: ticket.subject || "No Subject provided",
+      priority: ticket.priority,
+      category: ticket.category,
+      dateSubmitted: ticket.createdAt,
+      status: ticket.status,
+      assignedTo: ticket.assignedTo
+        ? { id: ticket.assignedTo.userId, name: ticket.assignedTo.userFullName }
+        : null,
+      unit: ticket.unit ? { id: ticket.unit.id, name: ticket.unit.name } : null,
+      property: ticket.unit?.property
+        ? { id: ticket.unit.property.id, name: ticket.unit.property.name }
+        : null,
+      responseTimeMinutes,
+      projectedFixDeadline,
+      isResponseLate,
+      isFixLate,
+    };
+  }
+
+  private get ticketIncludes() {
+    return {
+      assignedTo: true,
+      unit: {
+        select: {
+          id: true,
+          name: true,
+          property: { select: { id: true, name: true } },
+        },
+      },
+      messages: {
+        orderBy: { createdAt: "asc" as const },
+        take: 1,
+      },
+    };
+  }
+
+  // --- 0. GET ALL TICKETS (across all properties) ---
+  public async getAllTickets(): Promise<TicketListResponseDto[]> {
+    const tickets = await prisma.maintenanceRequest.findMany({
+      orderBy: { createdAt: "desc" },
+      include: this.ticketIncludes,
+    });
+
+    const now = new Date();
+    return tickets.map((t) => this.mapTicket(t, now));
+  }
+
   // --- 1. GET ALL TICKETS FOR A PROPERTY ---
   public async getPropertyTickets(
     propertyId: string,
   ): Promise<TicketListResponseDto[]> {
     const tickets = await prisma.maintenanceRequest.findMany({
-      where: {
-        unit: { propertyId: propertyId },
-      },
+      where: { unit: { propertyId } },
       orderBy: { createdAt: "desc" },
-      include: {
-        assignedTo: true,
-        messages: {
-          orderBy: { createdAt: "asc" },
-          take: 1,
-        },
-      },
+      include: this.ticketIncludes,
     });
 
     const now = new Date();
-
-    return tickets.map((ticket) => {
-      const sla = this.SLA[ticket.priority] ?? this.SLA.MEDIUM;
-      const projectedFixDeadline = new Date(
-        ticket.createdAt.getTime() + sla.fixHours * 60 * 60 * 1000,
-      );
-      const responseDeadline = new Date(
-        ticket.createdAt.getTime() + sla.responseHours * 60 * 60 * 1000,
-      );
-
-      const firstMessage = ticket.messages[0] ?? null;
-      const responseTimeMinutes = firstMessage
-        ? Math.round(
-            (firstMessage.createdAt.getTime() - ticket.createdAt.getTime()) /
-              60000,
-          )
-        : null;
-
-      const isResolved = ["RESOLVED", "FIXED", "CANCELLED"].includes(
-        ticket.status,
-      );
-
-      const isResponseLate = firstMessage
-        ? firstMessage.createdAt > responseDeadline
-        : !isResolved && now > responseDeadline;
-
-      const isFixLate = !isResolved && now > projectedFixDeadline;
-
-      return {
-        id: ticket.id,
-        subject: ticket.subject || "No Subject provided",
-        priority: ticket.priority,
-        category: ticket.category,
-        dateSubmitted: ticket.createdAt,
-        status: ticket.status,
-        assignedTo: ticket.assignedTo
-          ? { id: ticket.assignedTo.userId, name: ticket.assignedTo.userFullName }
-          : null,
-        responseTimeMinutes,
-        projectedFixDeadline,
-        isResponseLate,
-        isFixLate,
-      };
-    });
+    return tickets.map((t) => this.mapTicket(t, now));
   }
 
   // --- 2. GET SINGLE TICKET DETAILS (FOR THE MODAL) ---

@@ -11,6 +11,13 @@ import {
 export class AdminTicketController {
   private ticketService = new AdminTicketService();
 
+  // Get all tickets across all properties
+  @Get("tickets")
+  public async getAllTickets() {
+    const tickets = await this.ticketService.getAllTickets();
+    return { success: true, data: tickets };
+  }
+
   // Get list for the "Tickets" tab
   @Get("{propertyId}/tickets")
   public async getPropertyTickets(@Path() propertyId: string) {
