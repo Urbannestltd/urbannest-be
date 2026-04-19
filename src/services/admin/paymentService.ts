@@ -12,6 +12,7 @@ export class AdminPaymentService {
     const payments = await prisma.payment.findMany({
       where: {
         ...(filters.tenantId && { userId: filters.tenantId }),
+        ...(filters.status && { status: filters.status }),
         ...(filters.type && { type: filters.type }),
         ...(filters.startDate || filters.endDate
           ? {

@@ -26,7 +26,7 @@ export type PropertyRole = "LANDLORD" | "FACILITY_MANAGER" | "TENANT";
 
 export interface CreateUnitAdminDto {
   name: string; // e.g., "Unit 1"
-  floor?: string; // e.g., "First Floor"
+  floor?: string | number; // e.g., "First Floor", "Floor 1", or 1
   baseRent?: number; // e.g., 2000000
   bedrooms?: number;
   bathrooms?: number;
@@ -49,6 +49,7 @@ export interface ManageMemberDto {
 
 export interface UpdatePropertyAdminDto {
   name?: string;
+  type?: ActivePropertyType;
   price?: number;
   address?: string;
   state?: string;

@@ -17,7 +17,7 @@ export class AdminUnitService {
       data: {
         propertyId,
         name: data.name,
-        floor: data.floor || "Unassigned",
+        floor: normalizeFloor(data.floor != null ? String(data.floor) : null),
         baseRent: data.baseRent || 0,
         bedrooms: data.bedrooms || 1,
         bathrooms: data.bathrooms || 1,
@@ -131,16 +131,17 @@ export class AdminUnitService {
       const activeLease = unit.leases[0];
       const tenant = activeLease?.tenant;
 
-      // 1. Calculate Complaints Percentage (UI Red/Green/Yellow Bar)
+      // 1. Calculate open complaints count and % (open = not RESOLVED/FIXED/CANCELLED)
+      const CLOSED_STATUSES = ["RESOLVED", "FIXED", "CANCELLED"];
       const totalComplaints = unit.maintenanceRequests.length;
-      const unresolvedComplaints = unit.maintenanceRequests.filter(
-        (req) => req.status === "PENDING" || req.status === "IN_PROGRESS",
+      const openComplaints = unit.maintenanceRequests.filter(
+        (req) => !CLOSED_STATUSES.includes(req.status),
       ).length;
 
-      const complaintPercentage =
+      const openComplaintPercent =
         totalComplaints === 0
           ? 0
-          : Math.round((unresolvedComplaints / totalComplaints) * 100);
+          : Math.round((openComplaints / totalComplaints) * 100);
 
       // 2. Calculate Lease Expiry Percentage (UI Circular Progress Bar)
       let leaseExpiryPercentage = null;
@@ -180,8 +181,8 @@ export class AdminUnitService {
         members: activeLease ? 1 : 0,
         complaints: {
           total: totalComplaints,
-          unresolved: unresolvedComplaints,
-          percentage: `${complaintPercentage}%`,
+          openCount: openComplaints,
+          openPercent: openComplaintPercent,
         },
       };
     });

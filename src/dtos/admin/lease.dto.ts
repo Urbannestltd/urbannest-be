@@ -22,6 +22,20 @@ export interface UpdateLeaseDto {
   documentUrl?: string;
 }
 
+export interface LeaseDetailDto {
+  id: string;
+  status: string;
+  rentAmount: number;
+  serviceCharge: number | null;
+  startDate: Date;
+  endDate: Date;
+  moveOutNotice: string | null;
+  documentUrl: string | null;
+  tenant: { id: string; name: string | null; phone: string | null } | null;
+  unit: { id: string; name: string } | null;
+  property: { id: string; name: string | null } | null;
+}
+
 // Renewing an expired/terminated lease creates a new active lease for the same tenant + unit
 export interface RenewLeaseDto {
   startDate: string | Date;

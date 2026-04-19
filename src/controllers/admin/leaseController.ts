@@ -1,4 +1,4 @@
-import { Body, Patch, Path, Post, Route, Security, Tags } from "tsoa";
+import { Body, Get, Patch, Path, Post, Route, Security, Tags } from "tsoa";
 import { AdminLeaseService } from "../../services/admin/leaseService";
 import {
   CreateLeaseDto,
@@ -11,6 +11,12 @@ import {
 @Security("jwt", ["ADMIN"])
 export class AdminLeaseController {
   private leaseService = new AdminLeaseService();
+
+  @Get("{leaseId}")
+  public async getLeaseById(@Path() leaseId: string) {
+    const lease = await this.leaseService.getLeaseById(leaseId);
+    return { success: true, message: "Lease retrieved successfully", data: lease };
+  }
 
   @Post("/")
   public async createTenantLease(@Body() body: CreateLeaseDto) {
