@@ -17,7 +17,7 @@ export class AdminUnitService {
       data: {
         propertyId,
         name: data.name,
-        floor: data.floor || "Unassigned",
+        floor: normalizeFloor(data.floor != null ? String(data.floor) : null),
         baseRent: data.baseRent || 0,
         bedrooms: data.bedrooms || 1,
         bathrooms: data.bathrooms || 1,

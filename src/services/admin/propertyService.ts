@@ -418,25 +418,36 @@ export class AdminPropertyService {
       const targetTotal = targetFloors * targetUnitsPerFloor;
 
       if (targetTotal > currentCount) {
-        // Expand: create the missing units
+        // Expand: count existing units per floor, then fill each floor up to targetUnitsPerFloor
+        const existingByFloor = new Map<string, number>();
+        existingUnits.forEach((u) => {
+          const key = normalizeFloor(u.floor);
+          existingByFloor.set(key, (existingByFloor.get(key) ?? 0) + 1);
+        });
+
         const unitsToCreate = [];
         let globalUnitNum = currentCount + 1;
+
         for (let floor = 1; floor <= targetFloors; floor++) {
-          for (let u = 1; u <= targetUnitsPerFloor; u++) {
-            const thisUnitNum = (floor - 1) * targetUnitsPerFloor + u;
-            if (thisUnitNum > currentCount) {
-              unitsToCreate.push({
-                propertyId,
-                name: `Unit ${globalUnitNum}`,
-                floor: `Floor ${floor}`,
-                baseRent: updatedProperty.price || 0,
-                status: UnitStatus.AVAILABLE,
-              });
-              globalUnitNum++;
-            }
+          const floorKey = `Floor ${floor}`;
+          const existingOnFloor = existingByFloor.get(floorKey) ?? 0;
+          const unitsNeeded = Math.max(0, targetUnitsPerFloor - existingOnFloor);
+
+          for (let u = 0; u < unitsNeeded; u++) {
+            unitsToCreate.push({
+              propertyId,
+              name: `Unit ${globalUnitNum}`,
+              floor: floorKey,
+              baseRent: updatedProperty.price || 0,
+              status: UnitStatus.AVAILABLE,
+            });
+            globalUnitNum++;
           }
         }
-        await prisma.unit.createMany({ data: unitsToCreate });
+
+        if (unitsToCreate.length > 0) {
+          await prisma.unit.createMany({ data: unitsToCreate });
+        }
       } else if (targetTotal < currentCount) {
         // Shrink: delete only AVAILABLE units (newest first), never touch occupied units
         const deletableIds = existingUnits
