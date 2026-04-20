@@ -131,11 +131,11 @@ export class AdminUnitService {
       const activeLease = unit.leases[0];
       const tenant = activeLease?.tenant;
 
-      // 1. Calculate open complaints count and % (open = not RESOLVED/FIXED/CANCELLED)
-      const CLOSED_STATUSES = ["RESOLVED", "FIXED", "CANCELLED"];
+      // 1. Calculate open complaints count and % (open = PENDING or IN_PROGRESS only)
+      const OPEN_STATUSES = ["PENDING", "IN_PROGRESS"];
       const totalComplaints = unit.maintenanceRequests.length;
       const openComplaints = unit.maintenanceRequests.filter(
-        (req) => !CLOSED_STATUSES.includes(req.status),
+        (req) => OPEN_STATUSES.includes(req.status),
       ).length;
 
       const openComplaintPercent =
@@ -187,8 +187,8 @@ export class AdminUnitService {
       };
     });
 
-    // 3. Group by Floor so the frontend can easily render the distinct sections
-    const groupedByFloor = formattedUnits.reduce(
+    // 3. Group by Floor and return sorted numerically (Floor 1, Floor 2, ... Floor 10)
+    const groupMap = formattedUnits.reduce(
       (acc, unit) => {
         const floor = unit.floor;
         if (!acc[floor]) acc[floor] = [];
@@ -198,9 +198,18 @@ export class AdminUnitService {
       {} as Record<string, typeof formattedUnits>,
     );
 
+    const floorNumOf = (f: string) => {
+      const match = f.match(/\d+/);
+      return match ? parseInt(match[0]!) : 0;
+    };
+
+    const grouped = Object.keys(groupMap)
+      .sort((a, b) => floorNumOf(a) - floorNumOf(b))
+      .map((floor) => ({ floor, units: groupMap[floor]! }));
+
     return {
       totalUnits: units.length,
-      grouped: groupedByFloor,
+      grouped,
     };
   }
 
