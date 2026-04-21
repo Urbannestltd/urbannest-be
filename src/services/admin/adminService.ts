@@ -6,7 +6,7 @@ import { ApiResponse } from "../../dtos/apiResponse";
 import { BadRequestError } from "../../utils/apiError";
 import bcrypt from "bcrypt";
 import { ZeptoMailService } from "../external/zeptoMailService";
-import { EMAIL_TEMPLATES } from "../../config/emailTemplates";
+import { registrationInviteEmail } from "../../config/emailTemplates";
 
 export class AdminService {
   private zeptoMailService = new ZeptoMailService();
@@ -64,14 +64,14 @@ export class AdminService {
       },
     });
 
-    this.zeptoMailService.sendTemplateEmail(
+    const { subject, html } = registrationInviteEmail(
+      `${BASE_URL}/auth?token=${token}`,
+      "24 hours",
+    );
+    this.zeptoMailService.sendEmail(
       { email: params.userEmail, name: "Tenant" },
-      EMAIL_TEMPLATES.REGISTER_LINK,
-      {
-        Link: `${BASE_URL}/auth?token=${token}`,
-        valid_time: "24 hours",
-        support_id: "support@urbannesttech.com",
-      },
+      subject,
+      html,
     );
 
     // const mailOptions = {

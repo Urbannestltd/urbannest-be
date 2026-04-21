@@ -11,6 +11,7 @@ import {
   MaintenanceStatus,
 } from "@prisma/client";
 import { ZeptoMailService } from "./../external/zeptoMailService";
+import { maintenanceAlertEmail, maintenanceReplyEmail } from "../../config/emailTemplates";
 
 export class MaintenanceService {
   private emailService = new ZeptoMailService();
@@ -49,17 +50,16 @@ export class MaintenanceService {
     });
 
     // C. Notify Admin / Property Manager
-    // In a real app, you'd fetch the landlord's email from lease.property.landlordId
-    // For now, we simulate sending an alert
-    await this.emailService.sendTemplateEmail(
+    const alert = maintenanceAlertEmail(
+      params.category,
+      lease.unit.name,
+      "Tenant",
+      params.priority || "MEDIUM",
+    );
+    await this.emailService.sendEmail(
       { email: "manager@urbannest.com", name: "Property Manager" },
-      "MAINTENANCE_ALERT_TEMPLATE",
-      {
-        category: params.category,
-        unit: lease.unit.name,
-        tenant: "Tenant Name", // You can fetch this from tenantId
-        priority: params.priority || "MEDIUM",
-      },
+      alert.subject,
+      alert.html,
     );
 
     return ticket;
@@ -128,14 +128,16 @@ export class MaintenanceService {
     }
 
     // Fire & Forget Email
-    this.emailService.sendTemplateEmail(
+    const reply = maintenanceReplyEmail(
+      recipientName,
+      ticketId,
+      newMessage.sender.userFullName || "Support",
+      params.message.substring(0, 50),
+    );
+    this.emailService.sendEmail(
       { email: recipientEmail, name: recipientName },
-      "MAINTENANCE_REPLY_TEMPLATE",
-      {
-        ticket_id: ticketId.substring(0, 8),
-        sender_name: newMessage.sender.userFullName || "Support",
-        message_preview: params.message.substring(0, 50) + "...",
-      },
+      reply.subject,
+      reply.html,
     );
 
     return newMessage;
