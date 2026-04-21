@@ -121,6 +121,13 @@ export class AdminUnitService {
           where: { status: "ACTIVE" },
           include: { tenant: true },
         },
+        property: {
+          select: {
+            id: true,
+            name: true,
+            images: true,
+          },
+        },
         maintenanceRequests: true,
       },
       orderBy: [{ floor: "asc" }, { name: "asc" }],
@@ -134,8 +141,8 @@ export class AdminUnitService {
       // 1. Calculate open complaints count and % (open = PENDING or IN_PROGRESS only)
       const OPEN_STATUSES = ["PENDING", "IN_PROGRESS"];
       const totalComplaints = unit.maintenanceRequests.length;
-      const openComplaints = unit.maintenanceRequests.filter(
-        (req) => OPEN_STATUSES.includes(req.status),
+      const openComplaints = unit.maintenanceRequests.filter((req) =>
+        OPEN_STATUSES.includes(req.status),
       ).length;
 
       const openComplaintPercent =
@@ -205,7 +212,10 @@ export class AdminUnitService {
 
     const grouped = Object.keys(groupMap)
       .sort((a, b) => floorNumOf(a) - floorNumOf(b))
-      .map((floor) => ({ floor, units: groupMap[floor]! }));
+      .map((floor) => ({
+        floor,
+        units: groupMap[floor]!.sort((a, b) => floorNumOf(a.name) - floorNumOf(b.name)),
+      }));
 
     return {
       totalUnits: units.length,

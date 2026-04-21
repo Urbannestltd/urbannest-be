@@ -19,7 +19,7 @@ export interface TenantStatusDto {
   status: "ACTIVE" | "DEFAULTING";
 }
 
-export interface FacilityManagerSummaryDto {
+export interface PersonSummaryDto {
   id: string;
   name: string;
   photoUrl: string | null;
@@ -36,7 +36,8 @@ export interface PropertyOverviewItemDto {
   arrears: number;
   openMaintenance: number;
   openMaintenancePercent: number;
-  facilityManager: FacilityManagerSummaryDto | null;
+  facilityManager: PersonSummaryDto | null;
+  landlord: PersonSummaryDto | null;
   alerts: string[];
 }
 
