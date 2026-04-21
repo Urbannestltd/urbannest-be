@@ -10,6 +10,7 @@ import {
   Post,
   Security,
   Request,
+  Patch,
 } from "tsoa";
 import {
   AdminCreateUserRequest,
@@ -57,6 +58,25 @@ export class AdminController extends Controller {
   ) {
     await this.adminService.activateUser(userId, req.user.userId);
     return { success: true, message: "User activated successfully" };
+  }
+
+  @Get("users/{userId}")
+  public async getUserById(@Path() userId: string) {
+    const data = await this.adminService.getUserById(userId);
+    return { success: true, message: "User retrieved", data };
+  }
+
+  @Patch("settings/password")
+  public async changePassword(
+    @Request() req: any,
+    @Body() body: { oldPassword: string; newPassword: string },
+  ) {
+    await this.adminService.changePassword(
+      req.user.userId,
+      body.oldPassword,
+      body.newPassword,
+    );
+    return { success: true, message: "Password changed successfully" };
   }
 
   @Get("users/{userId}/activity")
