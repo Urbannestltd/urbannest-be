@@ -131,14 +131,9 @@ export class AdminService {
     });
   }
 
-  public async getAllUsers(excludeAdminId: string) {
-    const users = await prisma.user.findMany({
-      where: { userId: { not: excludeAdminId } },
-      include: { userRole: true, leases: true },
-      orderBy: { userCreatedAt: "desc" },
-    });
-
-    return users.map((u) => ({
+  private mapUserProperties(u: any) {
+    const propertyShape = (p: any) => ({ id: p.id, name: p.name });
+    return {
       id: u.userId,
       fullName: u.userFullName,
       email: u.userEmail,
@@ -151,7 +146,67 @@ export class AdminService {
       employer: u.employer,
       emergencyContact: u.userEmergencyContact,
       createdAt: u.userCreatedAt,
-    }));
+      properties: {
+        asLandlord: (u.properties ?? []).map(propertyShape),
+        asFacilityManager: (u.managedProperties ?? []).map(propertyShape),
+        asAgent: (u.agentedProperties ?? []).map(propertyShape),
+      },
+    };
+  }
+
+  public async getAllUsers(excludeAdminId: string) {
+    const propertySelect = { select: { id: true, name: true } };
+
+    const users = await prisma.user.findMany({
+      where: { userId: { not: excludeAdminId } },
+      include: {
+        userRole: true,
+        properties: propertySelect,
+        managedProperties: propertySelect,
+        agentedProperties: propertySelect,
+      },
+      orderBy: { userCreatedAt: "desc" },
+    });
+
+    return users.map((u) => this.mapUserProperties(u));
+  }
+
+  public async getUserById(userId: string) {
+    const propertySelect = { select: { id: true, name: true } };
+
+    const user = await prisma.user.findUnique({
+      where: { userId },
+      include: {
+        userRole: true,
+        properties: propertySelect,
+        managedProperties: propertySelect,
+        agentedProperties: propertySelect,
+      },
+    });
+
+    if (!user) throw new BadRequestError("User not found");
+
+    return this.mapUserProperties(user);
+  }
+
+  public async changePassword(
+    adminId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const admin = await prisma.user.findUnique({ where: { userId: adminId } });
+    if (!admin) throw new BadRequestError("User not found");
+
+    if (!admin.userPassword) throw new BadRequestError("No password set on this account");
+
+    const isMatch = await bcrypt.compare(oldPassword, admin.userPassword);
+    if (!isMatch) throw new BadRequestError("Current password is incorrect");
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { userId: adminId },
+      data: { userPassword: hashed },
+    });
   }
 
   public async getUserActivityLogs(userId: string): Promise<
