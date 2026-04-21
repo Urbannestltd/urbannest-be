@@ -92,11 +92,10 @@ export class AdminDashboardService {
       where: { isDeleted: false },
       include: {
         facilityManager: {
-          select: {
-            userId: true,
-            userFullName: true,
-            userProfileUrl: true,
-          },
+          select: { userId: true, userFullName: true, userProfileUrl: true },
+        },
+        landlord: {
+          select: { userId: true, userFullName: true, userProfileUrl: true },
         },
         units: {
           where: { status: { not: "DELETED" } },
@@ -132,12 +131,10 @@ export class AdminDashboardService {
       // Column 2: Occupancy %
       const totalUnits = property.units.length;
       const occupiedUnits = property.units.filter(
-        (u) => u.leases.length > 0
+        (u) => u.leases.length > 0,
       ).length;
       const occupancyPercent =
-        totalUnits === 0
-          ? 0
-          : Math.round((occupiedUnits / totalUnits) * 100);
+        totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
 
       // Column 3: Tenant summary + Column 4: Arrears
       // A lease is "defaulting" if it has at least one OVERDUE rent payment
@@ -159,11 +156,11 @@ export class AdminDashboardService {
       // Column 5: Open maintenance + % of total
       const openMaintenance = property.units.reduce(
         (sum, u) => sum + u.maintenanceRequests.length,
-        0
+        0,
       );
       const totalMaintenance = property.units.reduce(
         (sum, u) => sum + u._count.maintenanceRequests,
-        0
+        0,
       );
       const openMaintenancePercent =
         totalMaintenance === 0
@@ -179,16 +176,24 @@ export class AdminDashboardService {
           }
         : null;
 
+      const landlord = property.landlord
+        ? {
+            id: property.landlord.userId,
+            name: property.landlord.userFullName ?? "Unknown",
+            photoUrl: property.landlord.userProfileUrl,
+          }
+        : null;
+
       // Column 7: Alerts
       const alerts: string[] = [];
 
       const hasEmergency = property.units.some((u) =>
-        u.maintenanceRequests.some((r) => r.priority === "EMERGENCY")
+        u.maintenanceRequests.some((r) => r.priority === "EMERGENCY"),
       );
       if (hasEmergency) alerts.push("Emergency maintenance");
 
       const hasExpiringLease = property.units.some((u) =>
-        u.leases.some((l) => new Date(l.endDate) <= thirtyDaysFromNow)
+        u.leases.some((l) => new Date(l.endDate) <= thirtyDaysFromNow),
       );
       if (hasExpiringLease) alerts.push("Lease expiring soon");
 
@@ -198,6 +203,8 @@ export class AdminDashboardService {
         propertyId: property.id,
         propertyName,
         occupancyPercent,
+        propertyImages: property.images,
+        dateListed: property.createdAt,
         tenantSummary: {
           active: activeTenants - defaultingLeases,
           defaulting: defaultingLeases,
@@ -206,6 +213,7 @@ export class AdminDashboardService {
         openMaintenance,
         openMaintenancePercent,
         facilityManager,
+        landlord,
         alerts,
       };
     });
