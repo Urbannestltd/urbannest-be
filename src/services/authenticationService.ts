@@ -22,13 +22,15 @@ import {
   GOOGLE_CLIENT_ID,
   JWT_PRIVATE_KEY,
   JWTSECRET,
-  MAIL_USER,
 } from "../config/env";
 import { OAuth2Client } from "google-auth-library";
 import sendEmail from "../config/resend";
-import transporter from "../config/nodemailer";
 import { JwtPayload } from "jsonwebtoken";
 import { ZeptoMailService } from "./external/zeptoMailService";
+import {
+  loginOtpEmail,
+  passwordResetEmail,
+} from "../config/emailTemplates";
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -318,10 +320,11 @@ export class AuthenticationService {
       );
 
       // 5. Send the Email (Send the raw 'otp', NOT the hash)
-      await this.emailService.sendTemplateEmail(
+      const loginOtp = loginOtpEmail(user.userFullName ?? "there", otp);
+      await this.emailService.sendEmail(
         { email: user.userEmail, name: user.userFullName ?? "Tenant" },
-        "LOGIN_OTP_TEMPLATE",
-        { code: otp }, // The user gets the readable code
+        loginOtp.subject,
+        loginOtp.html,
       );
 
       // 6. Return a "Partial Login" response
@@ -461,28 +464,15 @@ export class AuthenticationService {
     });
 
     const resetLink = `http://localhost:3000/auth/reset-password?token=${resetToken}`;
-    // console.log(`[EMAIL] Link: ${resetLink}`);
-    // await sendEmail(
-    //   params.email,
-    //   "Password Reset",
-    //   `<p>Click <a href="${resetLink}">here</a> to reset your password.<br><br>Best Regards,<br>The Urbannest Team</p>`
-    // );
-
-    const mailOptions = {
-      from: {
-        address: MAIL_USER as string,
-        name: "Urbannest Support",
-      },
-      to: params.email,
-      subject: "Password Reset for Urbannest Account",
-      html: `<p>Click <a href="${resetLink}">here</a> to reset your password.<br><br>Best Regards,<br>The Urbannest Team</p>`,
-    };
-
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        new BadRequestError(error.message);
-      }
-    });
+    const { subject, html } = passwordResetEmail(
+      user.userFullName ?? "there",
+      resetLink,
+    );
+    await this.emailService.sendEmail(
+      { email: params.email, name: user.userFullName ?? undefined },
+      subject,
+      html,
+    );
     return { message: "If that email exists, a reset link has been sent." };
   }
 

@@ -10,6 +10,7 @@ import {
   SupportStatus,
 } from "@prisma/client";
 import { ZeptoMailService } from "./../external/zeptoMailService";
+import { supportNewTicketEmail, supportReplyEmail } from "../../config/emailTemplates";
 
 export class SupportService {
   private emailService = new ZeptoMailService();
@@ -38,10 +39,11 @@ export class SupportService {
     });
 
     // Notify Admins
-    await this.emailService.sendTemplateEmail(
+    const newTicket = supportNewTicketEmail(ticket.id, ticket.subject ?? "", tenantId);
+    await this.emailService.sendEmail(
       { email: "support@urbannest.com", name: "Support Team" },
-      "SUPPORT_NEW_TICKET",
-      { id: ticket.id, subject: ticket.subject, user_id: tenantId },
+      newTicket.subject,
+      newTicket.html,
     );
 
     return ticket;
@@ -79,16 +81,15 @@ export class SupportService {
       // In a real app, maybe notify specific assigned admin
     } else {
       // Admin replied -> Notify Tenant
-      await this.emailService.sendTemplateEmail(
-        {
-          email: ticket.tenant.userEmail,
-          name: ticket.tenant.userFullName || "Tenant",
-        },
-        "SUPPORT_REPLY_RECEIVED",
-        {
-          ticket_subject: ticket.subject,
-          reply_preview: params.message.substring(0, 50),
-        },
+      const reply = supportReplyEmail(
+        ticket.tenant.userFullName || "there",
+        ticket.subject ?? "",
+        params.message.substring(0, 50),
+      );
+      await this.emailService.sendEmail(
+        { email: ticket.tenant.userEmail, name: ticket.tenant.userFullName ?? undefined },
+        reply.subject,
+        reply.html,
       );
     }
 

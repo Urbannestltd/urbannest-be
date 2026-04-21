@@ -1,6 +1,6 @@
-import cron from "node-cron";
 import { prisma } from "../../config/prisma";
 import { ZeptoMailService } from "../external/zeptoMailService";
+import { reminderEmail } from "../../config/emailTemplates";
 
 export class ReminderWorker {
   private emailService = new ZeptoMailService();
@@ -34,17 +34,16 @@ export class ReminderWorker {
     for (const reminder of dueReminders) {
       try {
         // A. Send the Email
-        await this.emailService.sendTemplateEmail(
-          {
-            email: reminder.user.userEmail,
-            name: reminder.user.userFirstName || "Tenant",
-          },
-          "REMINDER_ALERT_TEMPLATE", // Create this template in ZeptoMail
-          {
-            title: reminder.title,
-            description: reminder.description || "No details provided.",
-            time: new Date(reminder.dueAt).toLocaleString(),
-          },
+        const rem = reminderEmail(
+          reminder.user.userFirstName || "there",
+          reminder.title,
+          reminder.description || "No details provided.",
+          new Date(reminder.dueAt).toLocaleString(),
+        );
+        await this.emailService.sendEmail(
+          { email: reminder.user.userEmail, name: reminder.user.userFirstName ?? undefined },
+          rem.subject,
+          rem.html,
         );
 
         // B. Mark as Sent (So we don't send it again next minute)

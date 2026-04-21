@@ -6,7 +6,8 @@ import {
   VisitorStatsResponse,
 } from "../../dtos/tenant/visitor.dto";
 import { NotFoundError, BadRequestError } from "../../utils/apiError";
-import { ZeptoMailService } from "./../external/zeptoMailService"; // Reuse your email service
+import { ZeptoMailService } from "./../external/zeptoMailService";
+import { visitorCheckInEmail } from "../../config/emailTemplates";
 import { InviteFrequency, InviteStatus, VisitorType } from "@prisma/client";
 
 export class VisitorService {
@@ -152,7 +153,7 @@ export class VisitorService {
    */
   public async checkInVisitor(code: string) {
     // Re-verify logic to be safe
-    const check = await this.verifyAccessCode(code);
+    await this.verifyAccessCode(code);
 
     // Update DB
     const invite = await prisma.visitorInvite.update({
@@ -164,17 +165,16 @@ export class VisitorService {
       include: { tenant: true },
     });
 
-    await this.emailService.sendTemplateEmail(
-      {
-        email: invite.tenant.userEmail,
-        name: invite.tenant.userFullName || "Tenant",
-      },
-      "VISITOR_ARRIVAL_TEMPLATE_KEY", // <--- Add this to your ZeptoMail Config
-      {
-        visitor_name: invite.visitorName,
-        time: new Date().toLocaleTimeString(),
-        location: "Main Gate",
-      },
+    const checkin = visitorCheckInEmail(
+      invite.tenant.userFullName || "there",
+      invite.visitorName,
+      new Date().toLocaleTimeString(),
+      "Main Gate",
+    );
+    await this.emailService.sendEmail(
+      { email: invite.tenant.userEmail, name: invite.tenant.userFullName ?? undefined },
+      checkin.subject,
+      checkin.html,
     );
 
     return { success: true, message: "Visitor checked in successfully" };

@@ -8,6 +8,7 @@ import {
 } from "../../dtos/tenant/settings.dto";
 import { BadRequestError, NotFoundError } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
+import { passwordChangedEmail, twoFaSetupEmail } from "../../config/emailTemplates";
 import bcrypt from "bcrypt";
 
 export class SettingsService {
@@ -208,13 +209,14 @@ export class SettingsService {
     });
 
     // D. Notify (Security Best Practice)
-    await this.emailService.sendTemplateEmail(
-      {
-        email: user.userEmail,
-        name: user.userFullName?.split(" ")[0] || "User",
-      },
-      "SECURITY_PASSWORD_CHANGED",
-      { date: new Date().toLocaleString() },
+    const pwChanged = passwordChangedEmail(
+      user.userFullName?.split(" ")[0] || "there",
+      new Date().toLocaleString(),
+    );
+    await this.emailService.sendEmail(
+      { email: user.userEmail, name: user.userFullName ?? undefined },
+      pwChanged.subject,
+      pwChanged.html,
     );
 
     return { success: true };
@@ -242,13 +244,14 @@ export class SettingsService {
     });
 
     // Send Email
-    await this.emailService.sendTemplateEmail(
-      {
-        email: user.userEmail,
-        name: user.userFullName?.split(" ")[0] || "User",
-      },
-      "SECURITY_2FA_CODE",
-      { code: otp },
+    const twoFa = twoFaSetupEmail(
+      user.userFullName?.split(" ")[0] || "there",
+      otp,
+    );
+    await this.emailService.sendEmail(
+      { email: user.userEmail, name: user.userFullName ?? undefined },
+      twoFa.subject,
+      twoFa.html,
     );
 
     return { message: "OTP sent to email" };

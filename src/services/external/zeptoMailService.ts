@@ -70,7 +70,7 @@ export class ZeptoMailService {
         track_opens: true,
       };
 
-      const response = await this.client.post("/email/template", payload);
+      await this.client.post("/email/template", payload);
 
       return { success: true, message: "Email queued successfully" };
     } catch (error: any) {
@@ -78,7 +78,44 @@ export class ZeptoMailService {
         "ZeptoMail Error:",
         JSON.stringify(error.response?.data || error.message, null, 2),
       );
-      // We don't throw here to avoid breaking the main flow (e.g. don't fail a payment just because email failed)
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send a transactional email with a custom HTML body.
+   * Use this with the template functions in src/config/emailTemplates.ts.
+   */
+  public async sendEmail(
+    to: EmailRecipient | EmailRecipient[],
+    subject: string,
+    html: string,
+  ) {
+    const recipients = Array.isArray(to) ? to : [to];
+
+    const formattedRecipients = recipients.map((r) => ({
+      email_address: {
+        address: r.email,
+        name: r.name || r.email.split("@")[0],
+      },
+    }));
+
+    try {
+      await this.client.post("/email", {
+        from: { address: this.fromAddress, name: this.fromName },
+        to: formattedRecipients,
+        subject,
+        htmlbody: html,
+        track_clicks: true,
+        track_opens: true,
+      });
+
+      return { success: true };
+    } catch (error: any) {
+      console.error(
+        "ZeptoMail Error:",
+        JSON.stringify(error.response?.data || error.message, null, 2),
+      );
       return { success: false, error: error.message };
     }
   }
