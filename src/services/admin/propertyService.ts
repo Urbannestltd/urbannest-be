@@ -4,8 +4,16 @@ import { prisma } from "../../config/prisma";
 // Normalises raw floor strings to a canonical "Floor N" form so that
 // "7", "Floor 7", "Seventh Floor" etc. all map to the same bucket.
 const WORD_TO_NUM: Record<string, number> = {
-  first: 1, second: 2, third: 3, fourth: 4, fifth: 5,
-  sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10,
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  fifth: 5,
+  sixth: 6,
+  seventh: 7,
+  eighth: 8,
+  ninth: 9,
+  tenth: 10,
 };
 
 export function normalizeFloor(raw: string | null | undefined): string {
@@ -13,7 +21,10 @@ export function normalizeFloor(raw: string | null | undefined): string {
   const s = raw.trim();
   if (/^Floor \d+$/i.test(s)) return `Floor ${parseInt(s.split(" ")[1]!)}`;
   if (/^\d+$/.test(s)) return `Floor ${parseInt(s)}`;
-  const lower = s.toLowerCase().replace(/\s*floor\s*/g, "").trim();
+  const lower = s
+    .toLowerCase()
+    .replace(/\s*floor\s*/g, "")
+    .trim();
   if (WORD_TO_NUM[lower]) return `Floor ${WORD_TO_NUM[lower]}`;
   return s;
 }
@@ -217,7 +228,10 @@ export class AdminPropertyService {
     return {
       id: property.id,
       name: property.name,
-      address: `${property.address}, ${property.state}`,
+      address: property.address,
+      state: property.state,
+      city: property.city,
+      zip: property.zip,
       lastUpdated: property.updatedAt,
 
       // Details Card
@@ -411,10 +425,13 @@ export class AdminPropertyService {
         .map((f: string) => normalizeFloor(f));
       const currentFloors = new Set(floorNames).size || 1;
       const currentUnitsPerFloor =
-        currentFloors > 0 ? Math.ceil(currentCount / currentFloors) : currentCount;
+        currentFloors > 0
+          ? Math.ceil(currentCount / currentFloors)
+          : currentCount;
 
       const targetFloors = data.noOfFloors ?? currentFloors;
-      const targetUnitsPerFloor = data.noOfUnitsPerFloor ?? currentUnitsPerFloor;
+      const targetUnitsPerFloor =
+        data.noOfUnitsPerFloor ?? currentUnitsPerFloor;
       const targetTotal = targetFloors * targetUnitsPerFloor;
 
       if (targetTotal > currentCount) {
@@ -431,7 +448,10 @@ export class AdminPropertyService {
         for (let floor = 1; floor <= targetFloors; floor++) {
           const floorKey = `Floor ${floor}`;
           const existingOnFloor = existingByFloor.get(floorKey) ?? 0;
-          const unitsNeeded = Math.max(0, targetUnitsPerFloor - existingOnFloor);
+          const unitsNeeded = Math.max(
+            0,
+            targetUnitsPerFloor - existingOnFloor,
+          );
 
           for (let u = 0; u < unitsNeeded; u++) {
             unitsToCreate.push({

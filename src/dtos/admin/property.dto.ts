@@ -69,6 +69,9 @@ export interface PropertyDetailsResponseDto {
   id: string;
   name: string | null;
   address: string;
+  state: string;
+  city: string | null;
+  zip: string | null;
   lastUpdated: Date;
 
   // Property Details Card
