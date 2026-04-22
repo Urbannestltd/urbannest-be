@@ -1,13 +1,19 @@
-import { Body, Get, Path, Post, Put, Route, Security, Tags } from "tsoa";
+import { Body, Get, Middlewares, Patch, Path, Post, Put, Request, Route, Security, Tags } from "tsoa";
 import { AdminTicketService } from "../../services/admin/ticketService";
 import {
   AddCommentDto,
+  RebuttalDto,
+  RejectTicketDto,
+  SetBudgetDto,
   UpdateTicketStatusDto,
 } from "../../dtos/admin/ticket.dto";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("admin/properties")
 @Tags("Admin - Tickets")
-@Security("jwt", ["ADMIN"])
+@Security("jwt")
+@Middlewares(requirePermission(Permission.VIEW_MAINTENANCE_TICKETS))
 export class AdminTicketController {
   private ticketService = new AdminTicketService();
 
@@ -59,10 +65,51 @@ export class AdminTicketController {
     @Body() body: UpdateTicketStatusDto,
   ) {
     const ticket = await this.ticketService.updateStatus(ticketId, body);
-    return {
-      success: true,
-      message: "Ticket status updated",
-      data: ticket,
-    };
+    return { success: true, message: "Ticket status updated", data: ticket };
+  }
+
+  // Set budget (and optionally the quoted cost) for a ticket
+  @Patch("tickets/{ticketId}/budget")
+  public async setBudget(
+    @Path() ticketId: string,
+    @Body() body: SetBudgetDto,
+  ) {
+    const ticket = await this.ticketService.setBudget(ticketId, body);
+    return { success: true, message: "Budget set successfully", data: ticket };
+  }
+
+  // Approve a ticket (even if quoted cost exceeds budget)
+  @Post("tickets/{ticketId}/approve")
+  @Middlewares(requirePermission(Permission.APPROVE_MAJOR_MAINTENANCE))
+  public async approveTicket(
+    @Path() ticketId: string,
+    @Request() req: any,
+  ) {
+    const ticket = await this.ticketService.approveTicket(ticketId, req.user.userId);
+    return { success: true, message: "Ticket approved", data: ticket };
+  }
+
+  // Reject a ticket with a mandatory reason
+  @Post("tickets/{ticketId}/reject")
+  @Middlewares(requirePermission(Permission.APPROVE_MAJOR_MAINTENANCE))
+  public async rejectTicket(
+    @Path() ticketId: string,
+    @Request() req: any,
+    @Body() body: RejectTicketDto,
+  ) {
+    const ticket = await this.ticketService.rejectTicket(ticketId, req.user.userId, body);
+    return { success: true, message: "Ticket rejected", data: ticket };
+  }
+
+  // Send a rebuttal / counter-message on the quoted cost
+  @Post("tickets/{ticketId}/rebuttal")
+  @Middlewares(requirePermission(Permission.APPROVE_MAJOR_MAINTENANCE))
+  public async sendRebuttal(
+    @Path() ticketId: string,
+    @Request() req: any,
+    @Body() body: RebuttalDto,
+  ) {
+    const ticket = await this.ticketService.sendRebuttal(ticketId, req.user.userId, body);
+    return { success: true, message: "Rebuttal sent", data: ticket };
   }
 }

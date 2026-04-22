@@ -3,6 +3,7 @@ import {
   Get,
   Path,
   Put,
+  Query,
   SuccessResponse,
   Route,
   Controller,
@@ -12,6 +13,7 @@ import {
   Request,
   Patch,
 } from "tsoa";
+import { Permission } from "@prisma/client";
 import {
   AdminCreateUserRequest,
   AdminCreateUserSchema,
@@ -36,9 +38,26 @@ export class AdminController extends Controller {
     return this.adminService.createUser(validation);
   }
 
+  @Get("users/metrics")
+  public async getUserMetrics(@Request() req: any) {
+    const data = await this.adminService.getUserMetrics(req.user.userId);
+    return { success: true, message: "User metrics retrieved", data };
+  }
+
   @Get("users")
-  public async getAllUsers(@Request() req: any) {
-    const data = await this.adminService.getAllUsers(req.user.userId);
+  public async getAllUsers(
+    @Request() req: any,
+    @Query() role?: string,
+    @Query() status?: string,
+    @Query() createdFrom?: string,
+    @Query() createdTo?: string,
+  ) {
+    const data = await this.adminService.getAllUsers(req.user.userId, {
+      role,
+      status,
+      createdFrom,
+      createdTo,
+    });
     return { success: true, message: "Users retrieved", data };
   }
 
@@ -66,6 +85,26 @@ export class AdminController extends Controller {
     return { success: true, message: "User retrieved", data };
   }
 
+  @Get("settings/notifications")
+  public async getNotificationSettings(@Request() req: any) {
+    const data = await this.adminService.getNotificationSettings(req.user.userId);
+    return { success: true, message: "Notification settings retrieved", data };
+  }
+
+  @Patch("settings/notifications")
+  public async updateNotificationSettings(
+    @Request() req: any,
+    @Body() body: {
+      emailPayments?: boolean;
+      emailLease?: boolean;
+      emailMaintenance?: boolean;
+      emailVisitors?: boolean;
+    },
+  ) {
+    const data = await this.adminService.updateNotificationSettings(req.user.userId, body);
+    return { success: true, message: "Notification settings updated", data };
+  }
+
   @Patch("settings/password")
   public async changePassword(
     @Request() req: any,
@@ -83,5 +122,15 @@ export class AdminController extends Controller {
   public async getUserActivity(@Path() userId: string) {
     const logs = await this.adminService.getUserActivityLogs(userId);
     return { success: true, message: "Activity logs retrieved", data: logs };
+  }
+
+  @Patch("users/{userId}/permissions")
+  public async updateUserPermissions(
+    @Path() userId: string,
+    @Request() req: any,
+    @Body() body: { permissions: Permission[] },
+  ) {
+    await this.adminService.updateUserPermissions(userId, req.user.userId, body.permissions);
+    return { success: true, message: "Permissions updated successfully" };
   }
 }

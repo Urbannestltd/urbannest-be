@@ -1,10 +1,13 @@
-import { Body, Delete, Get, Path, Post, Route, Security, Tags } from "tsoa";
+import { Body, Delete, Get, Middlewares, Path, Post, Route, Security, Tags } from "tsoa";
 import { AdminUnitService } from "../../services/admin/unitService";
 import { CreateUnitAdminDto } from "../../dtos/admin/property.dto";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("admin/units")
 @Tags("Admin - Property Units")
-@Security("jwt", ["ADMIN"])
+@Security("jwt")
+@Middlewares(requirePermission(Permission.MANAGE_PROPERTIES_AND_UNITS))
 export class AdminUnitController {
   private unitService = new AdminUnitService();
 

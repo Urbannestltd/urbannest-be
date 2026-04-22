@@ -7,7 +7,8 @@ import {
 } from "../../dtos/tenant/visitor.dto";
 import { NotFoundError, BadRequestError } from "../../utils/apiError";
 import { ZeptoMailService } from "./../external/zeptoMailService";
-import { visitorCheckInEmail } from "../../config/emailTemplates";
+import { adminVisitorCheckInEmail, visitorCheckInEmail } from "../../config/emailTemplates";
+import { getAdminRecipients } from "../../utils/getAdminRecipients";
 import { InviteFrequency, InviteStatus, VisitorType } from "@prisma/client";
 
 export class VisitorService {
@@ -176,6 +177,34 @@ export class VisitorService {
       checkin.subject,
       checkin.html,
     );
+
+    // Notify admins who have visitor notifications enabled
+    const adminRecipients = await getAdminRecipients("emailVisitors");
+    if (adminRecipients.length > 0) {
+      const lease = await prisma.lease.findFirst({
+        where: { tenantId: invite.tenantId, status: "ACTIVE" },
+        include: { unit: { include: { property: true } } },
+      });
+      const checkInTime = new Date().toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      for (const admin of adminRecipients) {
+        const alert = adminVisitorCheckInEmail(
+          admin.name ?? "Admin",
+          invite.tenant.userFullName ?? "Tenant",
+          invite.visitorName,
+          lease?.unit?.name ?? "Unknown Unit",
+          lease?.unit?.property?.name ?? "Unknown Property",
+          checkInTime,
+        );
+        await this.emailService.sendEmail(
+          { email: admin.email, name: admin.name ?? undefined },
+          alert.subject,
+          alert.html,
+        );
+      }
+    }
 
     return { success: true, message: "Visitor checked in successfully" };
   }

@@ -7,6 +7,7 @@ import { BadRequestError } from "../../utils/apiError";
 import bcrypt from "bcrypt";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { registrationInviteEmail } from "../../config/emailTemplates";
+import { Permission } from "@prisma/client";
 
 export class AdminService {
   private zeptoMailService = new ZeptoMailService();
@@ -64,12 +65,40 @@ export class AdminService {
       },
     });
 
+    // Look up property and unit names to include in the invite email
+    let propertyName: string | undefined;
+    let unitName: string | undefined;
+
+    if (params.propertyId) {
+      const property = await prisma.property.findUnique({
+        where: { id: params.propertyId },
+        select: { name: true },
+      });
+      propertyName = property?.name ?? undefined;
+    }
+
+    if (params.unitId) {
+      const unit = await prisma.unit.findUnique({
+        where: { id: params.unitId },
+        select: {
+          name: true,
+          property: { select: { name: true } },
+        },
+      });
+      unitName = unit?.name ?? undefined;
+      // If no propertyId was given but the unit knows its property, use that
+      if (!propertyName) propertyName = unit?.property?.name ?? undefined;
+    }
+
     const { subject, html } = registrationInviteEmail(
       `${BASE_URL}/auth?token=${token}`,
       "24 hours",
+      params.userRole,
+      propertyName,
+      unitName,
     );
     this.zeptoMailService.sendEmail(
-      { email: params.userEmail, name: "Tenant" },
+      { email: params.userEmail, name: params.userEmail },
       subject,
       html,
     );
@@ -154,11 +183,39 @@ export class AdminService {
     };
   }
 
-  public async getAllUsers(excludeAdminId: string) {
+  public async getUserMetrics(excludeAdminId: string) {
+    const base = { userId: { not: excludeAdminId } };
+    const [total, active, suspended] = await Promise.all([
+      prisma.user.count({ where: base }),
+      prisma.user.count({ where: { ...base, userStatus: "ACTIVE" } }),
+      prisma.user.count({ where: { ...base, userStatus: "BLOCKED" } }),
+    ]);
+    return { total, active, suspended };
+  }
+
+  public async getAllUsers(
+    excludeAdminId: string,
+    filters?: {
+      role?: string;
+      status?: string;
+      createdFrom?: string;
+      createdTo?: string;
+    },
+  ) {
     const propertySelect = { select: { id: true, name: true } };
 
     const users = await prisma.user.findMany({
-      where: { userId: { not: excludeAdminId } },
+      where: {
+        userId: { not: excludeAdminId },
+        ...(filters?.status && { userStatus: filters.status }),
+        ...(filters?.role && { userRole: { roleName: filters.role } }),
+        ...((filters?.createdFrom || filters?.createdTo) && {
+          userCreatedAt: {
+            ...(filters.createdFrom && { gte: new Date(filters.createdFrom) }),
+            ...(filters.createdTo && { lte: new Date(filters.createdTo) }),
+          },
+        }),
+      },
       include: {
         userRole: true,
         properties: propertySelect,
@@ -206,6 +263,69 @@ export class AdminService {
     await prisma.user.update({
       where: { userId: adminId },
       data: { userPassword: hashed },
+    });
+  }
+
+  public async getNotificationSettings(adminId: string) {
+    let settings = await prisma.notificationSetting.findUnique({
+      where: { userId: adminId },
+    });
+
+    if (!settings) {
+      settings = await prisma.notificationSetting.create({
+        data: { userId: adminId },
+      });
+    }
+
+    return {
+      emailPayments: settings.emailPayments,
+      emailLease: settings.emailLease,
+      emailMaintenance: settings.emailMaintenance,
+      emailVisitors: settings.emailVisitors,
+    };
+  }
+
+  public async updateNotificationSettings(
+    adminId: string,
+    params: {
+      emailPayments?: boolean;
+      emailLease?: boolean;
+      emailMaintenance?: boolean;
+      emailVisitors?: boolean;
+    },
+  ) {
+    return prisma.notificationSetting.upsert({
+      where: { userId: adminId },
+      update: {
+        ...(params.emailPayments !== undefined && { emailPayments: params.emailPayments }),
+        ...(params.emailLease !== undefined && { emailLease: params.emailLease }),
+        ...(params.emailMaintenance !== undefined && { emailMaintenance: params.emailMaintenance }),
+        ...(params.emailVisitors !== undefined && { emailVisitors: params.emailVisitors }),
+      },
+      create: {
+        userId: adminId,
+        emailPayments: params.emailPayments ?? true,
+        emailLease: params.emailLease ?? true,
+        emailMaintenance: params.emailMaintenance ?? true,
+        emailVisitors: params.emailVisitors ?? true,
+      },
+    });
+  }
+
+  public async updateUserPermissions(
+    targetUserId: string,
+    adminId: string,
+    permissions: Permission[],
+  ): Promise<void> {
+    if (targetUserId === adminId) {
+      throw new BadRequestError("Cannot modify your own permissions");
+    }
+    const user = await prisma.user.findUnique({ where: { userId: targetUserId } });
+    if (!user) throw new BadRequestError("User not found");
+
+    await prisma.user.update({
+      where: { userId: targetUserId },
+      data: { permissions },
     });
   }
 

@@ -1,11 +1,13 @@
 import * as express from "express";
-import { Get, Query, Request, Route, Security, Tags } from "tsoa";
-import { PaymentStatus, PaymentType } from "@prisma/client";
+import { Get, Middlewares, Query, Request, Route, Security, Tags } from "tsoa";
+import { PaymentStatus, PaymentType, Permission } from "@prisma/client";
 import { AdminPaymentService } from "../../services/admin/paymentService";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("admin/payments")
 @Tags("Admin - Payment Management")
-@Security("jwt", ["ADMIN"])
+@Security("jwt")
+@Middlewares(requirePermission(Permission.VIEW_FINANCIALS_AND_REPORTS))
 export class AdminPaymentController {
   private paymentService = new AdminPaymentService();
 

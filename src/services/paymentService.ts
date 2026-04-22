@@ -3,9 +3,13 @@ import { paystackClient } from "../utils/paystackClient";
 import { NotFoundError, BadRequestError } from "../utils/apiError";
 import { PaymentStatus, UnitStatus, LeaseStatus } from "@prisma/client";
 import { VTPassService } from "./external/vtPassService";
+import { ZeptoMailService } from "./external/zeptoMailService";
+import { adminPaymentReceivedEmail } from "../config/emailTemplates";
+import { getAdminRecipients } from "../utils/getAdminRecipients";
 
 export class PaymentService {
   private vtpass = new VTPassService();
+  private emailService = new ZeptoMailService();
 
   public async verifyPayment(reference: string) {
     // ====================================================
@@ -113,7 +117,7 @@ export class PaymentService {
     // These operations touch multiple tables (Lease, Unit, User), so we NEED a transaction.
     // Since there are no API calls here, it will run in < 100ms (no timeout).
 
-    return await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx) => {
       let finalLeaseId = payment.leaseId;
 
       const calculateEndDate = (startDate: Date) => {
@@ -198,5 +202,41 @@ export class PaymentService {
         message: "Transaction successful and lease updated.",
       };
     });
+
+    // Notify admins of payment (fire-and-forget, outside transaction)
+    const adminRecipients = await getAdminRecipients("emailPayments");
+    if (adminRecipients.length > 0) {
+      const paid = await prisma.payment.findUnique({
+        where: { id: payment.id },
+        include: {
+          user: { select: { userFullName: true } },
+          lease: {
+            include: {
+              unit: { include: { property: true } },
+            },
+          },
+        },
+      });
+      if (paid) {
+        for (const admin of adminRecipients) {
+          const { subject, html } = adminPaymentReceivedEmail(
+            admin.name ?? "Admin",
+            paid.user?.userFullName ?? "Tenant",
+            paid.amount,
+            paid.type,
+            paid.lease?.unit?.property?.name ?? "Unknown Property",
+            paid.lease?.unit?.name ?? "Unknown Unit",
+            paid.paidDate ?? new Date(),
+          );
+          await this.emailService.sendEmail(
+            { email: admin.email, name: admin.name ?? undefined },
+            subject,
+            html,
+          );
+        }
+      }
+    }
+
+    return txResult;
   }
 }

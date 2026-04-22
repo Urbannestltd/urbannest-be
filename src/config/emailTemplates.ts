@@ -162,17 +162,37 @@ function metaTable(rows: [string, string][]): string {
 // ---------------------------------------------------------------------------
 // 1. Registration invite
 // ---------------------------------------------------------------------------
-export function registrationInviteEmail(link: string, validTime = "24 hours") {
+export function registrationInviteEmail(
+  link: string,
+  validTime = "24 hours",
+  role?: string,
+  propertyName?: string,
+  unitName?: string,
+) {
+  const roleLabel =
+    role === "LANDLORD" ? "a landlord"
+    : role === "FACILITY_MANAGER" ? "a facility manager"
+    : role === "AGENT" ? "an agent"
+    : "a tenant";
+
+  const contextLines: [string, string][] = [];
+  if (propertyName) contextLines.push(["Property", propertyName]);
+  if (unitName) contextLines.push(["Unit", unitName]);
+  if (role) contextLines.push(["Role", roleLabel.replace(/^a[n]? /, "").replace(/\b\w/g, (c) => c.toUpperCase())]);
+
+  const contextTable = contextLines.length > 0 ? metaTable(contextLines) : "";
+
   return {
-    subject: "You're invited to Urbannest",
+    subject: "You've been added to Urbannest",
     html: base(`
-      ${heading("Welcome to Urbannest")}
-      ${subheading("Your account is ready to be set up")}
-      ${para("An administrator has created an account for you on the Urbannest platform. Click the button below to complete your registration and set your password.")}
+      ${heading("You've been added to Urbannest")}
+      ${subheading("Your account is ready — complete your registration below")}
+      ${para(`An administrator has added you to the <strong>Urbannest</strong> platform as <strong>${roleLabel}</strong>. Please review the details below and click the button to set your password and activate your account.`)}
+      ${contextTable}
       ${ctaButton("Complete Registration", link)}
       ${divider()}
-      ${para(`This invitation link is valid for <strong>${validTime}</strong>. After that, please contact your administrator for a new link.`)}
-      ${alertBox("Never share this link with anyone. It grants access to your account.")}
+      ${para(`This invitation link is valid for <strong>${validTime}</strong>. Contact your administrator if it expires.`)}
+      ${alertBox("Never share this link with anyone. It grants direct access to your account.")}
     `),
   };
 }
@@ -398,6 +418,229 @@ export function reminderEmail(
           ${description}</p>
       </div>
       ${metaTable([["Due at", time]])}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 12. Maintenance ticket approved
+// ---------------------------------------------------------------------------
+export function ticketApprovedEmail(
+  tenantName: string,
+  ticketSubject: string,
+  budget: number | null,
+) {
+  const budgetLine = budget != null
+    ? metaTable([["Approved budget", `₦${budget.toLocaleString()}`]])
+    : "";
+  return {
+    subject: `Your maintenance request has been approved`,
+    html: base(`
+      ${heading("Request approved")}
+      ${subheading(`Hi ${tenantName}`)}
+      ${para(`Your maintenance request — <strong>${ticketSubject}</strong> — has been reviewed and approved. Work will be scheduled shortly.`)}
+      ${budgetLine}
+      ${para("You will be notified once work begins.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 13. Maintenance ticket rejected
+// ---------------------------------------------------------------------------
+export function ticketRejectedEmail(
+  tenantName: string,
+  ticketSubject: string,
+  reason: string,
+) {
+  return {
+    subject: `Update on your maintenance request`,
+    html: base(`
+      ${heading("Request not approved")}
+      ${subheading(`Hi ${tenantName}`)}
+      ${para(`Your maintenance request — <strong>${ticketSubject}</strong> — could not be approved at this time.`)}
+      <div style="background:#fef2f2;border-left:3px solid #ef4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 4px;font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Reason</p>
+        <p style="margin:0;font-size:14px;color:#7f1d1d;line-height:1.6;">${reason}</p>
+      </div>
+      ${para("If you believe this is in error, please contact your facility manager or submit a new request with additional details.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 14. Maintenance ticket rebuttal
+// ---------------------------------------------------------------------------
+export function ticketRebuttalEmail(
+  recipientName: string,
+  ticketSubject: string,
+  message: string,
+  suggestedAmount?: number,
+) {
+  const suggestionLine = suggestedAmount != null
+    ? metaTable([["Suggested revised amount", `₦${suggestedAmount.toLocaleString()}`]])
+    : "";
+  return {
+    subject: `Response required on your maintenance request`,
+    html: base(`
+      ${heading("Response from management")}
+      ${subheading(`Hi ${recipientName}`)}
+      ${para(`Management has reviewed the request — <strong>${ticketSubject}</strong> — and has sent the following response:`)}
+      <div style="background:${BRAND.softBg};border:1px solid ${BRAND.border};border-radius:8px;padding:20px;margin:24px 0;">
+        <p style="margin:0;font-size:14px;color:${BRAND.text};line-height:1.7;">${message}</p>
+      </div>
+      ${suggestionLine}
+      ${para("Please review this feedback and respond or revise your request accordingly.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 15. Admin — New maintenance request received
+// ---------------------------------------------------------------------------
+export function adminMaintenanceAlertEmail(
+  adminName: string,
+  tenantName: string,
+  unitName: string,
+  propertyName: string,
+  category: string,
+  priority: string,
+) {
+  const priorityColor =
+    priority === "EMERGENCY" ? "#ef4444"
+    : priority === "HIGH" ? "#f97316"
+    : priority === "MEDIUM" ? "#eab308"
+    : "#22c55e";
+  return {
+    subject: `New maintenance request — ${unitName}`,
+    html: base(`
+      ${heading("New maintenance request")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`A new maintenance request has been submitted and requires your attention.`)}
+      ${metaTable([
+        ["Tenant", tenantName],
+        ["Property", propertyName],
+        ["Unit", unitName],
+        ["Category", category],
+        ["Priority", `<span style="color:${priorityColor};font-weight:600;">${priority}</span>`],
+      ])}
+      ${para("Please log in to review and assign the request.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 16. Admin — Payment received
+// ---------------------------------------------------------------------------
+export function adminPaymentReceivedEmail(
+  adminName: string,
+  tenantName: string,
+  amount: number,
+  paymentType: string,
+  propertyName: string,
+  unitName: string,
+  paidAt: Date,
+) {
+  return {
+    subject: `Payment received — ₦${amount.toLocaleString()}`,
+    html: base(`
+      ${heading("Payment received")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`A payment has been successfully processed.`)}
+      ${metaTable([
+        ["Tenant", tenantName],
+        ["Property", propertyName],
+        ["Unit", unitName],
+        ["Type", paymentType],
+        ["Amount", `₦${amount.toLocaleString()}`],
+        ["Date", paidAt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })],
+      ])}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 17. Admin — Lease created
+// ---------------------------------------------------------------------------
+export function adminLeaseCreatedEmail(
+  adminName: string,
+  tenantName: string,
+  propertyName: string,
+  unitName: string,
+  startDate: Date,
+  endDate: Date,
+  rentAmount: number,
+) {
+  return {
+    subject: `New lease created — ${unitName}`,
+    html: base(`
+      ${heading("New lease created")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`A new lease has been created for the following unit.`)}
+      ${metaTable([
+        ["Tenant", tenantName],
+        ["Property", propertyName],
+        ["Unit", unitName],
+        ["Start date", startDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })],
+        ["End date", endDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })],
+        ["Rent amount", `₦${rentAmount.toLocaleString()}`],
+      ])}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 18. Admin — Lease renewed
+// ---------------------------------------------------------------------------
+export function adminLeaseRenewedEmail(
+  adminName: string,
+  tenantName: string,
+  propertyName: string,
+  unitName: string,
+  newEndDate: Date,
+  rentAmount: number,
+) {
+  return {
+    subject: `Lease renewed — ${unitName}`,
+    html: base(`
+      ${heading("Lease renewed")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`A lease has been successfully renewed.`)}
+      ${metaTable([
+        ["Tenant", tenantName],
+        ["Property", propertyName],
+        ["Unit", unitName],
+        ["New end date", newEndDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })],
+        ["Rent amount", `₦${rentAmount.toLocaleString()}`],
+      ])}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 19. Admin — Visitor checked in
+// ---------------------------------------------------------------------------
+export function adminVisitorCheckInEmail(
+  adminName: string,
+  tenantName: string,
+  visitorName: string,
+  unitName: string,
+  propertyName: string,
+  time: string,
+) {
+  return {
+    subject: `Visitor arrived — ${propertyName}`,
+    html: base(`
+      ${heading("Visitor check-in")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`A visitor has checked in at your property.`)}
+      ${metaTable([
+        ["Visitor", visitorName],
+        ["Host (tenant)", tenantName],
+        ["Property", propertyName],
+        ["Unit", unitName],
+        ["Check-in time", time],
+      ])}
     `),
   };
 }

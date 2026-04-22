@@ -149,12 +149,27 @@ enum MaintenanceStatus {
   CANCELLED
 }
 
+enum MaintenanceApprovalStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  REBUTTAL_SENT
+}
+
 enum ExpenseCategory {
   MAINTENANCE
   UTILITIES
   INSURANCE
   LEGAL
   OTHER
+}
+
+enum Permission {
+  VIEW_FINANCIALS_AND_REPORTS
+  MANAGE_PROPERTIES_AND_UNITS
+  VIEW_TENANTS_AND_LEASES
+  VIEW_MAINTENANCE_TICKETS
+  APPROVE_MAJOR_MAINTENANCE
 }
 
 // ==========================================
@@ -215,6 +230,8 @@ model user {
   twoFactorExpiry    DateTime?
   sessions           Session[]
   activityLogs       ActivityLog[]
+
+  permissions  Permission[]  @default([])
 
   @@index([userRoleId])
   @@map("user")
@@ -602,6 +619,12 @@ model MaintenanceRequest {
   subject     String?
   description String
   attachments String[]
+
+  // Budget & approval
+  budget         Float?
+  quotedCost     Float?
+  approvalStatus MaintenanceApprovalStatus?
+  rebuttalNote   String?
 
   tenant user @relation(fields: [tenantId], references: [userId])
   unit   unit @relation(fields: [unitId], references: [id])
