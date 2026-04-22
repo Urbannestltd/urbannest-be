@@ -5,6 +5,8 @@ export const AdminCreateUserSchema = z.object({
   userRole: z
     .enum(["TENANT", "LANDLORD", "ADMIN", "FACILITY_MANAGER"])
     .optional(),
+  unitId: z.string().uuid().optional(),
+  propertyId: z.string().uuid().optional(),
 });
 
 export interface AdminCreateUserRequest {

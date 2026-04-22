@@ -6,10 +6,15 @@ import {
   RenewLeaseDto,
 } from "../../dtos/admin/lease.dto";
 import { BadRequestError } from "../../utils/apiError";
+import { ZeptoMailService } from "../external/zeptoMailService";
+import { adminLeaseCreatedEmail, adminLeaseRenewedEmail } from "../../config/emailTemplates";
+import { getAdminRecipients } from "../../utils/getAdminRecipients";
 
 const prisma = new PrismaClient();
 
 export class AdminLeaseService {
+  private emailService = new ZeptoMailService();
+
   public async createLease(data: CreateLeaseDto) {
     // 1. Verify the tenant exists and has the TENANT role
     const tenant = await prisma.user.findFirst({
@@ -31,7 +36,12 @@ export class AdminLeaseService {
     }
 
     // 3. Create the lease and update the unit status in a single transaction
-    const [newLease, updatedUnit] = await prisma.$transaction([
+    const unitWithProperty = await prisma.unit.findUnique({
+      where: { id: data.unitId },
+      include: { property: true },
+    });
+
+    const [newLease] = await prisma.$transaction([
       prisma.lease.create({
         data: {
           tenantId: data.tenantId,
@@ -50,6 +60,25 @@ export class AdminLeaseService {
         data: { status: UnitStatus.OCCUPIED },
       }),
     ]);
+
+    // Notify admins with lease notifications enabled
+    const adminRecipients = await getAdminRecipients("emailLease");
+    for (const admin of adminRecipients) {
+      const { subject, html } = adminLeaseCreatedEmail(
+        admin.name ?? "Admin",
+        tenant.userFullName ?? "Tenant",
+        unitWithProperty?.property?.name ?? "Unknown Property",
+        unitWithProperty?.name ?? "Unknown Unit",
+        new Date(data.startDate),
+        new Date(data.endDate),
+        data.rentAmount,
+      );
+      await this.emailService.sendEmail(
+        { email: admin.email, name: admin.name ?? undefined },
+        subject,
+        html,
+      );
+    }
 
     return newLease;
   }
@@ -136,7 +165,7 @@ export class AdminLeaseService {
       );
     }
 
-    return await prisma.$transaction(async (tx) => {
+    const renewedLease = await prisma.$transaction(async (tx) => {
       const newLease = await tx.lease.create({
         data: {
           tenantId: previousLease.tenantId,
@@ -159,5 +188,35 @@ export class AdminLeaseService {
 
       return newLease;
     });
+
+    // Notify admins with lease notifications enabled
+    const adminRecipients = await getAdminRecipients("emailLease");
+    if (adminRecipients.length > 0) {
+      const tenantUser = await prisma.user.findUnique({
+        where: { userId: previousLease.tenantId },
+        select: { userFullName: true },
+      });
+      const unitWithProperty = await prisma.unit.findUnique({
+        where: { id: previousLease.unitId },
+        include: { property: true },
+      });
+      for (const admin of adminRecipients) {
+        const { subject, html } = adminLeaseRenewedEmail(
+          admin.name ?? "Admin",
+          tenantUser?.userFullName ?? "Tenant",
+          unitWithProperty?.property?.name ?? "Unknown Property",
+          unitWithProperty?.name ?? "Unknown Unit",
+          new Date(data.endDate),
+          data.rentAmount ?? previousLease.rentAmount,
+        );
+        await this.emailService.sendEmail(
+          { email: admin.email, name: admin.name ?? undefined },
+          subject,
+          html,
+        );
+      }
+    }
+
+    return renewedLease;
   }
 }

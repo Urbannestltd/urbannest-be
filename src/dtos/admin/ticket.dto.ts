@@ -1,4 +1,4 @@
-import { MaintenanceStatus } from "@prisma/client";
+import { MaintenanceApprovalStatus, MaintenanceStatus } from "@prisma/client";
 
 export interface TicketListResponseDto {
   id: string;
@@ -11,11 +11,16 @@ export interface TicketListResponseDto {
   unit: { id: string; name: string } | null;
   property: { id: string; name: string | null } | null;
 
+  // Budget & approval
+  budget: number | null;
+  quotedCost: number | null;
+  approvalStatus: MaintenanceApprovalStatus | null;
+
   // SLA tracking
-  responseTimeMinutes: number | null; // null = no response yet
-  projectedFixDeadline: Date;         // createdAt + SLA window for this priority
-  isResponseLate: boolean;            // first response exceeded SLA response window
-  isFixLate: boolean;                 // still open past the fix deadline
+  responseTimeMinutes: number | null;
+  projectedFixDeadline: Date;
+  isResponseLate: boolean;
+  isFixLate: boolean;
 }
 
 export interface TicketDetailResponseDto {
@@ -51,14 +56,34 @@ export interface TicketDetailResponseDto {
     event: string;
     timestamp: Date;
   }[];
+
+  // Budget & approval
+  budget: number | null;
+  quotedCost: number | null;
+  approvalStatus: MaintenanceApprovalStatus | null;
+  rebuttalNote: string | null;
 }
 
 export interface AddCommentDto {
   message: string;
-  senderId: string; // The ID of the logged-in user making the comment
+  senderId: string;
 }
 
 export interface UpdateTicketStatusDto {
   status: MaintenanceStatus;
-  adminId: string; // The ID of the admin making the change
+  adminId: string;
+}
+
+export interface SetBudgetDto {
+  budget: number;
+  quotedCost?: number;
+}
+
+export interface RejectTicketDto {
+  reason: string;
+}
+
+export interface RebuttalDto {
+  message: string;
+  suggestedAmount?: number;
 }

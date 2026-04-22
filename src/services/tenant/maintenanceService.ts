@@ -11,7 +11,8 @@ import {
   MaintenanceStatus,
 } from "@prisma/client";
 import { ZeptoMailService } from "./../external/zeptoMailService";
-import { maintenanceAlertEmail, maintenanceReplyEmail } from "../../config/emailTemplates";
+import { adminMaintenanceAlertEmail, maintenanceReplyEmail } from "../../config/emailTemplates";
+import { getAdminRecipients } from "../../utils/getAdminRecipients";
 
 export class MaintenanceService {
   private emailService = new ZeptoMailService();
@@ -50,17 +51,28 @@ export class MaintenanceService {
     });
 
     // C. Notify Admin / Property Manager
-    const alert = maintenanceAlertEmail(
-      params.category,
-      lease.unit.name,
-      "Tenant",
-      params.priority || "MEDIUM",
-    );
-    await this.emailService.sendEmail(
-      { email: "manager@urbannest.com", name: "Property Manager" },
-      alert.subject,
-      alert.html,
-    );
+    const adminRecipients = await getAdminRecipients("emailMaintenance");
+    if (adminRecipients.length > 0) {
+      const tenantUser = await prisma.user.findUnique({
+        where: { userId: tenantId },
+        select: { userFullName: true },
+      });
+      for (const admin of adminRecipients) {
+        const alert = adminMaintenanceAlertEmail(
+          admin.name ?? "Admin",
+          tenantUser?.userFullName ?? "Tenant",
+          lease.unit.name,
+          lease.unit.property?.name ?? "Unknown Property",
+          params.category,
+          params.priority || "MEDIUM",
+        );
+        await this.emailService.sendEmail(
+          { email: admin.email, name: admin.name ?? undefined },
+          alert.subject,
+          alert.html,
+        );
+      }
+    }
 
     return ticket;
   }

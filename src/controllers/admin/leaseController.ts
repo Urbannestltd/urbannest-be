@@ -1,14 +1,17 @@
-import { Body, Get, Patch, Path, Post, Route, Security, Tags } from "tsoa";
+import { Body, Get, Middlewares, Patch, Path, Post, Route, Security, Tags } from "tsoa";
 import { AdminLeaseService } from "../../services/admin/leaseService";
 import {
   CreateLeaseDto,
   UpdateLeaseDto,
   RenewLeaseDto,
 } from "../../dtos/admin/lease.dto";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("admin/leases")
 @Tags("Admin - Leases")
-@Security("jwt", ["ADMIN"])
+@Security("jwt")
+@Middlewares(requirePermission(Permission.VIEW_TENANTS_AND_LEASES))
 export class AdminLeaseController {
   private leaseService = new AdminLeaseService();
 

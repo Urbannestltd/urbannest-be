@@ -1,14 +1,24 @@
 import { PrismaClient, MaintenanceStatus } from "@prisma/client";
 import {
   AddCommentDto,
+  RebuttalDto,
+  RejectTicketDto,
+  SetBudgetDto,
   TicketDetailResponseDto,
   TicketListResponseDto,
   UpdateTicketStatusDto,
 } from "../../dtos/admin/ticket.dto";
+import { ZeptoMailService } from "../external/zeptoMailService";
+import {
+  ticketApprovedEmail,
+  ticketRejectedEmail,
+  ticketRebuttalEmail,
+} from "../../config/emailTemplates";
 
 const prisma = new PrismaClient();
 
 export class AdminTicketService {
+  private emailService = new ZeptoMailService();
   // SLA windows by priority (in hours)
   private readonly SLA = {
     EMERGENCY: { responseHours: 1,  fixHours: 4   },
@@ -58,6 +68,9 @@ export class AdminTicketService {
       projectedFixDeadline,
       isResponseLate,
       isFixLate,
+      budget: ticket.budget ?? null,
+      quotedCost: ticket.quotedCost ?? null,
+      approvalStatus: ticket.approvalStatus ?? null,
     };
   }
 
@@ -198,6 +211,11 @@ export class AdminTicketService {
       },
 
       timeline,
+
+      budget: ticket.budget ?? null,
+      quotedCost: ticket.quotedCost ?? null,
+      approvalStatus: ticket.approvalStatus ?? null,
+      rebuttalNote: ticket.rebuttalNote ?? null,
     };
   }
 
@@ -232,10 +250,9 @@ export class AdminTicketService {
       data: { status: data.status },
     });
 
-    // Automatically add a system message to the chat log
     await prisma.maintenanceMessage.create({
       data: {
-        ticketId: ticketId,
+        ticketId,
         senderId: data.adminId,
         message: `System: Status updated to ${data.status}`,
         attachments: [],
@@ -243,5 +260,157 @@ export class AdminTicketService {
     });
 
     return updatedTicket;
+  }
+
+  // --- 5. SET BUDGET ---
+  public async setBudget(ticketId: string, data: SetBudgetDto) {
+    const ticket = await prisma.maintenanceRequest.findUnique({
+      where: { id: ticketId },
+    });
+    if (!ticket) throw new Error("Ticket not found");
+
+    const needsApproval =
+      data.quotedCost != null && data.quotedCost > data.budget;
+
+    return await prisma.maintenanceRequest.update({
+      where: { id: ticketId },
+      data: {
+        budget: data.budget,
+        ...(data.quotedCost != null && { quotedCost: data.quotedCost }),
+        ...(needsApproval && { approvalStatus: "PENDING_APPROVAL" }),
+      },
+    });
+  }
+
+  // --- 6. APPROVE TICKET ---
+  public async approveTicket(ticketId: string, adminId: string) {
+    const ticket = await prisma.maintenanceRequest.findUnique({
+      where: { id: ticketId },
+      include: {
+        tenant: { select: { userEmail: true, userFullName: true } },
+      },
+    });
+    if (!ticket) throw new Error("Ticket not found");
+
+    const updated = await prisma.maintenanceRequest.update({
+      where: { id: ticketId },
+      data: { approvalStatus: "APPROVED" },
+    });
+
+    await prisma.maintenanceMessage.create({
+      data: {
+        ticketId,
+        senderId: adminId,
+        message: `System: Request approved${ticket.budget != null ? ` with a budget of ₦${ticket.budget.toLocaleString()}` : ""}`,
+        attachments: [],
+      },
+    });
+
+    if (ticket.tenant) {
+      const { subject, html } = ticketApprovedEmail(
+        ticket.tenant.userFullName ?? "there",
+        ticket.subject ?? "Maintenance Request",
+        ticket.budget,
+      );
+      this.emailService.sendEmail(
+        { email: ticket.tenant.userEmail, name: ticket.tenant.userFullName ?? undefined },
+        subject,
+        html,
+      );
+    }
+
+    return updated;
+  }
+
+  // --- 7. REJECT TICKET ---
+  public async rejectTicket(
+    ticketId: string,
+    adminId: string,
+    data: RejectTicketDto,
+  ) {
+    const ticket = await prisma.maintenanceRequest.findUnique({
+      where: { id: ticketId },
+      include: {
+        tenant: { select: { userEmail: true, userFullName: true } },
+      },
+    });
+    if (!ticket) throw new Error("Ticket not found");
+
+    const updated = await prisma.maintenanceRequest.update({
+      where: { id: ticketId },
+      data: { approvalStatus: "REJECTED", rebuttalNote: data.reason },
+    });
+
+    await prisma.maintenanceMessage.create({
+      data: {
+        ticketId,
+        senderId: adminId,
+        message: `System: Request rejected — ${data.reason}`,
+        attachments: [],
+      },
+    });
+
+    if (ticket.tenant) {
+      const { subject, html } = ticketRejectedEmail(
+        ticket.tenant.userFullName ?? "there",
+        ticket.subject ?? "Maintenance Request",
+        data.reason,
+      );
+      this.emailService.sendEmail(
+        { email: ticket.tenant.userEmail, name: ticket.tenant.userFullName ?? undefined },
+        subject,
+        html,
+      );
+    }
+
+    return updated;
+  }
+
+  // --- 8. SEND REBUTTAL ---
+  public async sendRebuttal(
+    ticketId: string,
+    adminId: string,
+    data: RebuttalDto,
+  ) {
+    const ticket = await prisma.maintenanceRequest.findUnique({
+      where: { id: ticketId },
+      include: {
+        tenant: { select: { userEmail: true, userFullName: true } },
+      },
+    });
+    if (!ticket) throw new Error("Ticket not found");
+
+    const updated = await prisma.maintenanceRequest.update({
+      where: { id: ticketId },
+      data: {
+        approvalStatus: "REBUTTAL_SENT",
+        rebuttalNote: data.message,
+      },
+    });
+
+    await prisma.maintenanceMessage.create({
+      data: {
+        ticketId,
+        senderId: adminId,
+        message: `System: Rebuttal sent — ${data.message}${data.suggestedAmount != null ? ` (suggested: ₦${data.suggestedAmount.toLocaleString()})` : ""}`,
+        attachments: [],
+      },
+    });
+
+    if (ticket.tenant) {
+      const { subject, html } = ticketRebuttalEmail(
+        ticket.tenant.userFullName ?? "there",
+        ticket.subject ?? "Maintenance Request",
+        data.message,
+        data.suggestedAmount,
+      );
+      this.emailService.sendEmail(
+        { email: ticket.tenant.userEmail, name: ticket.tenant.userFullName ?? undefined },
+        subject,
+        html,
+      );
+    }
+
+    return updated;
   }
 }
