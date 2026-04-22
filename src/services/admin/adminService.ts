@@ -206,7 +206,6 @@ export class AdminService {
 
     const users = await prisma.user.findMany({
       where: {
-        userId: { not: excludeAdminId },
         ...(filters?.status && { userStatus: filters.status }),
         ...(filters?.role && { userRole: { roleName: filters.role } }),
         ...((filters?.createdFrom || filters?.createdTo) && {
@@ -225,7 +224,15 @@ export class AdminService {
       orderBy: { userCreatedAt: "desc" },
     });
 
-    return users.map((u) => this.mapUserProperties(u));
+    const mapped = users.map((u) => this.mapUserProperties(u));
+
+    // Requesting admin is always pinned first
+    const adminIdx = mapped.findIndex((u) => u.id === excludeAdminId);
+    if (adminIdx > 0) {
+      mapped.unshift(...mapped.splice(adminIdx, 1));
+    }
+
+    return mapped;
   }
 
   public async getUserById(userId: string) {
