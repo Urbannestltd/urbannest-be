@@ -36,7 +36,12 @@ export class MaintenanceService {
     if (!lease)
       throw new BadRequestError("No active unit found linked to your account.");
 
-    // B. Create Ticket
+    // B. Create Ticket — auto-apply global default budget if one is set
+    const systemSetting = await prisma.systemSetting.findUnique({
+      where: { id: "singleton" },
+      select: { defaultMaintenanceBudget: true },
+    });
+
     const ticket = await prisma.maintenanceRequest.create({
       data: {
         tenantId,
@@ -47,6 +52,9 @@ export class MaintenanceService {
         description: params.description,
         attachments: params.attachments || [],
         status: MaintenanceStatus.PENDING,
+        ...(systemSetting?.defaultMaintenanceBudget != null && {
+          budget: systemSetting.defaultMaintenanceBudget,
+        }),
       },
     });
 

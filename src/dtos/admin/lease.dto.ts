@@ -23,7 +23,7 @@ export interface UpdateLeaseDto {
 }
 
 export interface LeaseDetailDto {
-  id: string;
+  leaseId: string;
   status: string;
   rentAmount: number;
   serviceCharge: number | null;

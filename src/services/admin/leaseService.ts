@@ -103,8 +103,12 @@ export class AdminLeaseService {
 
     if (!lease) throw new BadRequestError("Lease not found.");
 
+    return this.mapLease(lease);
+  }
+
+  private mapLease(lease: any): LeaseDetailDto {
     return {
-      id: lease.id,
+      leaseId: lease.id,
       status: lease.status,
       rentAmount: lease.rentAmount,
       serviceCharge: lease.serviceCharge ?? null,
@@ -120,6 +124,26 @@ export class AdminLeaseService {
         ? { id: lease.unit.property.id, name: lease.unit.property.name }
         : null,
     };
+  }
+
+  // --- GET ALL LEASES ---
+  public async getAllLeases(): Promise<LeaseDetailDto[]> {
+    const leases = await prisma.lease.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        tenant: {
+          select: { userId: true, userFullName: true, userPhone: true },
+        },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            property: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    return leases.map((l) => this.mapLease(l));
   }
 
   // --- EDIT ACTIVE LEASE ---
