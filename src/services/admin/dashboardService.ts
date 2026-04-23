@@ -12,7 +12,9 @@ export class AdminDashboardService {
     const startOfYear = new Date(currentYear, 0, 1);
 
     // 1. Total Properties
-    const totalProperties = await prisma.property.count();
+    const totalProperties = await prisma.property.count({
+      where: { isDeleted: false },
+    });
 
     // 2. Total Tenants (Users with an active lease)
     const totalTenants = await prisma.user.count({

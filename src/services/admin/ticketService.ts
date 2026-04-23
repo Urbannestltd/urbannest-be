@@ -1,6 +1,7 @@
 import { PrismaClient, MaintenanceStatus } from "@prisma/client";
 import {
   AddCommentDto,
+  MaintenanceMetricsDto,
   RebuttalDto,
   RejectTicketDto,
   SetBudgetDto,
@@ -91,7 +92,94 @@ export class AdminTicketService {
     };
   }
 
-  // --- 0. GET ALL TICKETS (across all properties) ---
+  // --- 0. METRICS ---
+  public async getMetrics(): Promise<MaintenanceMetricsDto> {
+    const now = new Date();
+
+    // Week starts on Monday 00:00:00
+    const weekStart = new Date(now);
+    const day = weekStart.getDay(); // 0 = Sunday
+    weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1));
+    weekStart.setHours(0, 0, 0, 0);
+
+    const OPEN_STATUSES   = ["PENDING", "IN_PROGRESS", "WORK_SCHEDULED"] as const;
+    const CLOSED_STATUSES = ["RESOLVED", "FIXED", "CANCELLED"] as const;
+
+    const [
+      highPriorityOpenCount,
+      weeklyTickets,
+      costAggregate,
+      ticketsWithFirstMessage,
+    ] = await Promise.all([
+      // 1. HIGH + EMERGENCY tickets still open
+      prisma.maintenanceRequest.count({
+        where: {
+          priority: { in: ["HIGH", "EMERGENCY"] },
+          status: { in: [...OPEN_STATUSES] },
+        },
+      }),
+
+      // 2. All tickets created this week (status only)
+      prisma.maintenanceRequest.findMany({
+        where: { createdAt: { gte: weekStart } },
+        select: { status: true },
+      }),
+
+      // 3. Sum of budgets for non-cancelled tickets
+      prisma.maintenanceRequest.aggregate({
+        where: {
+          status: { notIn: ["CANCELLED"] },
+          budget: { not: null },
+        },
+        _sum: { budget: true },
+      }),
+
+      // 4. First message timestamp per ticket (for avg response time)
+      prisma.maintenanceRequest.findMany({
+        where: { messages: { some: {} } },
+        select: {
+          createdAt: true,
+          messages: {
+            orderBy: { createdAt: "asc" },
+            take: 1,
+            select: { createdAt: true },
+          },
+        },
+      }),
+    ]);
+
+    // Weekly completion %
+    const weeklyTotal     = weeklyTickets.length;
+    const weeklyCompleted = weeklyTickets.filter((t) =>
+      (CLOSED_STATUSES as readonly string[]).includes(t.status),
+    ).length;
+    const weeklyCompletionPercent =
+      weeklyTotal === 0 ? 0 : Math.round((weeklyCompleted / weeklyTotal) * 100);
+
+    // Avg response time in minutes
+    let avgResponseTimeMinutes: number | null = null;
+    if (ticketsWithFirstMessage.length > 0) {
+      const totalMinutes = ticketsWithFirstMessage.reduce((sum, t) => {
+        const first = t.messages[0];
+        if (!first) return sum;
+        return sum + (first.createdAt.getTime() - t.createdAt.getTime()) / 60000;
+      }, 0);
+      avgResponseTimeMinutes = Math.round(
+        totalMinutes / ticketsWithFirstMessage.length,
+      );
+    }
+
+    return {
+      highPriorityOpenCount,
+      avgResponseTimeMinutes,
+      weeklyCompletionPercent,
+      weeklyTicketsTotal: weeklyTotal,
+      weeklyTicketsCompleted: weeklyCompleted,
+      maintenanceCostEstimate: costAggregate._sum.budget ?? 0,
+    };
+  }
+
+  // --- 0b. GET ALL TICKETS (across all properties) ---
   public async getAllTickets(): Promise<TicketListResponseDto[]> {
     const tickets = await prisma.maintenanceRequest.findMany({
       orderBy: { createdAt: "desc" },
