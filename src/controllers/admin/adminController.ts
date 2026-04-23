@@ -85,6 +85,20 @@ export class AdminController extends Controller {
     return { success: true, message: "User retrieved", data };
   }
 
+  @Get("settings/system")
+  public async getSystemSettings() {
+    const data = await this.adminService.getSystemSettings();
+    return { success: true, message: "System settings retrieved", data };
+  }
+
+  @Patch("settings/system")
+  public async updateSystemSettings(
+    @Body() body: { defaultMaintenanceBudget?: number | null },
+  ) {
+    const data = await this.adminService.updateSystemSettings(body);
+    return { success: true, message: "System settings updated", data };
+  }
+
   @Get("settings/notifications")
   public async getNotificationSettings(@Request() req: any) {
     const data = await this.adminService.getNotificationSettings(req.user.userId);

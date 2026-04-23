@@ -269,6 +269,15 @@ model privilege {
   privilegeUpdatedAt   DateTime @updatedAt
 }
 
+// Singleton system-wide settings — always upserted on id = "singleton"
+model SystemSetting {
+  id                       String   @id @default("singleton")
+  defaultMaintenanceBudget Float?
+  updatedAt                DateTime @updatedAt
+
+  @@map("system_setting")
+}
+
 model otpLogs {
   otpLogId        String   @id @default(uuid())
   otpLogHash      String

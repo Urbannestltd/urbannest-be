@@ -15,6 +15,12 @@ import { requirePermission } from "../../middlewares/permissionMiddleware";
 export class AdminLeaseController {
   private leaseService = new AdminLeaseService();
 
+  @Get("/")
+  public async getAllLeases() {
+    const leases = await this.leaseService.getAllLeases();
+    return { success: true, message: "Leases retrieved successfully", data: leases };
+  }
+
   @Get("{leaseId}")
   public async getLeaseById(@Path() leaseId: string) {
     const lease = await this.leaseService.getLeaseById(leaseId);

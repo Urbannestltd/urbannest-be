@@ -160,6 +160,35 @@ export class AdminService {
     });
   }
 
+  public async getSystemSettings() {
+    const setting = await prisma.systemSetting.findUnique({
+      where: { id: "singleton" },
+    });
+    return {
+      defaultMaintenanceBudget: setting?.defaultMaintenanceBudget ?? null,
+    };
+  }
+
+  public async updateSystemSettings(params: {
+    defaultMaintenanceBudget?: number | null;
+  }) {
+    const setting = await prisma.systemSetting.upsert({
+      where: { id: "singleton" },
+      update: {
+        ...(params.defaultMaintenanceBudget !== undefined && {
+          defaultMaintenanceBudget: params.defaultMaintenanceBudget,
+        }),
+      },
+      create: {
+        id: "singleton",
+        defaultMaintenanceBudget: params.defaultMaintenanceBudget ?? null,
+      },
+    });
+    return {
+      defaultMaintenanceBudget: setting.defaultMaintenanceBudget ?? null,
+    };
+  }
+
   private mapUserProperties(u: any) {
     const propertyShape = (p: any) => ({ id: p.id, name: p.name });
     return {
