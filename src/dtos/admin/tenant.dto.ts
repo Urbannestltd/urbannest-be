@@ -15,6 +15,7 @@ export interface TenantProfileResponseDto {
 
   // Lease Information (Current)
   currentLease: {
+    leaseId: string;
     rentAmount: number;
     serviceCharge: number;
     leaseExpiryPercentage: string; // e.g., "80%"
@@ -27,6 +28,7 @@ export interface TenantProfileResponseDto {
 
   // Histories & Lists
   leaseHistory: {
+    leaseId: string;
     reference: string;
     startDate: Date;
     endDate: Date;

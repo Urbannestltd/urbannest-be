@@ -17,6 +17,13 @@ import { requirePermission } from "../../middlewares/permissionMiddleware";
 export class AdminTicketController {
   private ticketService = new AdminTicketService();
 
+  // Maintenance metrics summary
+  @Get("tickets/metrics")
+  public async getMetrics() {
+    const data = await this.ticketService.getMetrics();
+    return { success: true, message: "Maintenance metrics retrieved", data };
+  }
+
   // Get all tickets across all properties
   @Get("tickets")
   public async getAllTickets() {

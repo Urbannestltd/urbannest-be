@@ -214,7 +214,9 @@ export class AdminUnitService {
       .sort((a, b) => floorNumOf(a) - floorNumOf(b))
       .map((floor) => ({
         floor,
-        units: groupMap[floor]!.sort((a, b) => floorNumOf(a.name) - floorNumOf(b.name)),
+        units: groupMap[floor]!.sort(
+          (a, b) => floorNumOf(a.name) - floorNumOf(b.name),
+        ),
       }));
 
     return {
@@ -266,6 +268,7 @@ export class AdminUnitService {
       let percentage =
         totalDuration > 0 ? Math.round((elapsed / totalDuration) * 100) : 0;
       percentage = Math.max(0, Math.min(100, percentage));
+      const leaseId = activeLease.id;
 
       // Lease Length String (e.g., "4 years")
       const diffInMonths =
@@ -280,6 +283,7 @@ export class AdminUnitService {
           : `${diffInMonths} months`;
 
       currentLeaseData = {
+        leaseId,
         rentAmount: activeLease.rentAmount,
         serviceCharge: activeLease.serviceCharge || 0,
         leaseExpiryPercentage: `${percentage}%`,
@@ -308,6 +312,7 @@ export class AdminUnitService {
       currentLease: currentLeaseData,
 
       leaseHistory: pastLeases.map((l) => ({
+        leaseId: l.id,
         reference: l.unit.property.name || "Unknown Property",
         startDate: l.startDate,
         endDate: l.endDate,

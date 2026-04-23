@@ -62,19 +62,13 @@ export class AdminController extends Controller {
   }
 
   @Put("users/{userId}/suspend")
-  public async suspendUser(
-    @Path() userId: string,
-    @Request() req: any,
-  ) {
+  public async suspendUser(@Path() userId: string, @Request() req: any) {
     await this.adminService.suspendUser(userId, req.user.userId);
     return { success: true, message: "User suspended successfully" };
   }
 
   @Put("users/{userId}/activate")
-  public async activateUser(
-    @Path() userId: string,
-    @Request() req: any,
-  ) {
+  public async activateUser(@Path() userId: string, @Request() req: any) {
     await this.adminService.activateUser(userId, req.user.userId);
     return { success: true, message: "User activated successfully" };
   }
@@ -101,21 +95,27 @@ export class AdminController extends Controller {
 
   @Get("settings/notifications")
   public async getNotificationSettings(@Request() req: any) {
-    const data = await this.adminService.getNotificationSettings(req.user.userId);
+    const data = await this.adminService.getNotificationSettings(
+      req.user.userId,
+    );
     return { success: true, message: "Notification settings retrieved", data };
   }
 
   @Patch("settings/notifications")
   public async updateNotificationSettings(
     @Request() req: any,
-    @Body() body: {
+    @Body()
+    body: {
       emailPayments?: boolean;
       emailLease?: boolean;
       emailMaintenance?: boolean;
       emailVisitors?: boolean;
     },
   ) {
-    const data = await this.adminService.updateNotificationSettings(req.user.userId, body);
+    const data = await this.adminService.updateNotificationSettings(
+      req.user.userId,
+      body,
+    );
     return { success: true, message: "Notification settings updated", data };
   }
 
@@ -144,7 +144,11 @@ export class AdminController extends Controller {
     @Request() req: any,
     @Body() body: { permissions: Permission[] },
   ) {
-    await this.adminService.updateUserPermissions(userId, req.user.userId, body.permissions);
+    await this.adminService.updateUserPermissions(
+      userId,
+      req.user.userId,
+      body.permissions,
+    );
     return { success: true, message: "Permissions updated successfully" };
   }
 }

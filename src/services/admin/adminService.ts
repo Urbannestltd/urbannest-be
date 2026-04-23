@@ -204,6 +204,7 @@ export class AdminService {
       employer: u.employer,
       emergencyContact: u.userEmergencyContact,
       createdAt: u.userCreatedAt,
+      permissions: u.permissions ?? [],
       properties: {
         asLandlord: (u.properties ?? []).map(propertyShape),
         asFacilityManager: (u.managedProperties ?? []).map(propertyShape),
@@ -290,7 +291,8 @@ export class AdminService {
     const admin = await prisma.user.findUnique({ where: { userId: adminId } });
     if (!admin) throw new BadRequestError("User not found");
 
-    if (!admin.userPassword) throw new BadRequestError("No password set on this account");
+    if (!admin.userPassword)
+      throw new BadRequestError("No password set on this account");
 
     const isMatch = await bcrypt.compare(oldPassword, admin.userPassword);
     if (!isMatch) throw new BadRequestError("Current password is incorrect");
@@ -333,10 +335,18 @@ export class AdminService {
     return prisma.notificationSetting.upsert({
       where: { userId: adminId },
       update: {
-        ...(params.emailPayments !== undefined && { emailPayments: params.emailPayments }),
-        ...(params.emailLease !== undefined && { emailLease: params.emailLease }),
-        ...(params.emailMaintenance !== undefined && { emailMaintenance: params.emailMaintenance }),
-        ...(params.emailVisitors !== undefined && { emailVisitors: params.emailVisitors }),
+        ...(params.emailPayments !== undefined && {
+          emailPayments: params.emailPayments,
+        }),
+        ...(params.emailLease !== undefined && {
+          emailLease: params.emailLease,
+        }),
+        ...(params.emailMaintenance !== undefined && {
+          emailMaintenance: params.emailMaintenance,
+        }),
+        ...(params.emailVisitors !== undefined && {
+          emailVisitors: params.emailVisitors,
+        }),
       },
       create: {
         userId: adminId,
@@ -356,7 +366,9 @@ export class AdminService {
     if (targetUserId === adminId) {
       throw new BadRequestError("Cannot modify your own permissions");
     }
-    const user = await prisma.user.findUnique({ where: { userId: targetUserId } });
+    const user = await prisma.user.findUnique({
+      where: { userId: targetUserId },
+    });
     if (!user) throw new BadRequestError("User not found");
 
     await prisma.user.update({

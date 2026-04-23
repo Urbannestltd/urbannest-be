@@ -64,6 +64,23 @@ export interface TicketDetailResponseDto {
   rebuttalNote: string | null;
 }
 
+export interface MaintenanceMetricsDto {
+  /** Count of HIGH + EMERGENCY tickets that are still open */
+  highPriorityOpenCount: number;
+
+  /** Average time (in minutes) from ticket creation to first admin response */
+  avgResponseTimeMinutes: number | null;
+
+  /** % of tickets created this week that are now resolved/fixed/cancelled */
+  weeklyCompletionPercent: number;
+  /** Raw counts backing the weekly % */
+  weeklyTicketsTotal: number;
+  weeklyTicketsCompleted: number;
+
+  /** Sum of approved budgets for all non-cancelled tickets (₦) */
+  maintenanceCostEstimate: number;
+}
+
 export interface AddCommentDto {
   message: string;
   senderId: string;
