@@ -34,6 +34,16 @@ export interface CreateUnitAdminDto {
   status?: UnitStatus;
 }
 
+export interface UpdateUnitAdminDto {
+  name?: string;
+  floor?: string | number;
+  baseRent?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  type?: UnitType;
+  status?: UnitStatus;
+}
+
 // 2. The DTO used by your Controller
 export interface ManageMemberDto {
   userId: string;
