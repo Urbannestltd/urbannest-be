@@ -18,19 +18,12 @@ import * as jwt from "jsonwebtoken";
 import crypto from "crypto";
 import * as bcrypt from "bcrypt";
 import { ApiResponse } from "../dtos/apiResponse";
-import {
-  GOOGLE_CLIENT_ID,
-  JWT_PRIVATE_KEY,
-  JWTSECRET,
-} from "../config/env";
+import { GOOGLE_CLIENT_ID, JWT_PRIVATE_KEY, JWTSECRET } from "../config/env";
 import { OAuth2Client } from "google-auth-library";
 import sendEmail from "../config/resend";
 import { JwtPayload } from "jsonwebtoken";
 import { ZeptoMailService } from "./external/zeptoMailService";
-import {
-  loginOtpEmail,
-  passwordResetEmail,
-} from "../config/emailTemplates";
+import { loginOtpEmail, passwordResetEmail } from "../config/emailTemplates";
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -341,7 +334,7 @@ export class AuthenticationService {
     const token = jwt.sign(
       { userId: user.userId, role: user.userRole.roleName },
       privateKey,
-      { algorithm: "RS256", expiresIn: "15m" },
+      { algorithm: "RS256", expiresIn: "1d" },
     );
 
     // 2. Generate Cryptographically Secure Refresh Token
