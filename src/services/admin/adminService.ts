@@ -97,7 +97,7 @@ export class AdminService {
       propertyName,
       unitName,
     );
-    this.zeptoMailService.sendEmail(
+    await this.zeptoMailService.sendEmail(
       { email: params.userEmail, name: params.userEmail },
       subject,
       html,

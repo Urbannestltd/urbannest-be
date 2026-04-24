@@ -1,7 +1,5 @@
 import axios from "axios";
 
-// Interface for the data you want to inject into the email
-// e.g. { "name": "John", "amount": "50,000" }
 interface EmailMergeTags {
   [key: string]: string | number | boolean;
 }
@@ -10,6 +8,8 @@ interface EmailRecipient {
   email: string;
   name?: string;
 }
+
+const RETRY_DELAYS = [0, 1000, 2000]; // ms to wait before each attempt (attempt 0 = immediate)
 
 export class ZeptoMailService {
   private client;
@@ -24,6 +24,7 @@ export class ZeptoMailService {
     this.client = axios.create({
       baseURL:
         process.env.ZEPTOMAIL_BASE_URL || "https://api.zeptomail.com/v1.1",
+      timeout: 10_000,
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
@@ -32,21 +33,36 @@ export class ZeptoMailService {
     });
   }
 
+  private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < RETRY_DELAYS.length; attempt++) {
+      if (RETRY_DELAYS[attempt]! > 0) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+      }
+      try {
+        return await fn();
+      } catch (err) {
+        lastError = err;
+        const nextDelay = RETRY_DELAYS[attempt + 1];
+        if (nextDelay !== undefined) {
+          console.warn(
+            `ZeptoMail attempt ${attempt + 1} failed, retrying in ${nextDelay}ms...`,
+          );
+        }
+      }
+    }
+    throw lastError;
+  }
+
   /**
    * Send an Email using a Template created on ZeptoMail Portal
-   * @param to - Recipient(s)
-   * @param templateKey - The unique key from ZeptoMail dashboard (e.g. "2d6f.56...")
-   * @param mergeVariables - Data to fill placeholders (e.g. { name: "John", link: "..." })
    */
   public async sendTemplateEmail(
     to: EmailRecipient | EmailRecipient[],
     templateKey: string,
     mergeVariables?: EmailMergeTags,
   ) {
-    const recipients = Array.isArray(to) ? to : [to];
-
-    // Map to ZeptoMail 'to' format
-    const formattedRecipients = recipients.map((r) => ({
+    const formattedRecipients = (Array.isArray(to) ? to : [to]).map((r) => ({
       email_address: {
         address: r.email,
         name: r.name || r.email.split("@")[0],
@@ -54,23 +70,16 @@ export class ZeptoMailService {
     }));
 
     try {
-      // NOTE: We use the /email/template endpoint (or /email with template_key depending on API version)
-      // Standard ZeptoMail Template Payload:
-      const payload = {
-        from: {
-          address: this.fromAddress,
-          name: this.fromName,
-        },
-        to: formattedRecipients,
-        template_key: templateKey, // <--- Tells Zepto which design to use
-        merge_info: mergeVariables, // <--- Fills the {{name}} {{amount}} tags
-
-        // Tracking options
-        track_clicks: true,
-        track_opens: true,
-      };
-
-      await this.client.post("/email/template", payload);
+      await this.withRetry(() =>
+        this.client.post("/email/template", {
+          from: { address: this.fromAddress, name: this.fromName },
+          to: formattedRecipients,
+          template_key: templateKey,
+          merge_info: mergeVariables,
+          track_clicks: true,
+          track_opens: true,
+        }),
+      );
 
       return { success: true, message: "Email queued successfully" };
     } catch (error: any) {
@@ -91,9 +100,7 @@ export class ZeptoMailService {
     subject: string,
     html: string,
   ) {
-    const recipients = Array.isArray(to) ? to : [to];
-
-    const formattedRecipients = recipients.map((r) => ({
+    const formattedRecipients = (Array.isArray(to) ? to : [to]).map((r) => ({
       email_address: {
         address: r.email,
         name: r.name || r.email.split("@")[0],
@@ -101,14 +108,16 @@ export class ZeptoMailService {
     }));
 
     try {
-      await this.client.post("/email", {
-        from: { address: this.fromAddress, name: this.fromName },
-        to: formattedRecipients,
-        subject,
-        htmlbody: html,
-        track_clicks: true,
-        track_opens: true,
-      });
+      await this.withRetry(() =>
+        this.client.post("/email", {
+          from: { address: this.fromAddress, name: this.fromName },
+          to: formattedRecipients,
+          subject,
+          htmlbody: html,
+          track_clicks: true,
+          track_opens: true,
+        }),
+      );
 
       return { success: true };
     } catch (error: any) {
@@ -120,3 +129,6 @@ export class ZeptoMailService {
     }
   }
 }
+
+// Singleton — import this instead of constructing a new instance per service
+export const zeptoMailService = new ZeptoMailService();
