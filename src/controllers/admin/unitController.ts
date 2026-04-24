@@ -1,6 +1,6 @@
-import { Body, Delete, Get, Middlewares, Path, Post, Route, Security, Tags } from "tsoa";
+import { Body, Delete, Get, Middlewares, Patch, Path, Post, Route, Security, Tags } from "tsoa";
 import { AdminUnitService } from "../../services/admin/unitService";
-import { CreateUnitAdminDto } from "../../dtos/admin/property.dto";
+import { CreateUnitAdminDto, UpdateUnitAdminDto } from "../../dtos/admin/property.dto";
 import { Permission } from "@prisma/client";
 import { requirePermission } from "../../middlewares/permissionMiddleware";
 
@@ -32,6 +32,15 @@ export class AdminUnitController {
       message: "Units retrieved successfully",
       data: unitData,
     };
+  }
+
+  @Patch("{unitId}")
+  public async updateUnit(
+    @Path() unitId: string,
+    @Body() body: UpdateUnitAdminDto,
+  ) {
+    const unit = await this.unitService.updateUnit(unitId, body);
+    return { success: true, message: "Unit updated successfully", data: unit };
   }
 
   @Delete("{unitId}")

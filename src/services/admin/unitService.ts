@@ -1,7 +1,7 @@
 import { UnitStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { normalizeFloor } from "./propertyService";
-import { CreateUnitAdminDto } from "../../dtos/admin/property.dto";
+import { CreateUnitAdminDto, UpdateUnitAdminDto } from "../../dtos/admin/property.dto";
 import { TenantProfileResponseDto } from "../../dtos/admin/tenant.dto";
 import { BadRequestError } from "../../utils/apiError";
 
@@ -99,6 +99,26 @@ export class AdminUnitService {
   //     grouped: groupedByFloor,
   //   };
   // }
+
+  public async updateUnit(unitId: string, data: UpdateUnitAdminDto) {
+    const unit = await prisma.unit.findUnique({ where: { id: unitId } });
+    if (!unit) throw new BadRequestError("Unit not found");
+
+    return prisma.unit.update({
+      where: { id: unitId },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.floor !== undefined && {
+          floor: normalizeFloor(String(data.floor)),
+        }),
+        ...(data.baseRent !== undefined && { baseRent: data.baseRent }),
+        ...(data.bedrooms !== undefined && { bedrooms: data.bedrooms }),
+        ...(data.bathrooms !== undefined && { bathrooms: data.bathrooms }),
+        ...(data.type !== undefined && { type: data.type }),
+        ...(data.status !== undefined && { status: data.status }),
+      },
+    });
+  }
 
   public async deleteUnit(unitId: string) {
     const unit = await prisma.unit.findUnique({ where: { id: unitId } });
