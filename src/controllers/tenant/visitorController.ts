@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Body,
+  Middlewares,
   Route,
   Tags,
   Security,
@@ -20,9 +21,12 @@ import {
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
 import { VerifyCodeSchema } from "../../dtos/tenant/visitor.dto";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("tenant/visitors")
 @Tags("Tenant - Visitor Management")
+@Middlewares(requirePermission(Permission.VISITOR_ALLOWANCE))
 export class VisitorController extends Controller {
   private visitorService = new VisitorService();
 

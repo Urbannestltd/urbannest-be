@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Middlewares,
   Route,
   Tags,
   Security,
@@ -14,10 +15,13 @@ import {
   InitiateRentSchema,
 } from "../../dtos/tenant/rent.dto";
 import { successResponse } from "../../utils/responseHelper";
-import { validate } from "../../utils/validate"; // Wrapper around Zod parse
+import { validate } from "../../utils/validate";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("tenant/rent")
 @Tags("Tenant - Rent Management")
+@Middlewares(requirePermission(Permission.PAY_RENT_ONLINE))
 export class RentController extends Controller {
   private rentService = new RentService();
 

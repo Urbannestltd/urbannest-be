@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Middlewares,
   Route,
   Tags,
   Security,
@@ -22,9 +23,12 @@ import {
 } from "../../dtos/tenant/maintenance.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("tenant/maintenance")
 @Tags("Tenant - Maintenance Requests")
+@Middlewares(requirePermission(Permission.REQUEST_MAINTENANCE))
 export class MaintenanceController extends Controller {
   private maintenanceService = new MaintenanceService();
 

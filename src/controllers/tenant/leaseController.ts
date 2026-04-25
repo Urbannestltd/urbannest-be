@@ -1,9 +1,12 @@
-import { Controller, Get, Route, Tags, Security, Request, Path } from "tsoa";
+import { Controller, Get, Middlewares, Route, Tags, Security, Request, Path } from "tsoa";
 import { LeaseService } from "../../services/tenant/leaseService";
 import { successResponse } from "../../utils/responseHelper";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("tenant/leases")
 @Tags("Tenant - Lease Management")
+@Middlewares(requirePermission(Permission.ACCESS_TENANT_PORTAL))
 export class LeaseController extends Controller {
   private leaseService = new LeaseService();
 

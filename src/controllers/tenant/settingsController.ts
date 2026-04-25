@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Middlewares,
   Patch,
   Delete,
   Body,
@@ -26,9 +27,12 @@ import {
 } from "../../dtos/tenant/settings.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("tenant/settings")
 @Tags("Tenant - Account Settings")
+@Middlewares(requirePermission(Permission.ACCESS_TENANT_PORTAL))
 export class SettingsController extends Controller {
   private settingsService = new SettingsService();
 

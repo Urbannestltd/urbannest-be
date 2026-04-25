@@ -245,6 +245,129 @@ export class AdminUnitService {
     };
   }
 
+  public async getUnitById(unitId: string) {
+    const unit = await prisma.unit.findUnique({
+      where: { id: unitId },
+      include: {
+        property: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            state: true,
+            city: true,
+            images: true,
+            amenities: true,
+            type: true,
+          },
+        },
+        leases: {
+          include: { tenant: true },
+          orderBy: { startDate: "desc" },
+        },
+        maintenanceRequests: {
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!unit) throw new BadRequestError("Unit not found");
+
+    const activeLease = unit.leases.find((l) => l.status === "ACTIVE");
+    const pastLeases = unit.leases.filter((l) => l.status !== "ACTIVE");
+    const tenant = activeLease?.tenant;
+
+    // Lease expiry progress
+    let leaseExpiryPercentage: string | null = null;
+    let leaseLength: string | null = null;
+    if (activeLease) {
+      const start = new Date(activeLease.startDate).getTime();
+      const end = new Date(activeLease.endDate).getTime();
+      const now = Date.now();
+      const totalDuration = end - start;
+      const elapsed = now - start;
+
+      if (totalDuration > 0) {
+        const pct = Math.max(0, Math.min(100, Math.round((elapsed / totalDuration) * 100)));
+        leaseExpiryPercentage = `${pct}%`;
+      }
+
+      const diffInMonths =
+        (new Date(activeLease.endDate).getFullYear() - new Date(activeLease.startDate).getFullYear()) * 12 +
+        (new Date(activeLease.endDate).getMonth() - new Date(activeLease.startDate).getMonth());
+      leaseLength = diffInMonths >= 12 ? `${Math.round(diffInMonths / 12)} years` : `${diffInMonths} months`;
+    }
+
+    // Complaint stats
+    const OPEN_STATUSES = ["PENDING", "IN_PROGRESS"];
+    const totalComplaints = unit.maintenanceRequests.length;
+    const openComplaints = unit.maintenanceRequests.filter((r) => OPEN_STATUSES.includes(r.status)).length;
+    const openComplaintPercent =
+      totalComplaints === 0 ? 0 : Math.round((openComplaints / totalComplaints) * 100);
+
+    return {
+      id: unit.id,
+      name: unit.name,
+      floor: normalizeFloor(unit.floor),
+      status: unit.status,
+      bedrooms: unit.bedrooms,
+      bathrooms: unit.bathrooms,
+      type: unit.type,
+      baseRent: unit.baseRent,
+      createdAt: unit.createdAt,
+      updatedAt: unit.updatedAt,
+
+      property: unit.property,
+
+      currentTenant: tenant
+        ? {
+            tenantId: tenant.userId,
+            fullName: tenant.userFullName,
+            profilePic: tenant.userProfileUrl,
+            email: tenant.userEmail,
+            phone: tenant.userPhone,
+          }
+        : null,
+
+      currentLease: activeLease
+        ? {
+            leaseId: activeLease.id,
+            rentAmount: activeLease.rentAmount,
+            serviceCharge: activeLease.serviceCharge ?? 0,
+            startDate: activeLease.startDate,
+            endDate: activeLease.endDate,
+            leaseLength,
+            leaseExpiryPercentage,
+            moveOutNotice: activeLease.moveOutNotice,
+            agreementUrl: activeLease.documentUrl,
+          }
+        : null,
+
+      leaseHistory: pastLeases.map((l) => ({
+        leaseId: l.id,
+        status: l.status,
+        rentAmount: l.rentAmount,
+        startDate: l.startDate,
+        endDate: l.endDate,
+        agreementUrl: l.documentUrl,
+      })),
+
+      complaints: {
+        total: totalComplaints,
+        openCount: openComplaints,
+        openPercent: openComplaintPercent,
+      },
+
+      maintenanceRequests: unit.maintenanceRequests.map((r) => ({
+        id: r.id,
+        subject: r.subject,
+        status: r.status,
+        priority: r.priority,
+        createdAt: r.createdAt,
+      })),
+    };
+  }
+
   public async getTenantProfile(
     tenantId: string,
   ): Promise<TenantProfileResponseDto> {
