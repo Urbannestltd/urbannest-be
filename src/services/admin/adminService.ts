@@ -9,6 +9,7 @@ import bcrypt from "bcrypt";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { registrationInviteEmail } from "../../config/emailTemplates";
 import { Permission } from "@prisma/client";
+import { date } from "zod";
 
 export class AdminService {
   private zeptoMailService = new ZeptoMailService();
@@ -24,12 +25,21 @@ export class AdminService {
       throw new BadRequestError("User with this email already exists");
     }
 
+    const getUnit = await prisma.unit.findUnique({
+      where: { id: params.unitId ?? undefined },
+      include: { property: true },
+    });
+
+    if (!getUnit) {
+      throw new BadRequestError("Specified unit does not exist");
+    }
+
     // generate bcrypt hash with email as prefix then '$'
     const token: string = `${params.userEmail}$${bcrypt.hashSync(
       Math.floor(100000 + Math.random() * 900000).toString(),
       10,
     )}`;
-    await prisma.user.upsert({
+    const newUser = await prisma.user.upsert({
       where: { userEmail: params.userEmail },
       update: {
         registrationLinks: {
@@ -52,7 +62,15 @@ export class AdminService {
             ),
           },
         },
-        managedProperties: {},
+        leases: {
+          create: {
+            unitId: getUnit.id,
+            rentAmount: getUnit.baseRent || 0,
+            serviceCharge: 0,
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          },
+        },
         userRole: {
           connectOrCreate: {
             where: {
@@ -123,7 +141,7 @@ export class AdminService {
     return {
       success: true,
       message: "Registration initiated",
-      data: { userEmail: params.userEmail },
+      data: { userEmail: params.userEmail, userId: newUser.userId },
     };
   }
 
@@ -192,6 +210,10 @@ export class AdminService {
 
   private mapUserProperties(u: any) {
     const propertyShape = (p: any) => ({ id: p.id, name: p.name });
+    const activeLease = (u.leases ?? []).find(
+      (l: any) => l.status === "ACTIVE",
+    );
+
     return {
       id: u.userId,
       fullName: u.userFullName,
@@ -211,6 +233,18 @@ export class AdminService {
         asFacilityManager: (u.managedProperties ?? []).map(propertyShape),
         asAgent: (u.agentedProperties ?? []).map(propertyShape),
       },
+      currentUnit: activeLease
+        ? {
+            unitId: activeLease.unit.id,
+            unitName: activeLease.unit.name,
+            unitFloor: activeLease.unit.floor,
+            propertyId: activeLease.unit.property.id,
+            propertyName: activeLease.unit.property.name,
+            propertyImages: activeLease.unit.property.images,
+            dateListed: activeLease.unit.property.createdAt,
+            dateMovedIn: activeLease.startDate,
+          }
+        : null,
     };
   }
 
@@ -285,6 +319,16 @@ export class AdminService {
       where: { userId },
       include: {
         userRole: true,
+        leases: {
+          where: { status: "ACTIVE" },
+          include: {
+            unit: {
+              include: {
+                property: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
         properties: propertySelect,
         managedProperties: propertySelect,
         agentedProperties: propertySelect,
