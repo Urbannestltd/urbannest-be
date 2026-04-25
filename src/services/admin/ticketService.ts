@@ -184,8 +184,13 @@ export class AdminTicketService {
   private buildWhere(filters: TicketFiltersDto = {}) {
     const where: Record<string, any> = {};
 
-    if (filters.propertyId) {
-      where.unit = { propertyId: filters.propertyId };
+    if (filters.propertyId || filters.propertyType) {
+      where.unit = {
+        property: {
+          ...(filters.propertyId && { id: filters.propertyId }),
+          ...(filters.propertyType && { type: filters.propertyType }),
+        },
+      };
     }
     if (filters.status) {
       where.status = filters.status;

@@ -1,4 +1,4 @@
-import { MaintenanceApprovalStatus, MaintenanceStatus } from "@prisma/client";
+import { MaintenanceApprovalStatus, MaintenanceStatus, PropertyType } from "@prisma/client";
 
 export interface TicketListResponseDto {
   id: string;
@@ -84,6 +84,8 @@ export interface MaintenanceMetricsDto {
 export interface TicketFiltersDto {
   /** Filter to a single property */
   propertyId?: string;
+  /** Filter by property type (e.g. RESIDENTIAL, COMMERCIAL) */
+  propertyType?: PropertyType;
   /** Filter by ticket status */
   status?: MaintenanceStatus;
   /** Filter by priority */

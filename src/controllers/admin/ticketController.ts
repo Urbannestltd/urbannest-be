@@ -28,6 +28,7 @@ export class AdminTicketController {
   @Get("tickets")
   public async getAllTickets(
     @Query() propertyId?: string,
+    @Query() propertyType?: string,
     @Query() status?: string,
     @Query() priority?: string,
     @Query() category?: string,
@@ -36,6 +37,7 @@ export class AdminTicketController {
   ) {
     const tickets = await this.ticketService.getAllTickets({
       propertyId,
+      propertyType: propertyType as any,
       status: status as any,
       priority,
       category,
@@ -50,6 +52,7 @@ export class AdminTicketController {
   public async exportTickets(
     @Request() req: any,
     @Query() propertyId?: string,
+    @Query() propertyType?: string,
     @Query() status?: string,
     @Query() priority?: string,
     @Query() category?: string,
@@ -58,6 +61,7 @@ export class AdminTicketController {
   ) {
     const csv = await this.ticketService.getTicketsForExport({
       propertyId,
+      propertyType: propertyType as any,
       status: status as any,
       priority,
       category,
