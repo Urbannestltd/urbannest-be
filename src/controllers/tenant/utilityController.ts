@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Body,
+  Middlewares,
   Route,
   Tags,
   Security,
@@ -18,9 +19,12 @@ import {
 } from "../../dtos/tenant/utility.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("tenant/utilities")
 @Tags("Tenant - Utility Bills & Vending")
+@Middlewares(requirePermission(Permission.PAY_RENT_ONLINE))
 export class UtilityController extends Controller {
   private utilityService = new UtilityService();
 

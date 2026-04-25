@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Middlewares,
   Route,
   Tags,
   Security,
@@ -18,9 +19,12 @@ import {
 } from "../../dtos/tenant/support.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
+import { Permission } from "@prisma/client";
+import { requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("tenant/support")
 @Tags("Tenant - Support Tickets")
+@Middlewares(requirePermission(Permission.ACCESS_TENANT_PORTAL))
 export class SupportController extends Controller {
   private supportService = new SupportService();
 

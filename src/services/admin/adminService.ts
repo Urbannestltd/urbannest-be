@@ -1,4 +1,5 @@
-import { BASE_URL, MAIL_USER } from "../../config/env";
+import { BASE_URL } from "../../config/env";
+import { getPermissionsForRole } from "../../config/rolePermissions";
 import transporter from "../../config/nodemailer";
 import { prisma } from "../../config/prisma";
 import { AdminCreateUserRequest } from "../../dtos/admin/admin";
@@ -247,6 +248,18 @@ export class AdminService {
       },
       include: {
         userRole: true,
+        leases: {
+          where: { status: "ACTIVE" },
+          include: {
+            unit: {
+              include: {
+                property: {
+                  select: { id: true, name: true },
+                },
+              },
+            },
+          },
+        },
         properties: propertySelect,
         managedProperties: propertySelect,
         agentedProperties: propertySelect,
@@ -366,10 +379,20 @@ export class AdminService {
     if (targetUserId === adminId) {
       throw new BadRequestError("Cannot modify your own permissions");
     }
+
     const user = await prisma.user.findUnique({
       where: { userId: targetUserId },
+      include: { userRole: { select: { roleName: true } } },
     });
     if (!user) throw new BadRequestError("User not found");
+
+    const allowed = getPermissionsForRole(user.userRole.roleName);
+    const invalid = permissions.filter((p) => !allowed.includes(p));
+    if (invalid.length > 0) {
+      throw new BadRequestError(
+        `The following permissions are not valid for role ${user.userRole.roleName}: ${invalid.join(", ")}`,
+      );
+    }
 
     await prisma.user.update({
       where: { userId: targetUserId },

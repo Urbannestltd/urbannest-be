@@ -8,12 +8,12 @@ import {
   UpdateTicketStatusDto,
 } from "../../dtos/admin/ticket.dto";
 import { Permission } from "@prisma/client";
-import { requirePermission } from "../../middlewares/permissionMiddleware";
+import { requireAnyPermission, requirePermission } from "../../middlewares/permissionMiddleware";
 
 @Route("admin/properties")
 @Tags("Admin - Tickets")
 @Security("jwt")
-@Middlewares(requirePermission(Permission.VIEW_MAINTENANCE_TICKETS))
+@Middlewares(requireAnyPermission(Permission.VIEW_MAINTENANCE_TICKETS, Permission.MANAGE_TICKETS))
 export class AdminTicketController {
   private ticketService = new AdminTicketService();
 
@@ -53,6 +53,7 @@ export class AdminTicketController {
 
   // Add a comment to the ticket
   @Post("tickets/{ticketId}/comments")
+  @Middlewares(requirePermission(Permission.MANAGE_TICKETS))
   public async addComment(
     @Path() ticketId: string,
     @Body() body: AddCommentDto,
@@ -67,6 +68,7 @@ export class AdminTicketController {
 
   // Change the status (e.g., from "Pending" to "Work Scheduled")
   @Put("tickets/{ticketId}/status")
+  @Middlewares(requirePermission(Permission.MANAGE_TICKETS))
   public async updateTicketStatus(
     @Path() ticketId: string,
     @Body() body: UpdateTicketStatusDto,
@@ -77,6 +79,7 @@ export class AdminTicketController {
 
   // Set budget (and optionally the quoted cost) for a ticket
   @Patch("tickets/{ticketId}/budget")
+  @Middlewares(requirePermission(Permission.MANAGE_TICKETS))
   public async setBudget(
     @Path() ticketId: string,
     @Body() body: SetBudgetDto,

@@ -49,6 +49,16 @@ export class AdminUnitController {
     return { success: true, message: "Unit deleted successfully" };
   }
 
+  @Get("unit/{unitId}")
+  public async getUnitById(@Path() unitId: string) {
+    const unit = await this.unitService.getUnitById(unitId);
+    return {
+      success: true,
+      message: "Unit retrieved successfully",
+      data: unit,
+    };
+  }
+
   @Get("{tenantId}")
   public async getTenantProfile(@Path() tenantId: string) {
     const profile = await this.unitService.getTenantProfile(tenantId);

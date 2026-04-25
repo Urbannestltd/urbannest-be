@@ -14,6 +14,7 @@ import {
   Patch,
 } from "tsoa";
 import { Permission } from "@prisma/client";
+import { ROLE_PERMISSIONS } from "../../config/rolePermissions";
 import {
   AdminCreateUserRequest,
   AdminCreateUserSchema,
@@ -150,5 +151,14 @@ export class AdminController extends Controller {
       body.permissions,
     );
     return { success: true, message: "Permissions updated successfully" };
+  }
+
+  /**
+   * Returns the available permissions for each role.
+   * Use this to render the correct permission checkboxes per user role on the frontend.
+   */
+  @Get("roles/permissions")
+  public async getRolePermissions() {
+    return { success: true, message: "Role permissions retrieved", data: ROLE_PERMISSIONS };
   }
 }
