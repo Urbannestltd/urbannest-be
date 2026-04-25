@@ -1,7 +1,10 @@
 import { UnitStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { normalizeFloor } from "./propertyService";
-import { CreateUnitAdminDto, UpdateUnitAdminDto } from "../../dtos/admin/property.dto";
+import {
+  CreateUnitAdminDto,
+  UpdateUnitAdminDto,
+} from "../../dtos/admin/property.dto";
 import { TenantProfileResponseDto } from "../../dtos/admin/tenant.dto";
 import { BadRequestError } from "../../utils/apiError";
 
@@ -118,6 +121,63 @@ export class AdminUnitService {
         ...(data.status !== undefined && { status: data.status }),
       },
     });
+  }
+
+  public async deleteFloor(propertyId: string, floor: string) {
+    const normalizedFloor = normalizeFloor(floor);
+
+    if (normalizedFloor === "Unassigned") {
+      throw new BadRequestError(
+        "Could not parse floor value. Pass a number (e.g. '3') or 'Floor 3'.",
+      );
+    }
+
+    // Find all non-deleted units on this floor for this property
+    const units = await prisma.unit.findMany({
+      where: {
+        propertyId,
+        status: { not: UnitStatus.DELETED },
+        floor: normalizedFloor,
+      },
+      select: {
+        id: true,
+        name: true,
+        leases: {
+          where: { status: "ACTIVE" },
+          select: { id: true },
+        },
+      },
+    });
+
+    if (units.length === 0) {
+      throw new BadRequestError(
+        `No active units found on ${normalizedFloor} for this property.`,
+      );
+    }
+
+    // Block if any unit has an active lease
+    const occupied = units.filter((u) => u.leases.length > 0);
+    if (occupied.length > 0) {
+      const names = occupied.map((u) => u.name).join(", ");
+      throw new BadRequestError(
+        `Cannot remove ${normalizedFloor} — the following units have active tenant leases: ${names}.`,
+      );
+    }
+
+    // Soft-delete all units on this floor
+    await prisma.unit.updateMany({
+      where: {
+        propertyId,
+        floor: normalizedFloor,
+        status: { not: UnitStatus.DELETED },
+      },
+      data: { status: UnitStatus.DELETED },
+    });
+
+    return {
+      floor: normalizedFloor,
+      unitsRemoved: units.length,
+    };
   }
 
   public async deleteUnit(unitId: string) {
@@ -288,22 +348,35 @@ export class AdminUnitService {
       const elapsed = now - start;
 
       if (totalDuration > 0) {
-        const pct = Math.max(0, Math.min(100, Math.round((elapsed / totalDuration) * 100)));
+        const pct = Math.max(
+          0,
+          Math.min(100, Math.round((elapsed / totalDuration) * 100)),
+        );
         leaseExpiryPercentage = `${pct}%`;
       }
 
       const diffInMonths =
-        (new Date(activeLease.endDate).getFullYear() - new Date(activeLease.startDate).getFullYear()) * 12 +
-        (new Date(activeLease.endDate).getMonth() - new Date(activeLease.startDate).getMonth());
-      leaseLength = diffInMonths >= 12 ? `${Math.round(diffInMonths / 12)} years` : `${diffInMonths} months`;
+        (new Date(activeLease.endDate).getFullYear() -
+          new Date(activeLease.startDate).getFullYear()) *
+          12 +
+        (new Date(activeLease.endDate).getMonth() -
+          new Date(activeLease.startDate).getMonth());
+      leaseLength =
+        diffInMonths >= 12
+          ? `${Math.round(diffInMonths / 12)} years`
+          : `${diffInMonths} months`;
     }
 
     // Complaint stats
     const OPEN_STATUSES = ["PENDING", "IN_PROGRESS"];
     const totalComplaints = unit.maintenanceRequests.length;
-    const openComplaints = unit.maintenanceRequests.filter((r) => OPEN_STATUSES.includes(r.status)).length;
+    const openComplaints = unit.maintenanceRequests.filter((r) =>
+      OPEN_STATUSES.includes(r.status),
+    ).length;
     const openComplaintPercent =
-      totalComplaints === 0 ? 0 : Math.round((openComplaints / totalComplaints) * 100);
+      totalComplaints === 0
+        ? 0
+        : Math.round((openComplaints / totalComplaints) * 100);
 
     return {
       id: unit.id,
