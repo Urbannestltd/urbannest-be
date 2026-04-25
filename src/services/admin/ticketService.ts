@@ -6,6 +6,7 @@ import {
   RejectTicketDto,
   SetBudgetDto,
   TicketDetailResponseDto,
+  TicketFiltersDto,
   TicketListResponseDto,
   UpdateTicketStatusDto,
 } from "../../dtos/admin/ticket.dto";
@@ -179,15 +180,100 @@ export class AdminTicketService {
     };
   }
 
-  // --- 0b. GET ALL TICKETS (across all properties) ---
-  public async getAllTickets(): Promise<TicketListResponseDto[]> {
+  // --- SHARED: builds a Prisma where clause from filter params ---
+  private buildWhere(filters: TicketFiltersDto = {}) {
+    const where: Record<string, any> = {};
+
+    if (filters.propertyId) {
+      where.unit = { propertyId: filters.propertyId };
+    }
+    if (filters.status) {
+      where.status = filters.status;
+    }
+    if (filters.priority) {
+      where.priority = filters.priority;
+    }
+    if (filters.category) {
+      where.category = filters.category;
+    }
+    if (filters.dateFrom || filters.dateTo) {
+      where.createdAt = {
+        ...(filters.dateFrom && { gte: new Date(filters.dateFrom) }),
+        ...(filters.dateTo && { lte: new Date(filters.dateTo) }),
+      };
+    }
+
+    return where;
+  }
+
+  // --- 0b. GET ALL TICKETS (across all properties, with optional filters) ---
+  public async getAllTickets(filters: TicketFiltersDto = {}): Promise<TicketListResponseDto[]> {
     const tickets = await prisma.maintenanceRequest.findMany({
+      where: this.buildWhere(filters),
       orderBy: { createdAt: "desc" },
       include: this.ticketIncludes,
     });
 
     const now = new Date();
     return tickets.map((t) => this.mapTicket(t, now));
+  }
+
+  // --- 0c. EXPORT TICKETS AS CSV ---
+  public async getTicketsForExport(filters: TicketFiltersDto = {}): Promise<string> {
+    const tickets = await prisma.maintenanceRequest.findMany({
+      where: this.buildWhere(filters),
+      orderBy: { createdAt: "desc" },
+      include: {
+        ...this.ticketIncludes,
+        tenant: { select: { userFullName: true, userEmail: true, userPhone: true } },
+      },
+    });
+
+    const escape = (v: any) => {
+      const s = v == null ? "" : String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n")
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+
+    const headers = [
+      "Ticket ID",
+      "Subject",
+      "Status",
+      "Priority",
+      "Category",
+      "Property",
+      "Unit",
+      "Tenant Name",
+      "Tenant Email",
+      "Tenant Phone",
+      "Assigned To",
+      "Budget (₦)",
+      "Quoted Cost (₦)",
+      "Approval Status",
+      "Date Submitted",
+    ];
+
+    const rows = tickets.map((t) => [
+      t.id,
+      t.subject ?? "",
+      t.status,
+      t.priority,
+      t.category,
+      (t as any).unit?.property?.name ?? "",
+      (t as any).unit?.name ?? "",
+      (t as any).tenant?.userFullName ?? "",
+      (t as any).tenant?.userEmail ?? "",
+      (t as any).tenant?.userPhone ?? "",
+      (t as any).assignedTo?.userFullName ?? "",
+      t.budget ?? "",
+      t.quotedCost ?? "",
+      t.approvalStatus ?? "",
+      t.createdAt.toISOString(),
+    ]);
+
+    const lines = [headers, ...rows].map((r) => r.map(escape).join(","));
+    return lines.join("\n");
   }
 
   // --- 1. GET ALL TICKETS FOR A PROPERTY ---

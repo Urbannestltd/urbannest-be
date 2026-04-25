@@ -81,6 +81,21 @@ export interface MaintenanceMetricsDto {
   maintenanceCostEstimate: number;
 }
 
+export interface TicketFiltersDto {
+  /** Filter to a single property */
+  propertyId?: string;
+  /** Filter by ticket status */
+  status?: MaintenanceStatus;
+  /** Filter by priority */
+  priority?: string;
+  /** Filter by issue category */
+  category?: string;
+  /** Earliest createdAt (ISO string) */
+  dateFrom?: string;
+  /** Latest createdAt (ISO string) */
+  dateTo?: string;
+}
+
 export interface AddCommentDto {
   message: string;
   senderId: string;

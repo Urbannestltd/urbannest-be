@@ -1,4 +1,4 @@
-import { Body, Get, Middlewares, Patch, Path, Post, Put, Request, Route, Security, Tags } from "tsoa";
+import { Body, Get, Middlewares, Patch, Path, Post, Put, Query, Request, Route, Security, Tags } from "tsoa";
 import { AdminTicketService } from "../../services/admin/ticketService";
 import {
   AddCommentDto,
@@ -24,11 +24,51 @@ export class AdminTicketController {
     return { success: true, message: "Maintenance metrics retrieved", data };
   }
 
-  // Get all tickets across all properties
+  // Get all tickets across all properties with optional filters
   @Get("tickets")
-  public async getAllTickets() {
-    const tickets = await this.ticketService.getAllTickets();
+  public async getAllTickets(
+    @Query() propertyId?: string,
+    @Query() status?: string,
+    @Query() priority?: string,
+    @Query() category?: string,
+    @Query() dateFrom?: string,
+    @Query() dateTo?: string,
+  ) {
+    const tickets = await this.ticketService.getAllTickets({
+      propertyId,
+      status: status as any,
+      priority,
+      category,
+      dateFrom,
+      dateTo,
+    });
     return { success: true, data: tickets };
+  }
+
+  // Export filtered tickets as CSV
+  @Get("tickets/export")
+  public async exportTickets(
+    @Request() req: any,
+    @Query() propertyId?: string,
+    @Query() status?: string,
+    @Query() priority?: string,
+    @Query() category?: string,
+    @Query() dateFrom?: string,
+    @Query() dateTo?: string,
+  ) {
+    const csv = await this.ticketService.getTicketsForExport({
+      propertyId,
+      status: status as any,
+      priority,
+      category,
+      dateFrom,
+      dateTo,
+    });
+
+    const res = req.res;
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="tickets.csv"');
+    res.send(csv);
   }
 
   // Get list for the "Tickets" tab
