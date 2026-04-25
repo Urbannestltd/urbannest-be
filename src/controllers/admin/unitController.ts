@@ -1,4 +1,4 @@
-import { Body, Delete, Get, Middlewares, Patch, Path, Post, Route, Security, Tags } from "tsoa";
+import { Body, Delete, Get, Middlewares, Patch, Path, Post, Query, Route, Security, Tags } from "tsoa";
 import { AdminUnitService } from "../../services/admin/unitService";
 import { CreateUnitAdminDto, UpdateUnitAdminDto } from "../../dtos/admin/property.dto";
 import { Permission } from "@prisma/client";
@@ -41,6 +41,19 @@ export class AdminUnitController {
   ) {
     const unit = await this.unitService.updateUnit(unitId, body);
     return { success: true, message: "Unit updated successfully", data: unit };
+  }
+
+  @Delete("{propertyId}/floor")
+  public async deleteFloor(
+    @Path() propertyId: string,
+    @Query() floor: string,
+  ) {
+    const result = await this.unitService.deleteFloor(propertyId, floor);
+    return {
+      success: true,
+      message: `${result.floor} removed successfully (${result.unitsRemoved} unit${result.unitsRemoved !== 1 ? "s" : ""} deleted)`,
+      data: result,
+    };
   }
 
   @Delete("{unitId}")
