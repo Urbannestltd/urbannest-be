@@ -54,6 +54,7 @@ export class AdminService {
       create: {
         userEmail: params.userEmail,
         userStatus: "PENDING",
+        permissions: getPermissionsForRole(params.userRole ?? "TENANT"),
         registrationLinks: {
           create: {
             userRegistrationLinkToken: token,
@@ -203,6 +204,18 @@ export class AdminService {
         defaultMaintenanceBudget: params.defaultMaintenanceBudget ?? null,
       },
     });
+
+    // Apply the new global budget to all open tickets that have no manually-set budget
+    if (params.defaultMaintenanceBudget != null) {
+      await prisma.maintenanceRequest.updateMany({
+        where: {
+          budget: null,
+          status: { in: ["PENDING", "IN_PROGRESS", "WORK_SCHEDULED"] },
+        },
+        data: { budget: params.defaultMaintenanceBudget },
+      });
+    }
+
     return {
       defaultMaintenanceBudget: setting.defaultMaintenanceBudget ?? null,
     };
