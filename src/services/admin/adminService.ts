@@ -233,12 +233,14 @@ export class AdminService {
       },
     });
 
-    // Apply the new global budget to all open tickets that have no manually-set budget
+    // Apply the new global budget to all open tickets that have not been
+    // custom-set. approvalStatus being null means the budget (if any) was
+    // only ever auto-filled by the global default, never touched by an admin.
     if (params.defaultMaintenanceBudget != null) {
       await prisma.maintenanceRequest.updateMany({
         where: {
-          budget: null,
           status: { in: ["PENDING", "IN_PROGRESS", "WORK_SCHEDULED"] },
+          approvalStatus: null,
         },
         data: { budget: params.defaultMaintenanceBudget },
       });
