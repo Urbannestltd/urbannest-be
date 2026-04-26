@@ -16,14 +16,16 @@ export class AdminService {
   public async createUser(
     params: AdminCreateUserRequest,
   ): Promise<ApiResponse<any>> {
-    // check if user exists
-    const userExists = await prisma.user.findUnique({
-      where: { userEmail: params.userEmail, userStatus: { not: "PENDING" } },
+    // check if user exists (including PENDING users so we can track isNewUser)
+    const existingUser = await prisma.user.findUnique({
+      where: { userEmail: params.userEmail },
     });
 
-    if (userExists) {
+    if (existingUser && existingUser.userStatus !== "PENDING") {
       throw new BadRequestError("User with this email already exists");
     }
+
+    const isNewUser = !existingUser;
 
     const getUnit = await prisma.unit.findUnique({
       where: { id: params.unitId ?? undefined },
@@ -84,6 +86,32 @@ export class AdminService {
         },
       },
     });
+
+    // Auto-create an initial PAID payment for the default lease (new users only)
+    const baseRent = getUnit.baseRent ?? 0;
+    if (isNewUser && baseRent > 0) {
+      const defaultLease = await prisma.lease.findFirst({
+        where: { tenantId: newUser.userId, unitId: getUnit.id },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+
+      if (defaultLease) {
+        await prisma.payment.create({
+          data: {
+            userId: newUser.userId,
+            leaseId: defaultLease.id,
+            amount: baseRent,
+            dueDate: new Date(),
+            paidDate: new Date(),
+            status: "PAID",
+            reference: `DEFAULT-${newUser.userId}-${Date.now()}`,
+            type: "RENT",
+            metadata: { note: "Auto-generated initial payment on default lease creation" },
+          },
+        });
+      }
+    }
 
     // Look up property and unit names to include in the invite email
     let propertyName: string | undefined;
