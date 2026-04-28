@@ -94,7 +94,6 @@ export class AdminPaymentService {
       collectedRent,
       collectedServiceCharge,
       collectedUtility,
-      outstanding,
       defaultingTenants,
     ] = await Promise.all([
       // Expected: sum of rentAmount on all active leases
@@ -125,12 +124,6 @@ export class AdminPaymentService {
         },
       }),
 
-      // Outstanding: sum of all OVERDUE payment amounts
-      prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: { status: "OVERDUE", ...propertyFilter },
-      }),
-
       // Defaulting: distinct tenants with at least one OVERDUE payment
       prisma.user.count({
         where: {
@@ -148,11 +141,12 @@ export class AdminPaymentService {
     const rent = collectedRent._sum.amount ?? 0;
     const serviceCharge = collectedServiceCharge._sum.amount ?? 0;
     const utilityBills = collectedUtility._sum.amount ?? 0;
+    const totalExpected = expectedRevenue._sum.rentAmount ?? 0;
 
     return {
-      totalExpectedRevenue: expectedRevenue._sum.rentAmount ?? 0,
+      totalExpectedRevenue: totalExpected,
       totalCollected: rent,
-      outstandingAmount: outstanding._sum.amount ?? 0,
+      outstandingAmount: Math.max(0, totalExpected - rent),
       defaultingTenants,
       collectedBreakdown: { rent, serviceCharge, utilityBills },
     };
