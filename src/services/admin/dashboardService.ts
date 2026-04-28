@@ -8,9 +8,6 @@ import {
 
 export class AdminDashboardService {
   public async getDashboardMetrics(): Promise<DashboardMetricsDto> {
-    const currentYear = new Date().getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1);
-
     // 1. Total Properties
     const totalProperties = await prisma.property.count({
       where: { isDeleted: false },
@@ -45,36 +42,24 @@ export class AdminDashboardService {
       where: { status: "PAID", type: "RENT" },
     });
 
-    // 5. Maintenance Chart (Grouped by month for the current year)
-    // Note: We fetch the year's data and group in JS for cross-database compatibility
-    const yearMaintenance = await prisma.maintenanceRequest.findMany({
-      where: { createdAt: { gte: startOfYear } },
-      select: { createdAt: true },
+    // 5. Maintenance Chart — requests per property
+    const propertiesWithRequests = await prisma.property.findMany({
+      where: { isDeleted: false },
+      select: {
+        name: true,
+        address: true,
+        units: {
+          select: {
+            _count: { select: { maintenanceRequests: true } },
+          },
+        },
+      },
     });
 
-    const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const maintenanceChart = monthNames.map((month) => ({ month, count: 0 }));
-
-    yearMaintenance.forEach((req) => {
-      const monthIndex = req.createdAt.getMonth();
-
-      if (maintenanceChart[monthIndex]) {
-        maintenanceChart[monthIndex].count += 1;
-      }
-    });
+    const maintenanceChart = propertiesWithRequests.map((p) => ({
+      property: p.name ?? p.address,
+      count: p.units.reduce((sum, u) => sum + u._count.maintenanceRequests, 0),
+    }));
 
     return {
       totalProperties,

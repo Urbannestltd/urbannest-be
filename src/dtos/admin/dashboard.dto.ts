@@ -6,7 +6,7 @@ export interface DashboardMetricsDto {
     expectedIncome: number;
     amountCollected: number;
   };
-  maintenanceChart: { month: string; count: number }[];
+  maintenanceChart: { property: string; count: number }[];
 }
 
 export interface TenantStatusDto {
