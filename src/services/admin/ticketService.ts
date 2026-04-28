@@ -207,6 +207,13 @@ export class AdminTicketService {
         ...(filters.dateTo && { lte: new Date(filters.dateTo) }),
       };
     }
+    const q = filters.search?.trim();
+    if (q) {
+      where.OR = [
+        { subject: { contains: q, mode: "insensitive" } },
+        { tenant: { userFullName: { contains: q, mode: "insensitive" } } },
+      ];
+    }
 
     return where;
   }
@@ -284,9 +291,19 @@ export class AdminTicketService {
   // --- 1. GET ALL TICKETS FOR A PROPERTY ---
   public async getPropertyTickets(
     propertyId: string,
+    search?: string,
   ): Promise<TicketListResponseDto[]> {
+    const q = search?.trim();
     const tickets = await prisma.maintenanceRequest.findMany({
-      where: { unit: { propertyId } },
+      where: {
+        unit: { propertyId },
+        ...(q && {
+          OR: [
+            { subject: { contains: q, mode: "insensitive" } },
+            { tenant: { userFullName: { contains: q, mode: "insensitive" } } },
+          ],
+        }),
+      },
       orderBy: { createdAt: "desc" },
       include: this.ticketIncludes,
     });

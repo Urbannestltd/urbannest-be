@@ -52,12 +52,14 @@ export class AdminController extends Controller {
     @Query() status?: string,
     @Query() createdFrom?: string,
     @Query() createdTo?: string,
+    @Query() search?: string,
   ) {
     const data = await this.adminService.getAllUsers(req.user.userId, {
       role,
       status,
       createdFrom,
       createdTo,
+      search,
     });
     return { success: true, message: "Users retrieved", data };
   }

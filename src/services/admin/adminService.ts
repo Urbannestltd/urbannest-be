@@ -308,9 +308,11 @@ export class AdminService {
       status?: string;
       createdFrom?: string;
       createdTo?: string;
+      search?: string;
     },
   ) {
     const propertySelect = { select: { id: true, name: true } };
+    const q = filters?.search?.trim();
 
     const users = await prisma.user.findMany({
       where: {
@@ -321,6 +323,13 @@ export class AdminService {
             ...(filters.createdFrom && { gte: new Date(filters.createdFrom) }),
             ...(filters.createdTo && { lte: new Date(filters.createdTo) }),
           },
+        }),
+        ...(q && {
+          OR: [
+            { userFullName: { contains: q, mode: "insensitive" } },
+            { userEmail: { contains: q, mode: "insensitive" } },
+            { userPhone: { contains: q, mode: "insensitive" } },
+          ],
         }),
       },
       include: {

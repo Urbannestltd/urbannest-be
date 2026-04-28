@@ -25,8 +25,11 @@ export class AdminUnitController {
   }
 
   @Get("{propertyId}/units")
-  public async getPropertyUnits(@Path() propertyId: string) {
-    const unitData = await this.unitService.getUnitsByProperty(propertyId);
+  public async getPropertyUnits(
+    @Path() propertyId: string,
+    @Query() search?: string,
+  ) {
+    const unitData = await this.unitService.getUnitsByProperty(propertyId, search);
     return {
       success: true,
       message: "Units retrieved successfully",
