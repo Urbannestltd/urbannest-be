@@ -5,6 +5,7 @@ export interface DashboardMetricsDto {
   revenue: {
     expectedIncome: number;
     amountCollected: number;
+    collectedPercent: number;
   };
   maintenanceChart: { property: string; count: number }[];
 }
@@ -14,9 +15,19 @@ export interface TenantStatusDto {
   name: string;
   photoUrl: string | null;
   phone: string | null;
+  propertyName: string;
+  unitName: string;
+  propertyImages?: string[];
+  unitId?: string;
+  propertyId?: string;
   address: string;
   leaseDuration: string;
-  status: "ACTIVE" | "DEFAULTING";
+  status: "ACTIVE" | "EXPIRED";
+}
+
+export interface TenantStatusesResponseDto {
+  expired: TenantStatusDto[];
+  latest: TenantStatusDto[];
 }
 
 export interface PersonSummaryDto {
@@ -31,7 +42,7 @@ export interface PropertyOverviewItemDto {
   occupancyPercent: number;
   tenantSummary: {
     active: number;
-    defaulting: number;
+    expired: number;
   };
   arrears: number;
   openMaintenance: number;

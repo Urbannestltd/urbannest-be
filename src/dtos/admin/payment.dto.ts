@@ -1,27 +1,26 @@
 import { PaymentStatus, PaymentType } from "@prisma/client";
 
-export interface AdminPaymentListItemDto {
+export interface CombinedLedgerItemDto {
+  recordType: "PAYMENT" | "EXPENSE";
   id: string;
-  reference: string;
   amount: number;
-  status: string;
-  type: string;
+  date: Date;
+
+  // Payment-only (null for expenses)
+  reference: string | null;
+  status: string | null;
+  paymentType: string | null;
   dueDate: Date | null;
   paidDate: Date | null;
-  createdAt: Date;
-  tenant: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-  property: {
-    id: string;
-    name: string | null;
-  } | null;
-  unit: {
-    id: string;
-    name: string;
-  } | null;
+  tenant: { id: string; name: string; email: string } | null;
+  unit: { id: string; name: string } | null;
+
+  // Expense-only (null for payments)
+  category: string | null;
+  description: string | null;
+
+  // Common
+  property: { id: string; name: string | null } | null;
 }
 
 export interface AdminGetPaymentsQuery {
@@ -31,6 +30,8 @@ export interface AdminGetPaymentsQuery {
   startDate?: string;
   endDate?: string;
   type?: PaymentType;
+  /** Limit results to a single record type. Omit to return both. */
+  source?: "PAYMENT" | "EXPENSE";
 }
 
 export interface FinancialMetricsDto {

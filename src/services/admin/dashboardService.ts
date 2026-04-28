@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import {
   DashboardMetricsDto,
   TenantStatusDto,
+  TenantStatusesResponseDto,
   PropertyOverviewItemDto,
   PropertyOverviewResponseDto,
 } from "../../dtos/admin/dashboard.dto";
@@ -68,6 +69,9 @@ export class AdminDashboardService {
       revenue: {
         expectedIncome: expectedIncomeResult._sum.rentAmount || 0,
         amountCollected: collectedIncomeResult._sum.amount || 0,
+        collectedPercent: expectedIncomeResult._sum.rentAmount
+          ? Math.round(((collectedIncomeResult._sum.amount ?? 0) / expectedIncomeResult._sum.rentAmount) * 100)
+          : 0,
       },
       maintenanceChart,
     };
@@ -194,7 +198,7 @@ export class AdminDashboardService {
         dateListed: property.createdAt,
         tenantSummary: {
           active: activeTenants - defaultingLeases,
-          defaulting: defaultingLeases,
+          expired: defaultingLeases,
         },
         arrears,
         openMaintenance,
@@ -212,43 +216,50 @@ export class AdminDashboardService {
   }
 
   // --- 3. GET TENANT STATUS LIST ---
-  public async getTenantStatuses(): Promise<TenantStatusDto[]> {
-    // Fetch tenants with their active leases and checking for overdue payments
-    const tenants = await prisma.user.findMany({
-      where: {
-        userRole: { roleName: "TENANT" },
-        leases: { some: { status: "ACTIVE" } },
+  public async getTenantStatuses(): Promise<TenantStatusesResponseDto> {
+    const tenantIncludes = {
+      leases: {
+        where: { status: "ACTIVE" as const },
+        include: { unit: { include: { property: true } } },
       },
-      include: {
-        leases: {
-          where: { status: "ACTIVE" },
-          include: {
-            unit: {
-              include: { property: true },
-            },
-          },
-        },
-        payments: {
-          where: { status: "OVERDUE" },
-          select: { id: true }, // We only need to know if any exist
-        },
+      payments: {
+        where: { status: "OVERDUE" as const },
+        select: { id: true },
       },
-    });
+    };
 
-    return tenants.map((tenant) => {
-      const activeLease = tenant.leases[0]; // Assuming 1 active lease per tenant
+    const [expiredTenants, latestTenants] = await Promise.all([
+      // All tenants with at least one OVERDUE payment
+      prisma.user.findMany({
+        where: {
+          userRole: { roleName: "TENANT" },
+          leases: { some: { status: "ACTIVE" } },
+          payments: { some: { status: "OVERDUE" } },
+        },
+        include: tenantIncludes,
+      }),
+      // 5 most recently added tenants with an active lease
+      prisma.user.findMany({
+        where: {
+          userRole: { roleName: "TENANT" },
+          leases: { some: { status: "ACTIVE" } },
+        },
+        orderBy: { userCreatedAt: "desc" },
+        take: 5,
+        include: tenantIncludes,
+      }),
+    ]);
+
+    const mapTenant = (tenant: any): TenantStatusDto => {
+      const activeLease = tenant.leases[0];
       const unit = activeLease?.unit;
       const property = unit?.property;
 
-      // Calculate Lease Duration (e.g., "5 years" or "6 months")
       let leaseDuration = "Unknown";
       if (activeLease) {
-        const start = new Date(activeLease.startDate);
-        const end = new Date(activeLease.endDate);
         const diffInMonths =
-          (end.getFullYear() - start.getFullYear()) * 12 +
-          (end.getMonth() - start.getMonth());
-
+          (new Date(activeLease.endDate).getFullYear() - new Date(activeLease.startDate).getFullYear()) * 12 +
+          (new Date(activeLease.endDate).getMonth() - new Date(activeLease.startDate).getMonth());
         if (diffInMonths >= 12) {
           const years = Math.round(diffInMonths / 12);
           leaseDuration = `${years} year${years > 1 ? "s" : ""}`;
@@ -257,14 +268,9 @@ export class AdminDashboardService {
         }
       }
 
-      // Construct Address (e.g., "Unit 4B, The Wings Court, Lagos")
-      const address =
-        unit && property
-          ? `${unit.name}, ${property.name || property.address}, ${property.city}`
-          : "No Address Assigned";
-
-      // Determine Status (If they have any overdue payments, they are defaulting)
-      const isDefaulting = tenant.payments.length > 0;
+      const address = unit && property
+        ? `${unit.name}, ${property.name || property.address}, ${property.city}`
+        : "No Address Assigned";
 
       return {
         id: tenant.userId,
@@ -278,8 +284,13 @@ export class AdminDashboardService {
         propertyId: property?.id,
         address,
         leaseDuration: `Lease: ${leaseDuration}`,
-        status: isDefaulting ? "DEFAULTING" : "ACTIVE",
+        status: tenant.payments.length > 0 ? "EXPIRED" : "ACTIVE",
       };
-    });
+    };
+
+    return {
+      expired: expiredTenants.map(mapTenant),
+      latest: latestTenants.map(mapTenant),
+    };
   }
 }
