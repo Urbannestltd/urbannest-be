@@ -16,6 +16,7 @@ export class AdminPaymentService {
         }
       : undefined;
 
+    const q = filters.search?.trim();
     const results: CombinedLedgerItemDto[] = [];
 
     // ── Payments ────────────────────────────────────────────────────────────
@@ -27,6 +28,14 @@ export class AdminPaymentService {
           ...(filters.type       && { type: filters.type }),
           ...(dateRange          && { createdAt: dateRange }),
           ...(filters.propertyId && { lease: { unit: { propertyId: filters.propertyId } } }),
+          ...(q && {
+            OR: [
+              { reference: { contains: q, mode: "insensitive" } },
+              { user: { userFullName: { contains: q, mode: "insensitive" } } },
+              { user: { userEmail: { contains: q, mode: "insensitive" } } },
+              { lease: { unit: { property: { name: { contains: q, mode: "insensitive" } } } } },
+            ],
+          }),
         },
         orderBy: { createdAt: "desc" },
         include: {
@@ -69,6 +78,12 @@ export class AdminPaymentService {
         where: {
           ...(filters.propertyId && { propertyId: filters.propertyId }),
           ...(dateRange          && { date: dateRange }),
+          ...(q && {
+            OR: [
+              { description: { contains: q, mode: "insensitive" } },
+              { property: { name: { contains: q, mode: "insensitive" } } },
+            ],
+          }),
         },
         orderBy: { date: "desc" },
         include: {

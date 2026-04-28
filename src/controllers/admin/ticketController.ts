@@ -34,6 +34,7 @@ export class AdminTicketController {
     @Query() category?: string,
     @Query() dateFrom?: string,
     @Query() dateTo?: string,
+    @Query() search?: string,
   ) {
     const tickets = await this.ticketService.getAllTickets({
       propertyId,
@@ -43,6 +44,7 @@ export class AdminTicketController {
       category,
       dateFrom,
       dateTo,
+      search,
     });
     return { success: true, data: tickets };
   }
@@ -58,6 +60,7 @@ export class AdminTicketController {
     @Query() category?: string,
     @Query() dateFrom?: string,
     @Query() dateTo?: string,
+    @Query() search?: string,
   ) {
     const csv = await this.ticketService.getTicketsForExport({
       propertyId,
@@ -67,6 +70,7 @@ export class AdminTicketController {
       category,
       dateFrom,
       dateTo,
+      search,
     });
 
     const res = req.res;
@@ -77,8 +81,11 @@ export class AdminTicketController {
 
   // Get list for the "Tickets" tab
   @Get("{propertyId}/tickets")
-  public async getPropertyTickets(@Path() propertyId: string) {
-    const tickets = await this.ticketService.getPropertyTickets(propertyId);
+  public async getPropertyTickets(
+    @Path() propertyId: string,
+    @Query() search?: string,
+  ) {
+    const tickets = await this.ticketService.getPropertyTickets(propertyId, search);
     return {
       success: true,
       data: tickets,

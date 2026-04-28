@@ -1,4 +1,4 @@
-import { Get, Route, Security, Tags } from "tsoa";
+import { Get, Query, Route, Security, Tags } from "tsoa";
 import { AdminDashboardService } from "../../services/admin/dashboardService";
 import { PropertyOverviewResponseDto } from "../../dtos/admin/dashboard.dto";
 
@@ -29,12 +29,10 @@ export class AdminDashboardController {
   }
 
   @Get("properties/overview")
-  public async getPropertyOverview(): Promise<{
-    success: boolean;
-    message: string;
-    data: PropertyOverviewResponseDto;
-  }> {
-    const overview = await this.dashboardService.getPropertyOverview();
+  public async getPropertyOverview(
+    @Query() search?: string,
+  ): Promise<{ success: boolean; message: string; data: PropertyOverviewResponseDto }> {
+    const overview = await this.dashboardService.getPropertyOverview(search);
     return {
       success: true,
       message: "Property overview retrieved successfully",

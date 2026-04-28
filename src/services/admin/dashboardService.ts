@@ -78,9 +78,18 @@ export class AdminDashboardService {
   }
 
   // --- 2. GET PROPERTY OVERVIEW TABLE ---
-  public async getPropertyOverview(): Promise<PropertyOverviewResponseDto> {
+  public async getPropertyOverview(search?: string): Promise<PropertyOverviewResponseDto> {
+    const q = search?.trim();
     const properties = await prisma.property.findMany({
-      where: { isDeleted: false },
+      where: {
+        isDeleted: false,
+        ...(q && {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { address: { contains: q, mode: "insensitive" } },
+          ],
+        }),
+      },
       include: {
         facilityManager: {
           select: { userId: true, userFullName: true, userProfileUrl: true },

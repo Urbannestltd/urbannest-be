@@ -96,6 +96,8 @@ export interface TicketFiltersDto {
   dateFrom?: string;
   /** Latest createdAt (ISO string) */
   dateTo?: string;
+  /** Case-insensitive search across subject and tenant name */
+  search?: string;
 }
 
 export interface AddCommentDto {

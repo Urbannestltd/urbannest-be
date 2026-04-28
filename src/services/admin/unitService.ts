@@ -193,9 +193,26 @@ export class AdminUnitService {
     });
   }
 
-  public async getUnitsByProperty(propertyId: string) {
+  public async getUnitsByProperty(propertyId: string, search?: string) {
+    const q = search?.trim();
     const units = await prisma.unit.findMany({
-      where: { propertyId, status: { not: UnitStatus.DELETED } },
+      where: {
+        propertyId,
+        status: { not: UnitStatus.DELETED },
+        ...(q && {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            {
+              leases: {
+                some: {
+                  status: "ACTIVE",
+                  tenant: { userFullName: { contains: q, mode: "insensitive" } },
+                },
+              },
+            },
+          ],
+        }),
+      },
       include: {
         leases: {
           where: { status: "ACTIVE" },

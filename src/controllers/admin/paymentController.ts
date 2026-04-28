@@ -26,6 +26,7 @@ export class AdminPaymentController {
     @Query() endDate?: string,
     @Query() type?: PaymentType,
     @Query() source?: "PAYMENT" | "EXPENSE",
+    @Query() search?: string,
   ) {
     const payments = await this.paymentService.getAllPayments({
       propertyId,
@@ -35,6 +36,7 @@ export class AdminPaymentController {
       endDate,
       type,
       source,
+      search,
     });
     return {
       success: true,
@@ -52,6 +54,7 @@ export class AdminPaymentController {
     @Query() endDate?: string,
     @Query() type?: PaymentType,
     @Query() source?: "PAYMENT" | "EXPENSE",
+    @Query() search?: string,
   ) {
     const csv = await this.paymentService.generateCsvExport({
       propertyId,
@@ -60,6 +63,7 @@ export class AdminPaymentController {
       endDate,
       type,
       source,
+      search,
     });
     const res = request.res!;
     res.setHeader("Content-Type", "text/csv");

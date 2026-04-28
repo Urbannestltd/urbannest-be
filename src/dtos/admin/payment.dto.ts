@@ -32,6 +32,8 @@ export interface AdminGetPaymentsQuery {
   type?: PaymentType;
   /** Limit results to a single record type. Omit to return both. */
   source?: "PAYMENT" | "EXPENSE";
+  /** Case-insensitive search across tenant name, reference, description, property */
+  search?: string;
 }
 
 export interface FinancialMetricsDto {
