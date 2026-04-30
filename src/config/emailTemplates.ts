@@ -618,6 +618,154 @@ export function adminLeaseRenewedEmail(
 }
 
 // ---------------------------------------------------------------------------
+// Tenant receipts — shared date formatter
+// ---------------------------------------------------------------------------
+function fmtDate(d: Date) {
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function receiptRef(reference: string) {
+  return `<p style="margin:0 0 28px;font-size:12px;color:${BRAND.muted};
+                    letter-spacing:0.5px;">REF: ${reference.toUpperCase()}</p>`;
+}
+
+// ---------------------------------------------------------------------------
+// 20. Tenant — Rent payment receipt (new lease or renewal)
+// ---------------------------------------------------------------------------
+export function tenantRentReceiptEmail(
+  name: string,
+  action: string,
+  propertyName: string,
+  unitName: string,
+  amount: number,
+  reference: string,
+  paidDate: Date,
+  leaseEndDate: Date,
+) {
+  const isNewLease = action === "NEW_LEASE";
+  const title = isNewLease ? "Lease payment confirmed" : "Rent renewal confirmed";
+  const intro = isNewLease
+    ? "Your first rent payment has been received and your lease is now active."
+    : "Your rent renewal payment has been received and your lease has been extended.";
+
+  return {
+    subject: `${title} — ₦${amount.toLocaleString()}`,
+    html: base(`
+      ${heading(title)}
+      ${subheading(`Hi ${name}`)}
+      ${para(intro)}
+      ${receiptRef(reference)}
+      ${metaTable([
+        ["Property", propertyName],
+        ["Unit", unitName],
+        ["Amount paid", `₦${amount.toLocaleString()}`],
+        ["Payment date", fmtDate(paidDate)],
+        ["Lease valid until", fmtDate(leaseEndDate)],
+        ["Reference", reference],
+      ])}
+      ${divider()}
+      ${para(`Please keep this email as proof of payment. Contact us if you have any questions.`)}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 21. Tenant — Utility token / bill receipt
+// ---------------------------------------------------------------------------
+export function tenantUtilityReceiptEmail(
+  name: string,
+  utilityService: string,
+  meterNumber: string,
+  amount: number,
+  reference: string,
+  paidDate: Date,
+  token: string | null,
+) {
+  const tokenBlock = token
+    ? `
+      <div style="background:${BRAND.softBg};border:1px solid ${BRAND.border};
+                  border-radius:10px;padding:24px;text-align:center;margin:24px 0;">
+        <p style="margin:0 0 6px;font-size:11px;color:${BRAND.muted};
+                  text-transform:uppercase;letter-spacing:1px;">Your token</p>
+        <span style="font-size:28px;font-weight:700;letter-spacing:6px;
+                     color:${BRAND.dark};font-variant-numeric:tabular-nums;">${token}</span>
+        <p style="margin:8px 0 0;font-size:12px;color:${BRAND.muted};">
+          Enter this token on your meter to activate your units.
+        </p>
+      </div>`
+    : alertBox(
+        "Your payment was received successfully. Your token is being generated and will be delivered to you shortly. Please contact support if it does not arrive within 30 minutes.",
+        "info",
+      );
+
+  return {
+    subject: token
+      ? `Your utility token — ${utilityService}`
+      : `Utility payment received — processing token`,
+    html: base(`
+      ${heading(token ? "Utility token delivered" : "Payment received")}
+      ${subheading(`Hi ${name}`)}
+      ${para(
+        token
+          ? "Your utility purchase was successful. Your token is ready."
+          : "Your payment has been received. Token generation is in progress.",
+      )}
+      ${receiptRef(reference)}
+      ${metaTable([
+        ["Service", utilityService],
+        ["Meter number", meterNumber],
+        ["Amount paid", `₦${amount.toLocaleString()}`],
+        ["Payment date", fmtDate(paidDate)],
+        ["Reference", reference],
+      ])}
+      ${tokenBlock}
+      ${divider()}
+      ${para("Please keep this email as proof of payment.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 22. Tenant — Generic payment receipt (service charge, bills, etc.)
+// ---------------------------------------------------------------------------
+export function tenantPaymentReceiptEmail(
+  name: string,
+  paymentType: string,
+  amount: number,
+  reference: string,
+  paidDate: Date,
+  propertyName?: string,
+  unitName?: string,
+) {
+  const label = paymentType
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const locationRows: [string, string][] = [];
+  if (propertyName) locationRows.push(["Property", propertyName]);
+  if (unitName) locationRows.push(["Unit", unitName]);
+
+  return {
+    subject: `Payment confirmed — ₦${amount.toLocaleString()} (${label})`,
+    html: base(`
+      ${heading("Payment confirmed")}
+      ${subheading(`Hi ${name}`)}
+      ${para(`Your ${label.toLowerCase()} payment has been received and confirmed.`)}
+      ${receiptRef(reference)}
+      ${metaTable([
+        ...locationRows,
+        ["Payment type", label],
+        ["Amount paid", `₦${amount.toLocaleString()}`],
+        ["Payment date", fmtDate(paidDate)],
+        ["Reference", reference],
+      ])}
+      ${divider()}
+      ${para("Please keep this email as proof of payment. Contact us if you have any questions.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 19. Admin — Visitor checked in
 // ---------------------------------------------------------------------------
 export function adminVisitorCheckInEmail(

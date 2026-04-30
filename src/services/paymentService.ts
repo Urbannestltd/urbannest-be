@@ -4,7 +4,12 @@ import { NotFoundError, BadRequestError } from "../utils/apiError";
 import { PaymentStatus, UnitStatus, LeaseStatus } from "@prisma/client";
 import { VTPassService } from "./external/vtPassService";
 import { ZeptoMailService } from "./external/zeptoMailService";
-import { adminPaymentReceivedEmail } from "../config/emailTemplates";
+import {
+  adminPaymentReceivedEmail,
+  tenantRentReceiptEmail,
+  tenantUtilityReceiptEmail,
+  tenantPaymentReceiptEmail,
+} from "../config/emailTemplates";
 import { getAdminRecipients } from "../utils/getAdminRecipients";
 
 export class PaymentService {
@@ -80,6 +85,28 @@ export class PaymentService {
           },
         });
 
+        // Send tenant receipt with token
+        const tenantUser = await prisma.user.findUnique({
+          where: { userId: payment.userId },
+          select: { userEmail: true, userFullName: true },
+        });
+        if (tenantUser) {
+          const { subject, html } = tenantUtilityReceiptEmail(
+            tenantUser.userFullName ?? "Tenant",
+            meta.serviceID ?? "Utility",
+            meta.meterNumber ?? "",
+            payment.amount,
+            reference,
+            new Date(),
+            vendResult.token,
+          );
+          await this.emailService.sendEmail(
+            { email: tenantUser.userEmail, name: tenantUser.userFullName ?? undefined },
+            subject,
+            html,
+          );
+        }
+
         return {
           success: true,
           token: vendResult.token,
@@ -101,6 +128,28 @@ export class PaymentService {
             },
           },
         });
+
+        // Send tenant receipt indicating token is pending
+        const tenantUser = await prisma.user.findUnique({
+          where: { userId: payment.userId },
+          select: { userEmail: true, userFullName: true },
+        });
+        if (tenantUser) {
+          const { subject, html } = tenantUtilityReceiptEmail(
+            tenantUser.userFullName ?? "Tenant",
+            meta.serviceID ?? "Utility",
+            meta.meterNumber ?? "",
+            payment.amount,
+            reference,
+            new Date(),
+            null,
+          );
+          await this.emailService.sendEmail(
+            { email: tenantUser.userEmail, name: tenantUser.userFullName ?? undefined },
+            subject,
+            html,
+          );
+        }
 
         return {
           success: true,
@@ -203,37 +252,81 @@ export class PaymentService {
       };
     });
 
-    // Notify admins of payment (fire-and-forget, outside transaction)
-    const adminRecipients = await getAdminRecipients("emailPayments");
-    if (adminRecipients.length > 0) {
-      const paid = await prisma.payment.findUnique({
-        where: { id: payment.id },
-        include: {
-          user: { select: { userFullName: true } },
-          lease: {
-            include: {
-              unit: { include: { property: true } },
-            },
+    // Fetch enriched payment for receipts (admin + tenant)
+    const paid = await prisma.payment.findUnique({
+      where: { id: payment.id },
+      include: {
+        user: { select: { userFullName: true, userEmail: true } },
+        lease: {
+          include: {
+            unit: { include: { property: true } },
           },
         },
-      });
-      if (paid) {
-        for (const admin of adminRecipients) {
-          const { subject, html } = adminPaymentReceivedEmail(
-            admin.name ?? "Admin",
-            paid.user?.userFullName ?? "Tenant",
+      },
+    });
+
+    if (paid) {
+      const propertyName = paid.lease?.unit?.property?.name ?? "Unknown Property";
+      const unitName = paid.lease?.unit?.name ?? "Unknown Unit";
+      const paidDate = paid.paidDate ?? new Date();
+      const tenantName = paid.user?.userFullName ?? "Tenant";
+      const tenantEmail = paid.user?.userEmail;
+
+      // Send tenant receipt
+      if (tenantEmail) {
+        if (paid.type === "RENT") {
+          const leaseEndDate = paid.lease?.endDate ?? new Date();
+          const action = (meta?.action as string) ?? "RENT_RENEWAL";
+          const { subject, html } = tenantRentReceiptEmail(
+            tenantName,
+            action,
+            propertyName,
+            unitName,
             paid.amount,
-            paid.type,
-            paid.lease?.unit?.property?.name ?? "Unknown Property",
-            paid.lease?.unit?.name ?? "Unknown Unit",
-            paid.paidDate ?? new Date(),
+            paid.reference ?? reference,
+            paidDate,
+            leaseEndDate,
           );
           await this.emailService.sendEmail(
-            { email: admin.email, name: admin.name ?? undefined },
+            { email: tenantEmail, name: tenantName },
+            subject,
+            html,
+          );
+        } else {
+          const { subject, html } = tenantPaymentReceiptEmail(
+            tenantName,
+            paid.type,
+            paid.amount,
+            paid.reference ?? reference,
+            paidDate,
+            propertyName !== "Unknown Property" ? propertyName : undefined,
+            unitName !== "Unknown Unit" ? unitName : undefined,
+          );
+          await this.emailService.sendEmail(
+            { email: tenantEmail, name: tenantName },
             subject,
             html,
           );
         }
+      }
+
+      // Notify admins
+      const adminRecipients = await getAdminRecipients("emailPayments");
+      for (const admin of adminRecipients) {
+        const { subject, html } = adminPaymentReceivedEmail(
+          admin.name ?? "Admin",
+          tenantName,
+          paid.amount,
+          paid.type,
+          propertyName,
+          unitName,
+          paidDate,
+        );
+        await this.emailService.sendEmail(
+          { email: admin.email, name: admin.name ?? undefined },
+          subject,
+          html,
+        );
       }
     }
 
