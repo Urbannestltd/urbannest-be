@@ -13,7 +13,7 @@ export interface CombinedLedgerItemDto {
   dueDate: Date | null;
   paidDate: Date | null;
   tenant: { id: string; name: string; email: string } | null;
-  unit: { id: string; name: string } | null;
+  unit: { id: string | null; name: string } | null;
 
   // Expense-only (null for payments)
   category: string | null;

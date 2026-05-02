@@ -4,8 +4,8 @@ import { BadRequestError } from "../../utils/apiError";
 
 export class AdminExpenseService {
   public async addExpense(data: CreateExpenseDto): Promise<ExpenseResponseDto> {
-    if (!data.propertyId && !data.unitId) {
-      throw new BadRequestError("Either propertyId or unitId must be provided");
+    if (!data.propertyId) {
+      throw new BadRequestError("propertyId is required");
     }
 
     const expense = await prisma.expense.create({

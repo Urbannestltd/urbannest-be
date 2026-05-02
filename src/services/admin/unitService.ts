@@ -272,9 +272,13 @@ export class AdminUnitService {
         status: unit.status, // "AVAILABLE" (Vacant) or "OCCUPIED"
         rentAmount: activeLease?.rentAmount || unit.baseRent || 0,
 
-        // Tenant Details
+        // Tenant Details — show "Pending" until tenant has fully joined
         tenantId: tenant ? tenant.userId : null,
-        tenantName: tenant ? tenant.userFullName : null,
+        tenantName: tenant
+          ? tenant.userStatus === "PENDING"
+            ? "Pending"
+            : tenant.userFullName
+          : null,
         tenantProfilePic: tenant ? tenant.userProfileUrl : null,
         moveInDate: activeLease ? activeLease.startDate : null,
 
@@ -412,10 +416,11 @@ export class AdminUnitService {
       currentTenant: tenant
         ? {
             tenantId: tenant.userId,
-            fullName: tenant.userFullName,
+            fullName: tenant.userStatus === "PENDING" ? "Pending" : tenant.userFullName,
             profilePic: tenant.userProfileUrl,
             email: tenant.userEmail,
             phone: tenant.userPhone,
+            isPending: tenant.userStatus === "PENDING",
           }
         : null,
 
