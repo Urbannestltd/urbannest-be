@@ -5,7 +5,7 @@ export interface CreateExpenseDto {
   category: ExpenseCategory;
   description: string;
   date?: string;
-  propertyId?: string;
+  propertyId: string;
   unitId?: string;
 }
 

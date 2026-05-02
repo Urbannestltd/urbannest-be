@@ -104,7 +104,9 @@ export class AdminPaymentService {
           dueDate: null,
           paidDate: null,
           tenant: null,
-          unit: e.unit ? { id: e.unit.id, name: e.unit.name } : null,
+          unit: e.unit
+            ? { id: e.unit.id, name: e.unit.name }
+            : { id: null, name: "All units" },
           property: e.property ? { id: e.property.id, name: e.property.name } : null,
           category: e.category,
           description: e.description,

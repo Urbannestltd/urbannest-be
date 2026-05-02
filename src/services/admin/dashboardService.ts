@@ -57,10 +57,13 @@ export class AdminDashboardService {
       },
     });
 
-    const maintenanceChart = propertiesWithRequests.map((p) => ({
-      property: p.name ?? p.address,
-      count: p.units.reduce((sum, u) => sum + u._count.maintenanceRequests, 0),
-    }));
+    const maintenanceChart = propertiesWithRequests
+      .map((p) => ({
+        property: p.name ?? p.address,
+        count: p.units.reduce((sum, u) => sum + u._count.maintenanceRequests, 0),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
 
     return {
       totalProperties,
