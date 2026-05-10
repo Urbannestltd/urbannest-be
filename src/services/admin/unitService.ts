@@ -258,8 +258,9 @@ export class AdminUnitService {
         const elapsed = now - start;
 
         if (totalDuration > 0) {
-          let percentage = Math.round((elapsed / totalDuration) * 100);
-          percentage = Math.max(0, Math.min(100, percentage)); // Ensure it stays between 0-100
+          const remaining = end - now;
+          let percentage = Math.round((remaining / totalDuration) * 100);
+          percentage = Math.max(0, Math.min(100, percentage));
           leaseExpiryPercentage = `${percentage}%`;
         }
       }
