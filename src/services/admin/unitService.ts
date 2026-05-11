@@ -255,11 +255,11 @@ export class AdminUnitService {
         const now = new Date().getTime();
 
         const totalDuration = end - start;
-        const elapsed = now - start;
 
         if (totalDuration > 0) {
-          let percentage = Math.round((elapsed / totalDuration) * 100);
-          percentage = Math.max(0, Math.min(100, percentage)); // Ensure it stays between 0-100
+          const remaining = end - now;
+          let percentage = Math.round((remaining / totalDuration) * 100);
+          percentage = Math.max(0, Math.min(100, percentage));
           leaseExpiryPercentage = `${percentage}%`;
         }
       }
@@ -366,13 +366,10 @@ export class AdminUnitService {
       const end = new Date(activeLease.endDate).getTime();
       const now = Date.now();
       const totalDuration = end - start;
-      const elapsed = now - start;
 
       if (totalDuration > 0) {
-        const pct = Math.max(
-          0,
-          Math.min(100, Math.round((elapsed / totalDuration) * 100)),
-        );
+        const remaining = end - now;
+        const pct = Math.max(0, Math.min(100, Math.round((remaining / totalDuration) * 100)));
         leaseExpiryPercentage = `${pct}%`;
       }
 
@@ -502,9 +499,9 @@ export class AdminUnitService {
 
       // Expiry Circle
       const totalDuration = end - start;
-      const elapsed = now - start;
+      const remaining = end - now;
       let percentage =
-        totalDuration > 0 ? Math.round((elapsed / totalDuration) * 100) : 0;
+        totalDuration > 0 ? Math.round((remaining / totalDuration) * 100) : 0;
       percentage = Math.max(0, Math.min(100, percentage));
       const leaseId = activeLease.id;
 
