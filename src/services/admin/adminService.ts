@@ -278,6 +278,7 @@ export class AdminService {
       },
       currentUnit: activeLease
         ? {
+            leaseId: activeLease.id,
             unitId: activeLease.unit.id,
             unitName: activeLease.unit.name,
             unitFloor: activeLease.unit.floor,
