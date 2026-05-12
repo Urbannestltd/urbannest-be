@@ -272,7 +272,8 @@ export class AdminUnitService {
         status: unit.status, // "AVAILABLE" (Vacant) or "OCCUPIED"
         rentAmount: activeLease?.rentAmount || unit.baseRent || 0,
 
-        // Tenant Details — show "Pending" until tenant has fully joined
+        // Lease & Tenant Details
+        leaseId: activeLease ? activeLease.id : null,
         tenantId: tenant ? tenant.userId : null,
         tenantName: tenant
           ? tenant.userStatus === "PENDING"

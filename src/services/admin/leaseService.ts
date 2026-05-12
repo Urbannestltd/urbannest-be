@@ -1,4 +1,4 @@
-import { PrismaClient, UnitStatus, LeaseStatus } from "@prisma/client";
+import { UnitStatus, LeaseStatus } from "@prisma/client";
 import {
   CreateLeaseDto,
   LeaseDetailDto,
@@ -9,8 +9,7 @@ import { BadRequestError } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { adminLeaseCreatedEmail, adminLeaseRenewedEmail } from "../../config/emailTemplates";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
-
-const prisma = new PrismaClient();
+import { prisma } from "../../config/prisma";
 
 export class AdminLeaseService {
   private emailService = new ZeptoMailService();
