@@ -21,7 +21,7 @@ export class AdminService {
       where: { userEmail: params.userEmail },
     });
 
-    if (existingUser && existingUser.userStatus !== "PENDING") {
+    if (existingUser && !existingUser.isDeleted && existingUser.userStatus !== "PENDING") {
       throw new BadRequestError("User with this email already exists");
     }
 
@@ -183,7 +183,7 @@ export class AdminService {
     }
 
     const user = await prisma.user.findUnique({ where: { userId } });
-    if (!user) throw new BadRequestError("User not found");
+    if (!user || user.isDeleted) throw new BadRequestError("User not found");
 
     await prisma.user.update({
       where: { userId },
@@ -200,7 +200,7 @@ export class AdminService {
     }
 
     const user = await prisma.user.findUnique({ where: { userId } });
-    if (!user) throw new BadRequestError("User not found");
+    if (!user || user.isDeleted) throw new BadRequestError("User not found");
 
     await prisma.user.update({
       where: { userId },
@@ -293,7 +293,7 @@ export class AdminService {
   }
 
   public async getUserMetrics(excludeAdminId: string) {
-    const base = { userId: { not: excludeAdminId } };
+    const base = { userId: { not: excludeAdminId }, isDeleted: false };
     const [total, active, suspended] = await Promise.all([
       prisma.user.count({ where: base }),
       prisma.user.count({ where: { ...base, userStatus: "ACTIVE" } }),
@@ -317,6 +317,7 @@ export class AdminService {
 
     const users = await prisma.user.findMany({
       where: {
+        isDeleted: false,
         ...(filters?.status && { userStatus: filters.status }),
         ...(filters?.role && { userRole: { roleName: filters.role } }),
         ...((filters?.createdFrom || filters?.createdTo) && {
@@ -369,7 +370,7 @@ export class AdminService {
     const propertySelect = { select: { id: true, name: true } };
 
     const user = await prisma.user.findUnique({
-      where: { userId },
+      where: { userId, isDeleted: false },
       include: {
         userRole: true,
         leases: {
@@ -494,6 +495,85 @@ export class AdminService {
     await prisma.user.update({
       where: { userId: targetUserId },
       data: { permissions },
+    });
+  }
+
+  public async deleteUser(
+    userId: string,
+    requestingAdminId: string,
+  ): Promise<void> {
+    if (userId === requestingAdminId) {
+      throw new BadRequestError("You cannot delete your own account");
+    }
+
+    const user = await prisma.user.findUnique({ where: { userId } });
+    if (!user) throw new BadRequestError("User not found");
+    if (user.isDeleted) throw new BadRequestError("User is already deleted");
+
+    await prisma.$transaction(async (tx) => {
+      // Anonymize email so the original can be re-used on a new account
+      const anonymizedEmail = `deleted_${userId}@deleted.invalid`;
+
+      await tx.user.update({
+        where: { userId },
+        data: {
+          isDeleted: true,
+          deletedAt: new Date(),
+          userStatus: "DELETED",
+          userEmail: anonymizedEmail,
+        },
+      });
+
+      // Invalidate all active sessions
+      await tx.session.updateMany({
+        where: { userId, isValid: true },
+        data: { isValid: false },
+      });
+
+      // Remove from property assignments
+      await tx.property.updateMany({
+        where: { landlordId: userId },
+        data: { landlordId: null },
+      });
+      await tx.property.updateMany({
+        where: { facilityManagerId: userId },
+        data: { facilityManagerId: null },
+      });
+      await tx.property.updateMany({
+        where: { agentId: userId },
+        data: { agentId: null },
+      });
+
+      // Remove from unit assignments
+      await tx.unit.updateMany({
+        where: { landlordId: userId },
+        data: { landlordId: null },
+      });
+      await tx.unit.updateMany({
+        where: { facilityManagerId: userId },
+        data: { facilityManagerId: null },
+      });
+
+      // Terminate active leases
+      await tx.lease.updateMany({
+        where: { tenantId: userId, status: "ACTIVE" },
+        data: { status: "TERMINATED" },
+      });
+
+      // Cancel open maintenance requests raised by this tenant
+      await tx.maintenanceRequest.updateMany({
+        where: {
+          tenantId: userId,
+          status: { notIn: ["RESOLVED", "FIXED", "CANCELLED"] },
+        },
+        data: { status: "CANCELLED" },
+      });
+
+      // Unassign maintenance requests assigned to this user
+      await tx.maintenanceRequest.updateMany({
+        where: { assignedToId: userId },
+        data: { assignedToId: null },
+      });
     });
   }
 

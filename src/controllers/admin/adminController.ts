@@ -1,5 +1,6 @@
 import {
   Body,
+  Delete,
   Get,
   Path,
   Put,
@@ -62,6 +63,12 @@ export class AdminController extends Controller {
       search,
     });
     return { success: true, message: "Users retrieved", data };
+  }
+
+  @Delete("users/{userId}")
+  public async deleteUser(@Path() userId: string, @Request() req: any) {
+    await this.adminService.deleteUser(userId, req.user.userId);
+    return { success: true, message: "User deleted successfully" };
   }
 
   @Put("users/{userId}/suspend")
