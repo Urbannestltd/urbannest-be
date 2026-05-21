@@ -244,6 +244,9 @@ model user {
 
   permissions  Permission[]  @default([])
 
+  isDeleted Boolean   @default(false)
+  deletedAt  DateTime?
+
   @@index([userRoleId])
   @@map("user")
 }
