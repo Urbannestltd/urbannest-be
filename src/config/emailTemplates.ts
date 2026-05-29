@@ -181,6 +181,7 @@ export function registrationInviteEmail(
   if (role) contextLines.push(["Role", roleLabel.replace(/^a[n]? /, "").replace(/\b\w/g, (c) => c.toUpperCase())]);
 
   const contextTable = contextLines.length > 0 ? metaTable(contextLines) : "";
+  const ctaLabel = role === "FACILITY_MANAGER" ? "Set up your account" : "Complete Registration";
 
   return {
     subject: "You've been added to Urbannest",
@@ -189,7 +190,7 @@ export function registrationInviteEmail(
       ${subheading("Your account is ready — complete your registration below")}
       ${para(`An administrator has added you to the <strong>Urbannest</strong> platform as <strong>${roleLabel}</strong>. Please review the details below and click the button to set your password and activate your account.`)}
       ${contextTable}
-      ${ctaButton("Complete Registration", link)}
+      ${ctaButton(ctaLabel, link)}
       ${divider()}
       ${para(`This invitation link is valid for <strong>${validTime}</strong>. Contact your administrator if it expires.`)}
       ${alertBox("Never share this link with anyone. It grants direct access to your account.")}
