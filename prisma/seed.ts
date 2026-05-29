@@ -71,6 +71,7 @@ async function main() {
     { name: "LANDLORD", desc: "Property Owner" },
     { name: "TENANT", desc: "Resident" },
     { name: "VENDOR", desc: "Service Provider / Maintenance Worker" },
+    { name: "FACILITY_MANAGER", desc: "Manages property facilities and operations" },
   ];
 
   // We no longer need the createdRoles dictionary!
@@ -100,6 +101,21 @@ async function main() {
       userStatus: UserStatus.ACTIVE,
       // Fix: Use relational connect instead of a loose string
       userRole: { connect: { roleName: "ADMIN" } },
+    },
+  });
+
+  // Facility Manager: Jonathan Doe
+  const facilityManager = await prisma.user.upsert({
+    where: { userEmail: "jonathan@urbannest.com" },
+    update: {},
+    create: {
+      userEmail: "jonathan@urbannest.com",
+      userFullName: "Jonathan Doe",
+      userPhone: "08012345678",
+      userStatus: UserStatus.ACTIVE,
+      userPassword: defaultPassword,
+      // Fix: Connect directly via the unique roleName
+      userRole: { connect: { roleName: "FACILITY_MANAGER" } },
     },
   });
 
@@ -142,7 +158,12 @@ async function main() {
     where: { name: "1004 Estate (Cluster C)" },
   });
 
-  if (!property) {
+  if (property) {
+    property = await prisma.property.update({
+      where: { id: property.id },
+      data: { facilityManagerId: facilityManager.userId },
+    });
+  } else {
     property = await prisma.property.create({
       data: {
         name: "1004 Estate (Cluster C)",
@@ -152,6 +173,7 @@ async function main() {
         zip: "101241",
         landlordId: landlord.userId,
         type: PropertyType.MULTI_UNIT, // Fix: Use Enum instead of raw string
+        facilityManagerId: facilityManager.userId,
         units: {
           create: [
             {
