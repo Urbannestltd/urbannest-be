@@ -282,7 +282,7 @@ export class AuthenticationService {
     }
 
     if (user?.userStatus !== "ACTIVE") {
-      throw new UnauthorizedError("Account is not active.");
+      throw new BadRequestError("Account is not active.");
     }
 
     // --- SECURITY ENFORCEMENT ---

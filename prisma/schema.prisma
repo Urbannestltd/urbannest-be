@@ -22,6 +22,7 @@ enum RoleType {
   ADMIN
   LANDLORD
   TENANT
+  FACILITY_MANAGER
   VENDOR
   AGENT
 }
@@ -86,6 +87,7 @@ enum VisitorType {
 
 enum InviteFrequency {
   ONE_OFF
+  ONE_OFF_AGENT
   WHOLE_DAY
   RECURRING
 }
