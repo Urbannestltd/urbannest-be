@@ -36,6 +36,35 @@ export class AuthenticationService {
     }
     return secret;
   }
+  public async validateRegistrationToken(token: string): Promise<{
+    status: "valid" | "expired" | "used";
+    email?: string;
+    role?: string;
+  }> {
+    const regLink = await prisma.userRegistrationLink.findUnique({
+      where: { userRegistrationLinkToken: token },
+      include: {
+        userRegistrationLinkUser: {
+          include: { userRole: true },
+        },
+      },
+    });
+
+    if (!regLink) throw new BadRequestError("Invalid registration token");
+
+    if (regLink.userRegistrationLinkUsed) return { status: "used" };
+
+    if (regLink.userRegistrationLinkExpiresAt < new Date())
+      return { status: "expired" };
+
+    const user = regLink.userRegistrationLinkUser;
+    return {
+      status: "valid",
+      email: user.userEmail,
+      role: user.userRole.roleName,
+    };
+  }
+
   public async register(
     params: RegisterRequest,
     token: string,
@@ -58,6 +87,11 @@ export class AuthenticationService {
     if (!regLinkCheck)
       throw new BadRequestError("Invalid registration token provided");
 
+    if (regLinkCheck.userRegistrationLinkUsed)
+      throw new BadRequestError(
+        "This account has already been set up. Log in instead.",
+      );
+
     if (regLinkCheck.userRegistrationLinkExpiresAt < new Date())
       throw new BadRequestError("Registration token has expired");
 
@@ -75,35 +109,13 @@ export class AuthenticationService {
         },
         userStatus: "ACTIVE",
       },
+      include: { userRole: true },
     });
-
-    // console.log(`[EMAIL SERVICE] Sending OTP to ${params.userEmail}: ${otp}`);
-    // sendEmail(
-    //   params.userEmail,
-    //   "Verify your Email for Urbannest",
-    //   `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p><br><br>Best Regards,<br>The Urbannest Team`
-    // );
-
-    // const mailOptions = {
-    //   from: {
-    //     address: MAIL_USER as string,
-    //     name: "Urbannest Support",
-    //   },
-    //   to: params.userEmail,
-    //   subject: "Verify your Email for Urbannest",
-    //   html: `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p><br><br>Best Regards,<br>The Urbannest Team`,
-    // };
-
-    // transporter.sendMail(mailOptions, (error, info) => {
-    //   if (error) {
-    //     new BadRequestError(error.message);
-    //   }
-    // });
 
     return {
       success: true,
       message: "Registration completed successfully",
-      data: { userId: newUser.userId },
+      data: { userId: newUser.userId, role: newUser.userRole.roleName },
     };
   }
 

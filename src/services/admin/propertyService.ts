@@ -91,7 +91,19 @@ export class AdminPropertyService {
     });
     if (!property) throw new Error("Property not found");
 
+    // Collect unit IDs belonging to this property so we can terminate their leases
+    const units = await prisma.unit.findMany({
+      where: { propertyId },
+      select: { id: true },
+    });
+    const unitIds = units.map((u) => u.id);
+
     await prisma.$transaction([
+      // Terminate all active leases on this property's units
+      prisma.lease.updateMany({
+        where: { unitId: { in: unitIds }, status: "ACTIVE" },
+        data: { status: "TERMINATED" },
+      }),
       prisma.unit.updateMany({
         where: { propertyId, status: { not: UnitStatus.DELETED } },
         data: { status: UnitStatus.DELETED },

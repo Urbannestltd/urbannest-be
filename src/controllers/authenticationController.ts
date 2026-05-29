@@ -42,6 +42,17 @@ export class AuthenticationController extends Controller {
   private sessionService = new SessionService();
 
   /**
+   * Pre-validates an invite token before the user fills in the registration form.
+   * Returns { status: "valid", email, role } | { status: "expired" } | { status: "used" }.
+   * The frontend should call this on page load and branch to the appropriate screen.
+   */
+  @Get("validate-token")
+  public async validateToken(@Query() token: string) {
+    const result = await this.authenticationService.validateRegistrationToken(token);
+    return { success: true, data: result };
+  }
+
+  /**
    * Initiates registration for a new user.
    */
   @Post("register")
