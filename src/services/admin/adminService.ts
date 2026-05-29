@@ -21,11 +21,29 @@ export class AdminService {
       where: { userEmail: params.userEmail },
     });
 
-    if (existingUser && !existingUser.isDeleted && existingUser.userStatus !== "PENDING") {
-      throw new BadRequestError("User with this email already exists");
+    // Gracefully handle re-inviting a previously deleted account.
+    // The delete flow anonymises the email, but if it didn't complete
+    // (e.g. migration not yet deployed when the delete ran), the original
+    // email may still be on the record. Free it up now so the upsert
+    // below creates a completely fresh record.
+    if (existingUser?.isDeleted || existingUser?.userStatus === "DELETED") {
+      await prisma.user.update({
+        where: { userId: existingUser.userId },
+        data: { userEmail: `deleted_${existingUser.userId}@deleted.invalid` },
+      });
+      // Fall through as a brand-new user — upsert will take the create path
     }
 
-    const isNewUser = !existingUser;
+    const isCleanSlate =
+      !existingUser ||
+      existingUser.isDeleted ||
+      existingUser.userStatus === "DELETED";
+
+    if (!isCleanSlate && existingUser!.userStatus !== "PENDING") {
+      throw new BadRequestError("A user with this email already exists");
+    }
+
+    const isNewUser = isCleanSlate;
 
     const getUnit = await prisma.unit.findUnique({
       where: { id: params.unitId ?? undefined },
