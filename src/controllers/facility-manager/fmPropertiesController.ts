@@ -15,7 +15,7 @@ const VALID_OCCUPANCY = ["VACANT", "PARTIAL", "OCCUPIED"] as const;
 type OccupancyFilter = (typeof VALID_OCCUPANCY)[number];
 
 @Route("facility-manager/properties")
-@Tags("Facility Manager")
+@Tags("FM - Properties")
 @Security("jwt", ["FACILITY_MANAGER"])
 export class FmPropertiesController extends Controller {
   private fmPropertiesService = new FmPropertiesService();
