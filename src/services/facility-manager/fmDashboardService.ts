@@ -75,6 +75,7 @@ export class FmDashboardService {
       propertyName: t.unit.property.name ?? t.unit.property.address,
       unitName: t.unit.name,
       tenantName: t.tenant.userFullName ?? "Unknown",
+      category: t.category,
       priority: t.priority,
       status: t.status,
       createdAt: t.createdAt,

@@ -2,7 +2,7 @@ import { Get, Route, Controller, Tags, Security, Request } from "tsoa";
 import { FmDashboardService } from "../../services/facility-manager/fmDashboardService";
 
 @Route("facility-manager/dashboard")
-@Tags("Facility Manager")
+@Tags("FM - Dashboard")
 @Security("jwt", ["FACILITY_MANAGER"])
 export class FmDashboardController extends Controller {
   private fmDashboardService = new FmDashboardService();

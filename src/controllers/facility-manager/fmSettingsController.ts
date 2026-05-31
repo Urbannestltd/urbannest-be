@@ -11,7 +11,7 @@ import {
 import { FmSettingsService } from "../../services/facility-manager/fmSettingsService";
 
 @Route("facility-manager")
-@Tags("Facility Manager")
+@Tags("FM - Settings")
 @Security("jwt", ["FACILITY_MANAGER"])
 export class FmSettingsController extends Controller {
   private fmSettingsService = new FmSettingsService();

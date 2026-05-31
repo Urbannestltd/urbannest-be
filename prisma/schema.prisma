@@ -661,6 +661,7 @@ model MaintenanceRequest {
   assignedTo   user?   @relation("AssignedTickets", fields: [assignedToId], references: [userId])
 
   messages MaintenanceMessage[]
+  expenses Expense[]
 
   @@index([unitId])
   @@index([tenantId])
@@ -702,11 +703,15 @@ model Expense {
   unitId     String?
   unit       unit?     @relation(fields: [unitId], references: [id])
 
+  maintenanceRequestId String?
+  maintenanceRequest   MaintenanceRequest? @relation(fields: [maintenanceRequestId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([propertyId])
   @@index([unitId])
+  @@index([maintenanceRequestId])
   @@map("expenses")
 }
 
