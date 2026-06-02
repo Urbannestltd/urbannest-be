@@ -19,7 +19,7 @@ import * as jwt from "jsonwebtoken";
 import crypto from "crypto";
 import * as bcrypt from "bcrypt";
 import { ApiResponse } from "../dtos/apiResponse";
-import { GOOGLE_CLIENT_ID, JWT_PRIVATE_KEY, JWTSECRET } from "../config/env";
+import { BASE_URL, GOOGLE_CLIENT_ID, JWT_PRIVATE_KEY, JWTSECRET } from "../config/env";
 import { OAuth2Client } from "google-auth-library";
 import sendEmail from "../config/resend";
 import { JwtPayload } from "jsonwebtoken";
@@ -499,7 +499,7 @@ export class AuthenticationService {
       },
     });
 
-    const resetLink = `http://localhost:3000/auth/reset-password?token=${resetToken}`;
+    const resetLink = `${BASE_URL}/auth/reset-password?token=${resetToken}`;
     const { subject, html } = passwordResetEmail(
       user.userFullName ?? "there",
       resetLink,
