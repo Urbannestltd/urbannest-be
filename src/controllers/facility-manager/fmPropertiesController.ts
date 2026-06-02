@@ -11,8 +11,9 @@ import {
 import { FmPropertiesService } from "../../services/facility-manager/fmPropertiesService";
 import { BadRequestError } from "../../utils/apiError";
 
-const VALID_OCCUPANCY = ["VACANT", "PARTIAL", "OCCUPIED"] as const;
-type OccupancyFilter = (typeof VALID_OCCUPANCY)[number];
+const VALID_TYPES = ["RESIDENTIAL", "COMMERCIAL"] as const;
+const VALID_OCCUPANCY_RANGES = ["0-20", "21-40", "41-60", "61-80", "81-100"] as const;
+type OccupancyRange = (typeof VALID_OCCUPANCY_RANGES)[number];
 
 @Route("facility-manager/properties")
 @Tags("FM - Properties")
@@ -22,7 +23,13 @@ export class FmPropertiesController extends Controller {
 
   /**
    * Returns all properties assigned to the requesting FM.
-   * Sorted alphabetically by name. Supports search, type, and occupancy filters.
+   * Sorted alphabetically by name.
+   *
+   * Filters:
+   *  - search: matches property name or address
+   *  - type: "RESIDENTIAL" | "COMMERCIAL"
+   *  - occupancy: "0-20" | "21-40" | "41-60" | "61-80" | "81-100" (% range)
+   *  - unitRange: "1-10" | "11-20" | ... | "141-150"
    */
   @Get()
   public async getAssignedProperties(
@@ -30,10 +37,16 @@ export class FmPropertiesController extends Controller {
     @Query() search?: string,
     @Query() type?: string,
     @Query() occupancy?: string,
+    @Query() unitRange?: string,
   ) {
-    if (occupancy && !VALID_OCCUPANCY.includes(occupancy as OccupancyFilter)) {
+    if (type && !VALID_TYPES.includes(type as any)) {
       throw new BadRequestError(
-        `Invalid occupancy filter. Must be one of: ${VALID_OCCUPANCY.join(", ")}`,
+        `Invalid type filter. Must be one of: ${VALID_TYPES.join(", ")}`,
+      );
+    }
+    if (occupancy && !VALID_OCCUPANCY_RANGES.includes(occupancy as OccupancyRange)) {
+      throw new BadRequestError(
+        `Invalid occupancy filter. Must be one of: ${VALID_OCCUPANCY_RANGES.join(", ")}`,
       );
     }
 
@@ -42,7 +55,8 @@ export class FmPropertiesController extends Controller {
       {
         search,
         type,
-        occupancy: occupancy as OccupancyFilter | undefined,
+        occupancy: occupancy as OccupancyRange | undefined,
+        unitRange,
       },
     );
     return { success: true, message: "Properties retrieved", data };

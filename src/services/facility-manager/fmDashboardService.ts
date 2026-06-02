@@ -47,13 +47,14 @@ export class FmDashboardService {
     return { propertiesManaged, openTickets, pendingBudgetApprovals, todayVisitorCount };
   }
 
-  public async getRecentTickets(userId: string) {
+  public async getRecentTickets(userId: string, priorities?: string[]) {
     const propertyScope = this.scopedProperty(userId);
 
     const tickets = await prisma.maintenanceRequest.findMany({
       where: {
         unit: { property: propertyScope },
         status: { notIn: ["RESOLVED", "FIXED", "CANCELLED"] },
+        ...(priorities?.length ? { priority: { in: priorities as any } } : {}),
       },
       include: {
         unit: {
@@ -82,7 +83,7 @@ export class FmDashboardService {
     }));
   }
 
-  public async getTodaysVisitors(userId: string) {
+  public async getTodaysVisitors(userId: string, frequencies?: string[]) {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
@@ -95,6 +96,7 @@ export class FmDashboardService {
         unit: { property: propertyScope },
         validFrom: { lte: todayEnd },
         validUntil: { gte: todayStart },
+        ...(frequencies?.length ? { frequency: { in: frequencies as any } } : {}),
       },
       include: {
         unit: {

@@ -5,6 +5,7 @@ import { prisma } from "../../config/prisma";
 import { AdminCreateUserRequest } from "../../dtos/admin/admin";
 import { ApiResponse } from "../../dtos/apiResponse";
 import { BadRequestError } from "../../utils/apiError";
+import { SessionService } from "../sessionService";
 import bcrypt from "bcrypt";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { registrationInviteEmail } from "../../config/emailTemplates";
@@ -192,6 +193,8 @@ export class AdminService {
     };
   }
 
+  private sessionService = new SessionService();
+
   public async suspendUser(
     userId: string,
     requestingAdminId: string,
@@ -203,10 +206,10 @@ export class AdminService {
     const user = await prisma.user.findUnique({ where: { userId } });
     if (!user || user.isDeleted) throw new BadRequestError("User not found");
 
-    await prisma.user.update({
-      where: { userId },
-      data: { userStatus: "BLOCKED" },
-    });
+    await Promise.all([
+      prisma.user.update({ where: { userId }, data: { userStatus: "BLOCKED" } }),
+      this.sessionService.invalidateAllUserSessions(userId),
+    ]);
   }
 
   public async activateUser(
@@ -356,6 +359,7 @@ export class AdminService {
         userRole: true,
         leases: {
           where: { status: "ACTIVE" },
+          orderBy: { createdAt: "desc" },
           include: {
             unit: {
               include: {
@@ -393,6 +397,7 @@ export class AdminService {
         userRole: true,
         leases: {
           where: { status: "ACTIVE" },
+          orderBy: { createdAt: "desc" },
           include: {
             unit: {
               include: {

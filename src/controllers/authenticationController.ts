@@ -8,6 +8,7 @@ import {
   Post,
   SuccessResponse,
   Query,
+  Security,
 } from "tsoa";
 import * as express from "express";
 import { AuthenticationService } from "../services/authenticationService";
@@ -46,6 +47,19 @@ export class AuthenticationController extends Controller {
    * Returns { status: "valid", email, role } | { status: "expired" } | { status: "used" }.
    * The frontend should call this on page load and branch to the appropriate screen.
    */
+  /**
+   * Validates the caller's JWT and returns their basic profile.
+   * Frontend calls this on app load — if it succeeds, skip the login screen.
+   * Returns 401 if the token is missing/invalid, 403 if the account is deactivated.
+   */
+  @Get("me")
+  @Security("jwt")
+  public async getMe(@Request() req: any) {
+    const { userId, role } = req.user;
+    const user = await this.authenticationService.getMe(userId);
+    return { success: true, data: { ...user, role } };
+  }
+
   @Get("validate-token")
   public async validateToken(@Query() token: string) {
     const result = await this.authenticationService.validateRegistrationToken(token);

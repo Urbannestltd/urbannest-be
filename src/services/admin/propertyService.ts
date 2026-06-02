@@ -1,5 +1,6 @@
 import { UnitStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma";
+import { BadRequestError, NotFoundError } from "../../utils/apiError";
 
 // Normalises raw floor strings to a canonical "Floor N" form so that
 // "7", "Floor 7", "Seventh Floor" etc. all map to the same bucket.
@@ -289,39 +290,69 @@ export class AdminPropertyService {
   }
 
   public async assignMember(propertyId: string, data: ManageMemberDto) {
-    const user = await prisma.user.findUnique({
-      where: { userId: data.userId },
-    });
-    if (!user) throw new Error("User not found");
+    const [user, property] = await Promise.all([
+      prisma.user.findUnique({
+        where: { userId: data.userId, isDeleted: false },
+        include: { userRole: true },
+      }),
+      prisma.property.findUnique({ where: { id: propertyId, isDeleted: false } }),
+    ]);
+
+    if (!user) throw new NotFoundError("User not found");
+    if (!property) throw new NotFoundError("Property not found");
+
+    const userRole = user.userRole?.roleName;
 
     if (data.role === "LANDLORD") {
-      return await prisma.property.update({
+      if (userRole !== "LANDLORD") {
+        throw new BadRequestError(
+          `Cannot assign as LANDLORD — user's role is ${userRole}`,
+        );
+      }
+      await prisma.property.update({
         where: { id: propertyId },
         data: { landlordId: data.userId },
       });
+      return { role: "LANDLORD", userId: data.userId, propertyId };
     }
 
     if (data.role === "FACILITY_MANAGER") {
-      return await prisma.property.update({
+      if (userRole !== "FACILITY_MANAGER") {
+        throw new BadRequestError(
+          `Cannot assign as FACILITY_MANAGER — user's role is ${userRole}`,
+        );
+      }
+      await prisma.property.update({
         where: { id: propertyId },
         data: { facilityManagerId: data.userId },
       });
+      return { role: "FACILITY_MANAGER", userId: data.userId, propertyId };
     }
 
     if (data.role === "TENANT") {
       if (!data.unitId)
-        throw new Error("unitId is required to assign a tenant.");
+        throw new BadRequestError("unitId is required to assign a tenant.");
 
-      const unit = await prisma.unit.findUnique({ where: { id: data.unitId } });
-      if (!unit) throw new Error("Unit not found");
+      const unit = await prisma.unit.findUnique({
+        where: { id: data.unitId, propertyId },
+      });
+      if (!unit) throw new NotFoundError("Unit not found on this property.");
+      if (unit.status === UnitStatus.DELETED)
+        throw new BadRequestError("Cannot assign a tenant to a deleted unit.");
 
-      // Calculate lease dates (Default 1 year if not provided)
+      // Terminate any existing active leases before creating a new one.
+      // Without this, reassigning a tenant creates duplicate active leases and
+      // causes admin and tenant views to resolve to different properties.
+      await prisma.lease.updateMany({
+        where: { tenantId: data.userId, status: "ACTIVE" },
+        data: { status: "TERMINATED" },
+      });
+
       const startDate = new Date();
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + (data.leaseMonths || 12));
 
-      // Create an active lease to officially make them a tenant of this unit
-      return await prisma.lease.create({
+      const lease = await prisma.lease.create({
         data: {
           unitId: data.unitId,
           tenantId: data.userId,
@@ -331,49 +362,49 @@ export class AdminPropertyService {
           status: "ACTIVE",
         },
       });
+      return { role: "TENANT", userId: data.userId, propertyId, leaseId: lease.id };
     }
 
-    throw new Error("Invalid role specified");
+    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, or TENANT.");
   }
 
   // --- REMOVE MEMBER ---
   public async removeMember(propertyId: string, data: ManageMemberDto) {
     if (data.role === "LANDLORD") {
-      return await prisma.property.update({
+      await prisma.property.update({
         where: { id: propertyId },
-        data: { landlordId: null }, // Disconnect landlord
+        data: { landlordId: null },
       });
+      return;
     }
 
     if (data.role === "FACILITY_MANAGER") {
-      return await prisma.property.update({
+      await prisma.property.update({
         where: { id: propertyId },
-        data: { facilityManagerId: null }, // Disconnect facility manager
+        data: { facilityManagerId: null },
       });
+      return;
     }
 
     if (data.role === "TENANT") {
       if (!data.unitId)
-        throw new Error("unitId is required to remove a tenant.");
+        throw new BadRequestError("unitId is required to remove a tenant.");
 
-      // Find the active lease for this tenant in this unit
       const activeLease = await prisma.lease.findFirst({
-        where: {
-          unitId: data.unitId,
-          tenantId: data.userId,
-          status: "ACTIVE",
-        },
+        where: { unitId: data.unitId, tenantId: data.userId, status: "ACTIVE" },
       });
 
       if (!activeLease)
-        throw new Error("No active lease found for this tenant in this unit.");
+        throw new NotFoundError("No active lease found for this tenant in this unit.");
 
-      // Terminate the lease to "remove" the tenant
-      return await prisma.lease.update({
+      await prisma.lease.update({
         where: { id: activeLease.id },
         data: { status: "TERMINATED" },
       });
+      return;
     }
+
+    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, or TENANT.");
   }
 
   // --- UPDATE PROPERTY ---

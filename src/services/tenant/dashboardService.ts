@@ -16,6 +16,7 @@ export class DashboardService {
     // 2. Fetch Active Lease (For the Rent Card)
     const lease = await prisma.lease.findFirst({
       where: { tenantId: userId, status: "ACTIVE" },
+      orderBy: { createdAt: "desc" },
       include: { unit: true },
     });
 

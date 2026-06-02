@@ -3,7 +3,12 @@ import { ForbiddenError, NotFoundError } from "../../utils/apiError";
 import { AdminPropertyService } from "../admin/propertyService";
 import { AdminUnitService } from "../admin/unitService";
 
-type OccupancyFilter = "VACANT" | "PARTIAL" | "OCCUPIED";
+type OccupancyRange = "0-20" | "21-40" | "41-60" | "61-80" | "81-100";
+
+function parseRange(range: string): [number, number] {
+  const parts = range.split("-").map(Number);
+  return [parts[0]!, parts[1]!];
+}
 
 export class FmPropertiesService {
   private adminPropertyService = new AdminPropertyService();
@@ -61,7 +66,8 @@ export class FmPropertiesService {
     filters?: {
       search?: string;
       type?: string;
-      occupancy?: OccupancyFilter;
+      occupancy?: OccupancyRange;
+      unitRange?: string;
     },
   ) {
     const q = filters?.search?.trim();
@@ -105,11 +111,6 @@ export class FmPropertiesService {
       const occupancyRate =
         totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
 
-      const occupancyStatus: OccupancyFilter =
-        occupancyRate === 0 ? "VACANT"
-        : occupancyRate === 100 ? "OCCUPIED"
-        : "PARTIAL";
-
       const complaints = p.units.reduce(
         (sum, u) => sum + u.maintenanceRequests.length,
         0,
@@ -125,17 +126,23 @@ export class FmPropertiesService {
         images: p.images,
         unitCount: totalUnits,
         occupancyRate,
-        occupancyStatus,
         complaints,
         createdAt: p.createdAt,
       };
     });
 
-    // Apply occupancy filter in-memory (computed field — can't push into Prisma where)
+    let result = mapped;
+
     if (filters?.occupancy) {
-      return mapped.filter((p) => p.occupancyStatus === filters.occupancy);
+      const [lo, hi] = parseRange(filters.occupancy);
+      result = result.filter((p) => p.occupancyRate >= lo && p.occupancyRate <= hi);
     }
 
-    return mapped;
+    if (filters?.unitRange) {
+      const [lo, hi] = parseRange(filters.unitRange);
+      result = result.filter((p) => p.unitCount >= lo && p.unitCount <= hi);
+    }
+
+    return result;
   }
 }

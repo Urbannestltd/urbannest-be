@@ -12,18 +12,17 @@ export class LeaseService {
     // 1. Fetch Lease with Hierarchy
     const lease = await prisma.lease.findFirst({
       where: {
-        tenantId: userId, // Refactored from 'leaseTenantId'
-        status: "ACTIVE", // Refactored from 'leaseStatus'
+        tenantId: userId,
+        status: "ACTIVE",
       },
+      orderBy: { createdAt: "desc" },
       include: {
         unit: {
-          // Refactored from 'leaseUnit'
           include: {
-            property: true, // Refactored from 'unitProperty'
+            property: true,
           },
         },
       },
-      orderBy: { startDate: "desc" },
     });
 
     if (!lease) {
