@@ -1,5 +1,6 @@
 import { prisma } from "../config/prisma";
 import * as jwt from "jsonwebtoken";
+import { ForbiddenError, UnauthorizedError } from "../utils/apiError";
 
 export class SessionService {
   public async refreshAccessToken(refreshToken: string) {
@@ -9,51 +10,65 @@ export class SessionService {
     });
 
     if (!session || !session.isValid) {
-      throw new Error("Session invalid or revoked. Please log in again.");
+      throw new UnauthorizedError("Session invalid or revoked. Please log in again.");
+    }
+
+    if (session.user.userStatus === "BLOCKED") {
+      await this.invalidateSession(refreshToken);
+      throw new ForbiddenError(
+        "This account has been deactivated. Contact your administrator.",
+      );
     }
 
     const now = new Date();
 
-    // --- SECURITY RULE 1: Absolute Timeout (e.g., 24 hours max) ---
     const MAX_SESSION_HOURS = 24;
     const sessionAgeHours =
       (now.getTime() - session.createdAt.getTime()) / (1000 * 60 * 60);
     if (sessionAgeHours > MAX_SESSION_HOURS) {
-      await this.invalidateSession(session.id);
-      throw new Error("Absolute session timeout reached.");
+      await this.invalidateSession(refreshToken);
+      throw new UnauthorizedError("Session expired. Please log in again.");
     }
 
-    // --- SECURITY RULE 2: Idle Timeout (e.g., 2 hours of inactivity) ---
     const MAX_IDLE_HOURS = 2;
     const idleHours =
       (now.getTime() - session.lastActiveAt.getTime()) / (1000 * 60 * 60);
     if (idleHours > MAX_IDLE_HOURS) {
-      await this.invalidateSession(session.id);
-      throw new Error("Session expired due to inactivity.");
+      await this.invalidateSession(refreshToken);
+      throw new UnauthorizedError("Session expired due to inactivity.");
     }
 
-    // --- SECURITY RULE 3: Update Activity & Issue New Token ---
     await prisma.session.update({
-      where: { id: session.id },
-      data: { lastActiveAt: now }, // Resets the idle timer
+      where: { refreshToken },
+      data: { lastActiveAt: now },
     });
 
     const privateKey = Buffer.from(
-      process.env.JWT_PRIVATE_KEY_B64!,
+      process.env.JWT_PRIVATE_KEY!,
       "base64",
     ).toString("ascii");
+
     const newAccessToken = jwt.sign(
       { userId: session.userId, role: session.user.userRole.roleName },
       privateKey,
-      { algorithm: "RS256", expiresIn: "15m" },
+      { algorithm: "RS256", expiresIn: "1d" },
     );
 
     return { accessToken: newAccessToken };
   }
 
-  public async invalidateSession(sessionId: string) {
-    await prisma.session.update({
-      where: { id: sessionId },
+  /** Invalidates a session by its refresh token (the stable unique identifier callers have). */
+  public async invalidateSession(refreshToken: string) {
+    await prisma.session.updateMany({
+      where: { refreshToken },
+      data: { isValid: false },
+    });
+  }
+
+  /** Revokes ALL active sessions for a user — called on account suspension. */
+  public async invalidateAllUserSessions(userId: string) {
+    await prisma.session.updateMany({
+      where: { userId, isValid: true },
       data: { isValid: false },
     });
   }

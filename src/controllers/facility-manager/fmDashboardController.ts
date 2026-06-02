@@ -1,4 +1,4 @@
-import { Get, Route, Controller, Tags, Security, Request } from "tsoa";
+import { Get, Route, Controller, Tags, Security, Request, Query } from "tsoa";
 import { FmDashboardService } from "../../services/facility-manager/fmDashboardService";
 
 @Route("facility-manager/dashboard")
@@ -22,8 +22,14 @@ export class FmDashboardController extends Controller {
    * Loads independently — call in parallel with /summary and /visitors.
    */
   @Get("tickets")
-  public async getRecentTickets(@Request() req: any) {
-    const data = await this.fmDashboardService.getRecentTickets(req.user.userId);
+  public async getRecentTickets(
+    @Request() req: any,
+    @Query() priority?: string,
+  ) {
+    const priorities = priority
+      ? priority.split(",").map((p) => p.trim().toUpperCase())
+      : undefined;
+    const data = await this.fmDashboardService.getRecentTickets(req.user.userId, priorities);
     return { success: true, message: "Recent tickets retrieved", data };
   }
 
@@ -32,8 +38,14 @@ export class FmDashboardController extends Controller {
    * Loads independently — call in parallel with /summary and /tickets.
    */
   @Get("visitors")
-  public async getTodaysVisitors(@Request() req: any) {
-    const data = await this.fmDashboardService.getTodaysVisitors(req.user.userId);
+  public async getTodaysVisitors(
+    @Request() req: any,
+    @Query() frequency?: string,
+  ) {
+    const frequencies = frequency
+      ? frequency.split(",").map((f) => f.trim().toUpperCase())
+      : undefined;
+    const data = await this.fmDashboardService.getTodaysVisitors(req.user.userId, frequencies);
     return { success: true, message: "Today's visitors retrieved", data };
   }
 }

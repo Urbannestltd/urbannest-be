@@ -10,6 +10,7 @@ import {
 } from "../dtos/auth.dto";
 import {
   UnauthorizedError,
+  ForbiddenError,
   ConflictError,
   BadRequestError,
   NotFoundError,
@@ -36,6 +37,30 @@ export class AuthenticationService {
     }
     return secret;
   }
+  public async getMe(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { userId, isDeleted: false },
+      select: {
+        userId: true,
+        userFullName: true,
+        userEmail: true,
+        userProfileUrl: true,
+        userStatus: true,
+        userRole: { select: { roleName: true } },
+      },
+    });
+
+    if (!user) throw new BadRequestError("User not found");
+
+    return {
+      id: user.userId,
+      name: user.userFullName,
+      email: user.userEmail,
+      profilePicUrl: user.userProfileUrl,
+      role: user.userRole?.roleName,
+    };
+  }
+
   public async validateRegistrationToken(token: string): Promise<{
     status: "valid" | "expired" | "used";
     email?: string;
@@ -278,11 +303,17 @@ export class AuthenticationService {
       !user ||
       !(await bcrypt.compare(params.password, user.userPassword ?? ""))
     ) {
-      throw new BadRequestError("Invalid email or password");
+      throw new BadRequestError("Incorrect email or password.");
     }
 
-    if (user?.userStatus !== "ACTIVE") {
-      throw new BadRequestError("Account is not active.");
+    if (user.userStatus === "BLOCKED") {
+      throw new BadRequestError(
+        "This account has been deactivated. Contact your administrator.",
+      );
+    }
+
+    if (user.userStatus !== "ACTIVE") {
+      throw new BadRequestError("Incorrect email or password.");
     }
 
     // --- SECURITY ENFORCEMENT ---
