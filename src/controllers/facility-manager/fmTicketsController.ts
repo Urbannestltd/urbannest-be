@@ -72,7 +72,10 @@ export class FmTicketsController extends Controller {
       dateFrom,
       dateTo,
     });
-    const data = await this.fmTicketsService.getTickets(req.user.userId, filters);
+    const data = await this.fmTicketsService.getTickets(
+      req.user.userId,
+      filters,
+    );
     return { success: true, message: "Tickets retrieved", data };
   }
 
@@ -113,10 +116,7 @@ export class FmTicketsController extends Controller {
    * Returns 403 if the ticket does not belong to one of the FM's properties.
    */
   @Get("{ticketId}")
-  public async getTicketDetail(
-    @Path() ticketId: string,
-    @Request() req: any,
-  ) {
+  public async getTicketDetail(@Path() ticketId: string, @Request() req: any) {
     const data = await this.fmTicketsService.getTicketDetail(
       req.user.userId,
       ticketId,
@@ -135,7 +135,11 @@ export class FmTicketsController extends Controller {
     @Body() body: SetPriorityRequest,
   ) {
     const { priority } = validate(SetPrioritySchema, body);
-    await this.fmTicketsService.setPriority(req.user.userId, ticketId, priority);
+    await this.fmTicketsService.setPriority(
+      req.user.userId,
+      ticketId,
+      priority,
+    );
     return { success: true, message: "Priority updated" };
   }
 
@@ -165,7 +169,11 @@ export class FmTicketsController extends Controller {
     @Request() req: any,
     @Query() since?: string,
   ) {
-    const data = await this.fmTicketsService.getMessages(req.user.userId, ticketId, since);
+    const data = await this.fmTicketsService.getMessages(
+      req.user.userId,
+      ticketId,
+      since,
+    );
     return { success: true, message: "Messages retrieved", data };
   }
 
@@ -174,10 +182,7 @@ export class FmTicketsController extends Controller {
    * Call when FM opens the chat screen to clear the unread badge.
    */
   @Put("{ticketId}/messages/read")
-  public async markMessagesRead(
-    @Path() ticketId: string,
-    @Request() req: any,
-  ) {
+  public async markMessagesRead(@Path() ticketId: string, @Request() req: any) {
     await this.fmTicketsService.markMessagesRead(req.user.userId, ticketId);
     return { success: true, message: "Messages marked as read" };
   }
@@ -207,11 +212,11 @@ export class FmTicketsController extends Controller {
    * Returns all expenses logged against this ticket.
    */
   @Get("{ticketId}/expenses")
-  public async getExpenses(
-    @Path() ticketId: string,
-    @Request() req: any,
-  ) {
-    const data = await this.fmTicketsService.getExpenses(req.user.userId, ticketId);
+  public async getExpenses(@Path() ticketId: string, @Request() req: any) {
+    const data = await this.fmTicketsService.getExpenses(
+      req.user.userId,
+      ticketId,
+    );
     return { success: true, message: "Expenses retrieved", data };
   }
 
@@ -225,7 +230,11 @@ export class FmTicketsController extends Controller {
     @Body() body: LogExpenseRequest,
   ) {
     const validated = validate(LogExpenseSchema, body);
-    const data = await this.fmTicketsService.logExpense(req.user.userId, ticketId, validated);
+    const data = await this.fmTicketsService.logExpense(
+      req.user.userId,
+      ticketId,
+      validated,
+    );
     return { success: true, message: "Expense logged", data };
   }
 
@@ -233,11 +242,11 @@ export class FmTicketsController extends Controller {
    * Returns the budget, quoted cost, approval status, and rebuttal note for a ticket.
    */
   @Get("{ticketId}/budget")
-  public async getBudgetStatus(
-    @Path() ticketId: string,
-    @Request() req: any,
-  ) {
-    const data = await this.fmTicketsService.getBudgetStatus(req.user.userId, ticketId);
+  public async getBudgetStatus(@Path() ticketId: string, @Request() req: any) {
+    const data = await this.fmTicketsService.getBudgetStatus(
+      req.user.userId,
+      ticketId,
+    );
     return { success: true, message: "Budget status retrieved", data };
   }
 }

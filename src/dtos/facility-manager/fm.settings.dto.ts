@@ -8,7 +8,7 @@ export const UpdateProfileSchema = z.object({
   userEmergencyContact: z.string().min(7, "Invalid emergency contact").optional(),
   userProfileUrl: z.string().url("Must be a valid URL").optional(),
 });
-export type UpdateProfileRequest = z.infer<typeof UpdateProfileSchema>;
+export type FmUpdateProfileRequest = z.infer<typeof UpdateProfileSchema>;
 
 export const ChangePasswordSchema = z.object({
   oldPassword: z.string().min(1, "Old password is required"),
@@ -19,7 +19,7 @@ export const ChangePasswordSchema = z.object({
     .regex(/[0-9]/, "Must contain at least one number")
     .regex(/[^a-zA-Z0-9]/, "Must contain at least one special character"),
 });
-export type ChangePasswordRequest = z.infer<typeof ChangePasswordSchema>;
+export type FmChangePasswordRequest = z.infer<typeof ChangePasswordSchema>;
 
 // ── Responses ─────────────────────────────────────────────────────────────────
 
