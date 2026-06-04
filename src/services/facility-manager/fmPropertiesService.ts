@@ -5,6 +5,10 @@ import { AdminUnitService } from "../admin/unitService";
 
 type OccupancyRange = "0-20" | "21-40" | "41-60" | "61-80" | "81-100";
 
+function normalizePropertyType(type: string): "RESIDENTIAL" | "COMMERCIAL" {
+  return type === "COMMERCIAL" ? "COMMERCIAL" : "RESIDENTIAL";
+}
+
 function parseRange(range: string): [number, number] {
   const parts = range.split("-").map(Number);
   return [parts[0]!, parts[1]!];
@@ -118,7 +122,7 @@ export class FmPropertiesService {
         address: p.address,
         state: p.state,
         city: p.city,
-        type: p.type,
+        type: normalizePropertyType(p.type),
         images: p.images,
         unitCount: totalUnits,
         occupancyRate,

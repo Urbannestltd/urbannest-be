@@ -29,6 +29,10 @@ export function normalizeFloor(raw: string | null | undefined): string {
   if (WORD_TO_NUM[lower]) return `Floor ${WORD_TO_NUM[lower]}`;
   return s;
 }
+function normalizePropertyType(type: string): "RESIDENTIAL" | "COMMERCIAL" {
+  return type === "COMMERCIAL" ? "COMMERCIAL" : "RESIDENTIAL";
+}
+
 import {
   CreatePropertyAdminDto,
   ManageMemberDto,
@@ -139,8 +143,8 @@ export class AdminPropertyService {
       const occupancyPercent =
         totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
 
-      const { units, ...rest } = p;
-      return { ...rest, totalUnits, occupancyPercent };
+      const { units, type, ...rest } = p;
+      return { ...rest, type: normalizePropertyType(type), totalUnits, occupancyPercent };
     });
   }
 
