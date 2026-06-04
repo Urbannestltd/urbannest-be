@@ -463,24 +463,36 @@ export class AdminUnitService {
 
   public async getTenantProfile(
     tenantId: string,
+    visitorPeriod?: "today" | "last_week" | "last_month",
   ): Promise<TenantProfileResponseDto> {
+    const now = new Date();
+    let visitorFrom: Date | undefined;
+    if (visitorPeriod === "today") {
+      visitorFrom = new Date(now);
+      visitorFrom.setHours(0, 0, 0, 0);
+    } else if (visitorPeriod === "last_week") {
+      visitorFrom = new Date(now);
+      visitorFrom.setDate(visitorFrom.getDate() - 7);
+    } else if (visitorPeriod === "last_month") {
+      visitorFrom = new Date(now);
+      visitorFrom.setMonth(visitorFrom.getMonth() - 1);
+    }
+
     const tenant = await prisma.user.findUnique({
       where: { userId: tenantId },
       include: {
-        // Fetch all leases (past and present) and the property names they belong to
         leases: {
           include: { unit: { include: { property: true } } },
           orderBy: { startDate: "desc" },
         },
-        // Fetch payment history
         payments: {
           orderBy: { createdAt: "desc" },
-          take: 10, // Limit for the UI snippet
-        },
-        // Fetch visitor history
-        visitorInvites: {
-          orderBy: { createdAt: "desc" },
           take: 10,
+        },
+        visitorInvites: {
+          where: visitorFrom ? { createdAt: { gte: visitorFrom } } : undefined,
+          orderBy: { createdAt: "desc" },
+          take: 50,
         },
       },
     });

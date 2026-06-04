@@ -674,8 +674,9 @@ model MaintenanceMessage {
   ticketId String
   senderId String
 
-  message     String
-  attachments String[]
+  message        String
+  attachments    String[]
+  isInternalNote Boolean @default(false)
 
   ticket MaintenanceRequest @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   sender user               @relation(fields: [senderId], references: [userId])

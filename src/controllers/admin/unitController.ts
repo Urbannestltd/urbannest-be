@@ -76,8 +76,11 @@ export class AdminUnitController {
   }
 
   @Get("{tenantId}")
-  public async getTenantProfile(@Path() tenantId: string) {
-    const profile = await this.unitService.getTenantProfile(tenantId);
+  public async getTenantProfile(
+    @Path() tenantId: string,
+    @Query() visitorPeriod?: "today" | "last_week" | "last_month",
+  ) {
+    const profile = await this.unitService.getTenantProfile(tenantId, visitorPeriod);
     return {
       success: true,
       message: "Tenant profile retrieved successfully",

@@ -169,8 +169,8 @@ export class MaintenanceService {
    */
   public async getTicketMessages(ticketId: string) {
     return prisma.maintenanceMessage.findMany({
-      where: { ticketId },
-      orderBy: { createdAt: "asc" }, // Oldest first (like WhatsApp)
+      where: { ticketId, isInternalNote: false },
+      orderBy: { createdAt: "asc" },
       include: {
         sender: {
           select: { userId: true, userFullName: true, userRole: true },

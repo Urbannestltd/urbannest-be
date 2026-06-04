@@ -119,7 +119,7 @@ export class FmDashboardService {
       tenantName: v.tenant.userFullName ?? "Unknown",
       validFrom: v.validFrom,
       validUntil: v.validUntil,
-      type: v.type,
+      accessType: v.frequency,
       isWalkIn: v.isWalkIn,
       status: v.status,
       checkedInAt: v.checkedInAt,

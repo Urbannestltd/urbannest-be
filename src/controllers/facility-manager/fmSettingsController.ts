@@ -9,6 +9,13 @@ import {
   Request,
 } from "tsoa";
 import { FmSettingsService } from "../../services/facility-manager/fmSettingsService";
+import {
+  ChangePasswordSchema,
+  UpdateProfileSchema,
+  type ChangePasswordRequest,
+  type UpdateProfileRequest,
+} from "../../dtos/facility-manager/fm.settings.dto";
+import { validate } from "../../utils/validate";
 
 @Route("facility-manager")
 @Tags("FM - Settings")
@@ -25,27 +32,23 @@ export class FmSettingsController extends Controller {
   @Patch("profile")
   public async updateProfile(
     @Request() req: any,
-    @Body()
-    body: {
-      userFullName?: string;
-      userPhone?: string;
-      userEmergencyContact?: string;
-      userProfileUrl?: string;
-    },
+    @Body() body: UpdateProfileRequest,
   ) {
-    const data = await this.fmSettingsService.updateProfile(req.user.userId, body);
+    const validated = validate(UpdateProfileSchema, body);
+    const data = await this.fmSettingsService.updateProfile(req.user.userId, validated);
     return { success: true, message: "Profile updated", data };
   }
 
   @Patch("settings/password")
   public async changePassword(
     @Request() req: any,
-    @Body() body: { oldPassword: string; newPassword: string },
+    @Body() body: ChangePasswordRequest,
   ) {
+    const validated = validate(ChangePasswordSchema, body);
     await this.fmSettingsService.changePassword(
       req.user.userId,
-      body.oldPassword,
-      body.newPassword,
+      validated.oldPassword,
+      validated.newPassword,
     );
     return { success: true, message: "Password changed successfully" };
   }
