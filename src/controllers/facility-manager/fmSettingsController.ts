@@ -12,8 +12,8 @@ import { FmSettingsService } from "../../services/facility-manager/fmSettingsSer
 import {
   ChangePasswordSchema,
   UpdateProfileSchema,
-  type ChangePasswordRequest,
-  type UpdateProfileRequest,
+  type FmChangePasswordRequest,
+  type FmUpdateProfileRequest,
 } from "../../dtos/facility-manager/fm.settings.dto";
 import { validate } from "../../utils/validate";
 
@@ -32,7 +32,7 @@ export class FmSettingsController extends Controller {
   @Patch("profile")
   public async updateProfile(
     @Request() req: any,
-    @Body() body: UpdateProfileRequest,
+    @Body() body: FmUpdateProfileRequest,
   ) {
     const validated = validate(UpdateProfileSchema, body);
     const data = await this.fmSettingsService.updateProfile(req.user.userId, validated);
@@ -42,7 +42,7 @@ export class FmSettingsController extends Controller {
   @Patch("settings/password")
   public async changePassword(
     @Request() req: any,
-    @Body() body: ChangePasswordRequest,
+    @Body() body: FmChangePasswordRequest,
   ) {
     const validated = validate(ChangePasswordSchema, body);
     await this.fmSettingsService.changePassword(
