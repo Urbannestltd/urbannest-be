@@ -2,13 +2,15 @@ import { ExpenseCategory, MaintenanceCategory, MaintenancePriority, MaintenanceS
 import { prisma } from "../../config/prisma";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../utils/apiError";
 
-const VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "EMERGENCY"] as const;
-type Priority = (typeof VALID_PRIORITIES)[number];
+// EMERGENCY is reserved for admin — FM can only set LOW/MEDIUM/HIGH
+const FM_VALID_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
+type FmPriority = (typeof FM_VALID_PRIORITIES)[number];
 
 export interface FmTicketFilters {
   search?: string;
   status?: string;
   propertyId?: string;
+  propertyType?: string;
   priority?: string;
   category?: string;
   dateFrom?: string;
@@ -26,12 +28,12 @@ export class FmTicketsService {
   private buildWhere(userId: string, filters: FmTicketFilters = {}) {
     const q = filters.search?.trim();
     return {
-      // Always scope to FM's assigned properties
       unit: {
         property: {
           facilityManagerId: userId,
           isDeleted: false,
           ...(filters.propertyId && { id: filters.propertyId }),
+          ...(filters.propertyType && { type: filters.propertyType as any }),
         },
       },
       ...(filters.status && { status: filters.status as MaintenanceStatus }),
@@ -52,7 +54,7 @@ export class FmTicketsService {
     };
   }
 
-  private mapTicketListItem(ticket: any, now: Date) {
+  private mapTicketListItem(ticket: any, now: Date, viewerUserId?: string) {
     const sla = this.SLA[ticket.priority as keyof typeof this.SLA] ?? this.SLA.MEDIUM;
 
     const projectedFixDeadline = new Date(
@@ -89,10 +91,11 @@ export class FmTicketsService {
       isResponseLate,
       isFixLate,
       approvalStatus: ticket.approvalStatus ?? null,
+      unreadCount: ticket._count?.messages ?? 0,
     };
   }
 
-  private get listIncludes() {
+  private listIncludes(viewerUserId: string) {
     return {
       unit: {
         select: {
@@ -106,6 +109,92 @@ export class FmTicketsService {
         orderBy: { createdAt: "asc" as const },
         take: 1,
       },
+      _count: {
+        select: {
+          messages: {
+            where: {
+              senderId: { not: viewerUserId },
+              readAt: null,
+              isInternalNote: false,
+            },
+          },
+        },
+      },
+    };
+  }
+
+  public async getStats(userId: string) {
+    const propertyScope = { facilityManagerId: userId, isDeleted: false };
+
+    // Start of current week (Monday 00:00:00)
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    weekStart.setHours(0, 0, 0, 0);
+
+    const [
+      highPriorityOpen,
+      weeklyTickets,
+      weeklyResolved,
+      ticketsWithFirstMessage,
+    ] = await Promise.all([
+      // 1. High priority tickets that are OPEN (PENDING only, not in progress)
+      prisma.maintenanceRequest.count({
+        where: {
+          unit: { property: propertyScope },
+          priority: "HIGH",
+          status: "PENDING",
+        },
+      }),
+
+      // 2. Total tickets created this week
+      prisma.maintenanceRequest.count({
+        where: {
+          unit: { property: propertyScope },
+          createdAt: { gte: weekStart },
+        },
+      }),
+
+      // 3. Tickets resolved this week
+      prisma.maintenanceRequest.count({
+        where: {
+          unit: { property: propertyScope },
+          createdAt: { gte: weekStart },
+          status: { in: ["RESOLVED", "FIXED"] },
+        },
+      }),
+
+      // 4. All tickets that have at least one message — used to calculate avg response time
+      prisma.maintenanceRequest.findMany({
+        where: { unit: { property: propertyScope } },
+        select: {
+          createdAt: true,
+          messages: {
+            orderBy: { createdAt: "asc" },
+            take: 1,
+            select: { createdAt: true },
+          },
+        },
+      }),
+    ]);
+
+    // Average response time in minutes (only tickets where a message was sent)
+    const responseTimes = ticketsWithFirstMessage
+      .filter((t) => t.messages.length > 0)
+      .map((t) => (t.messages[0]!.createdAt.getTime() - t.createdAt.getTime()) / 60000);
+
+    const avgResponseMinutes =
+      responseTimes.length > 0
+        ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+        : null;
+
+    const weeklyResolutionRate =
+      weeklyTickets > 0 ? Math.round((weeklyResolved / weeklyTickets) * 100) : 0;
+
+    return {
+      avgResponseMinutes,
+      highPriorityOpenCount: highPriorityOpen,
+      weeklyResolutionRate,
     };
   }
 
@@ -118,26 +207,26 @@ export class FmTicketsService {
 
     const tickets = await prisma.maintenanceRequest.findMany({
       where: this.buildWhere(userId, { ...filters, propertyId }),
-      include: this.listIncludes,
+      include: this.listIncludes(userId),
       orderBy: { createdAt: "desc" },
     });
 
     const now = new Date();
     return {
       property,
-      tickets: tickets.map((t) => this.mapTicketListItem(t, now)),
+      tickets: tickets.map((t) => this.mapTicketListItem(t, now, userId)),
     };
   }
 
   public async getTickets(userId: string, filters: FmTicketFilters = {}) {
     const tickets = await prisma.maintenanceRequest.findMany({
       where: this.buildWhere(userId, filters),
-      include: this.listIncludes,
+      include: this.listIncludes(userId),
       orderBy: { createdAt: "desc" },
     });
 
     const now = new Date();
-    return tickets.map((t) => this.mapTicketListItem(t, now));
+    return tickets.map((t) => this.mapTicketListItem(t, now, userId));
   }
 
   public async getTicketDetail(userId: string, ticketId: string) {
@@ -153,7 +242,7 @@ export class FmTicketsService {
         },
         tenant: { select: { userId: true, userFullName: true, userPhone: true } },
         messages: {
-          include: { sender: { select: { userFullName: true } } },
+          include: { sender: { select: { userId: true, userFullName: true } } },
           orderBy: { createdAt: "asc" },
         },
       },
@@ -196,6 +285,15 @@ export class FmTicketsService {
         )
       : null;
 
+    const isClosed = ticket.status === MaintenanceStatus.CANCELLED;
+    const isChatLocked =
+      ticket.status === MaintenanceStatus.RESOLVED ||
+      ticket.status === MaintenanceStatus.FIXED ||
+      isClosed;
+
+    const availableActions: string[] =
+      isClosed ? [] : (this.ALLOWED_TRANSITIONS[ticket.status] ?? []);
+
     return {
       id: ticket.id,
       subject: ticket.subject ?? "No subject provided",
@@ -203,6 +301,9 @@ export class FmTicketsService {
       category: ticket.category,
       priority: ticket.priority,
       status: ticket.status,
+      isClosed,
+      isChatLocked,
+      availableActions,
       dateSubmitted: ticket.createdAt,
       images: ticket.attachments,
       propertyId: ticket.unit?.property?.id ?? null,
@@ -218,6 +319,7 @@ export class FmTicketsService {
       rebuttalNote: ticket.rebuttalNote ?? null,
       activity: messages.map((m) => ({
         id: m.id,
+        senderId: m.sender.userId,
         senderName: m.sender.userFullName ?? "Unknown",
         message: m.message,
         timestamp: m.createdAt,
@@ -291,43 +393,70 @@ export class FmTicketsService {
   // -----------------------------------------------------------------------
   // Chat
   // -----------------------------------------------------------------------
-  public async getMessages(userId: string, ticketId: string) {
-    await this.assertFmAccess(userId, ticketId);
-
-    const messages = await prisma.maintenanceMessage.findMany({
-      where: { ticketId },
-      include: { sender: { select: { userId: true, userFullName: true } } },
-      orderBy: { createdAt: "asc" },
-    });
-
-    return messages.map((m) => ({
+  private mapMessage(m: any, viewerUserId: string) {
+    return {
       id: m.id,
       senderId: m.sender.userId,
       senderName: m.sender.userFullName ?? "Unknown",
       message: m.message,
-      attachments: m.attachments,
       timestamp: m.createdAt,
       readAt: m.readAt,
       isSystemMessage: m.message.startsWith("System:"),
-    }));
+      isInternalNote: m.isInternalNote,
+      isMine: m.sender.userId === viewerUserId,
+    };
+  }
+
+  public async getMessages(userId: string, ticketId: string, since?: string) {
+    await this.assertFmAccess(userId, ticketId);
+
+    const messages = await prisma.maintenanceMessage.findMany({
+      where: {
+        ticketId,
+        ...(since ? { createdAt: { gt: new Date(since) } } : {}),
+      },
+      include: { sender: { select: { userId: true, userFullName: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return messages.map((m) => this.mapMessage(m, userId));
+  }
+
+  public async markMessagesRead(userId: string, ticketId: string) {
+    await this.assertFmAccess(userId, ticketId);
+
+    await prisma.maintenanceMessage.updateMany({
+      where: {
+        ticketId,
+        senderId: { not: userId },
+        readAt: null,
+      },
+      data: { readAt: new Date() },
+    });
   }
 
   public async sendMessage(
     userId: string,
     ticketId: string,
     message: string,
-    attachments: string[] = [],
+    isInternalNote = false,
   ) {
     const ticket = await this.assertFmAccess(userId, ticketId);
 
-    if (ticket.status === MaintenanceStatus.RESOLVED || ticket.status === MaintenanceStatus.CANCELLED) {
+    if (
+      ticket.status === MaintenanceStatus.RESOLVED ||
+      ticket.status === MaintenanceStatus.FIXED ||
+      ticket.status === MaintenanceStatus.CANCELLED
+    ) {
       throw new BadRequestError("Chat is locked for this ticket.");
     }
 
-    return prisma.maintenanceMessage.create({
-      data: { ticketId, senderId: userId, message, attachments },
-      include: { sender: { select: { userFullName: true } } },
+    const created = await prisma.maintenanceMessage.create({
+      data: { ticketId, senderId: userId, message, attachments: [], isInternalNote },
+      include: { sender: { select: { userId: true, userFullName: true } } },
     });
+
+    return this.mapMessage(created, userId);
   }
 
   // -----------------------------------------------------------------------
@@ -383,9 +512,9 @@ export class FmTicketsService {
   }
 
   public async setPriority(userId: string, ticketId: string, priority: string) {
-    if (!VALID_PRIORITIES.includes(priority as Priority)) {
+    if (!FM_VALID_PRIORITIES.includes(priority as FmPriority)) {
       throw new BadRequestError(
-        `Invalid priority. Must be one of: ${VALID_PRIORITIES.join(", ")}`,
+        `Invalid priority. Must be one of: ${FM_VALID_PRIORITIES.join(", ")}`,
       );
     }
 
@@ -393,7 +522,7 @@ export class FmTicketsService {
 
     await prisma.maintenanceRequest.update({
       where: { id: ticketId },
-      data: { priority: priority as Priority },
+      data: { priority: priority as FmPriority },
     });
   }
 }

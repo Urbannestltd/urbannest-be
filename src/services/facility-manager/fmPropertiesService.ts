@@ -44,20 +44,16 @@ export class FmPropertiesService {
     userId: string,
     propertyId: string,
     tenantId: string,
+    visitorPeriod?: "today" | "last_week" | "last_month",
   ) {
     await this.checkFmAccess(userId, propertyId);
-    // Verify the tenant actually belongs to this property before returning their profile
     const tenantOnProperty = await prisma.lease.findFirst({
-      where: {
-        tenantId,
-        status: "ACTIVE",
-        unit: { propertyId },
-      },
+      where: { tenantId, status: "ACTIVE", unit: { propertyId } },
       select: { id: true },
     });
     if (!tenantOnProperty)
       throw new NotFoundError("Tenant not found on this property");
-    return this.adminUnitService.getTenantProfile(tenantId);
+    return this.adminUnitService.getTenantProfile(tenantId, visitorPeriod);
   }
 
 

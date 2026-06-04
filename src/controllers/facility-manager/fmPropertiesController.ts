@@ -9,11 +9,11 @@ import {
   Request,
 } from "tsoa";
 import { FmPropertiesService } from "../../services/facility-manager/fmPropertiesService";
-import { BadRequestError } from "../../utils/apiError";
-
-const VALID_TYPES = ["RESIDENTIAL", "COMMERCIAL"] as const;
-const VALID_OCCUPANCY_RANGES = ["0-20", "21-40", "41-60", "61-80", "81-100"] as const;
-type OccupancyRange = (typeof VALID_OCCUPANCY_RANGES)[number];
+import {
+  GetPropertiesQuerySchema,
+  GetTenantProfileQuerySchema,
+} from "../../dtos/facility-manager/fm.properties.dto";
+import { validate } from "../../utils/validate";
 
 @Route("facility-manager/properties")
 @Tags("FM - Properties")
@@ -39,26 +39,8 @@ export class FmPropertiesController extends Controller {
     @Query() occupancy?: string,
     @Query() unitRange?: string,
   ) {
-    if (type && !VALID_TYPES.includes(type as any)) {
-      throw new BadRequestError(
-        `Invalid type filter. Must be one of: ${VALID_TYPES.join(", ")}`,
-      );
-    }
-    if (occupancy && !VALID_OCCUPANCY_RANGES.includes(occupancy as OccupancyRange)) {
-      throw new BadRequestError(
-        `Invalid occupancy filter. Must be one of: ${VALID_OCCUPANCY_RANGES.join(", ")}`,
-      );
-    }
-
-    const data = await this.fmPropertiesService.getAssignedProperties(
-      req.user.userId,
-      {
-        search,
-        type,
-        occupancy: occupancy as OccupancyRange | undefined,
-        unitRange,
-      },
-    );
+    const filters = validate(GetPropertiesQuerySchema, { search, type, occupancy, unitRange });
+    const data = await this.fmPropertiesService.getAssignedProperties(req.user.userId, filters);
     return { success: true, message: "Properties retrieved", data };
   }
 
@@ -99,6 +81,7 @@ export class FmPropertiesController extends Controller {
 
   /**
    * Returns the full tenant profile (general info, lease, visitor history, payment history, cohabitants).
+   * Optional filter: ?visitorPeriod=today|last_week|last_month
    * Returns 403 if FM access has been revoked, 404 if tenant does not belong to this property.
    */
   @Get("{propertyId}/tenants/{tenantId}")
@@ -106,11 +89,14 @@ export class FmPropertiesController extends Controller {
     @Path() propertyId: string,
     @Path() tenantId: string,
     @Request() req: any,
+    @Query() visitorPeriod?: string,
   ) {
+    const { visitorPeriod: period } = validate(GetTenantProfileQuerySchema, { visitorPeriod });
     const data = await this.fmPropertiesService.getTenantProfile(
       req.user.userId,
       propertyId,
       tenantId,
+      period,
     );
     return { success: true, message: "Tenant profile retrieved", data };
   }

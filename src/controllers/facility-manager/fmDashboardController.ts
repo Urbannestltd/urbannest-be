@@ -1,5 +1,10 @@
 import { Get, Route, Controller, Tags, Security, Request, Query } from "tsoa";
 import { FmDashboardService } from "../../services/facility-manager/fmDashboardService";
+import {
+  GetDashboardTicketsQuerySchema,
+  GetDashboardVisitorsQuerySchema,
+} from "../../dtos/facility-manager/fm.dashboard.dto";
+import { validate } from "../../utils/validate";
 
 @Route("facility-manager/dashboard")
 @Tags("FM - Dashboard")
@@ -19,32 +24,34 @@ export class FmDashboardController extends Controller {
 
   /**
    * Returns the 5 most recent open maintenance tickets for the FM's properties.
-   * Loads independently — call in parallel with /summary and /visitors.
+   * Optional filter: ?priority=HIGH,MEDIUM,LOW (comma-separated, case-insensitive).
    */
   @Get("tickets")
   public async getRecentTickets(
     @Request() req: any,
     @Query() priority?: string,
   ) {
-    const priorities = priority
-      ? priority.split(",").map((p) => p.trim().toUpperCase())
-      : undefined;
+    const { priority: priorities } = validate(
+      GetDashboardTicketsQuerySchema,
+      { priority },
+    );
     const data = await this.fmDashboardService.getRecentTickets(req.user.userId, priorities);
     return { success: true, message: "Recent tickets retrieved", data };
   }
 
   /**
    * Returns all visitors whose window overlaps today for the FM's properties.
-   * Loads independently — call in parallel with /summary and /tickets.
+   * Optional filter: ?frequency=ONE_OFF,WHOLE_DAY (comma-separated, case-insensitive).
    */
   @Get("visitors")
   public async getTodaysVisitors(
     @Request() req: any,
     @Query() frequency?: string,
   ) {
-    const frequencies = frequency
-      ? frequency.split(",").map((f) => f.trim().toUpperCase())
-      : undefined;
+    const { frequency: frequencies } = validate(
+      GetDashboardVisitorsQuerySchema,
+      { frequency },
+    );
     const data = await this.fmDashboardService.getTodaysVisitors(req.user.userId, frequencies);
     return { success: true, message: "Today's visitors retrieved", data };
   }

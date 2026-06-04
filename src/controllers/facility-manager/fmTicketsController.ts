@@ -3,6 +3,7 @@ import {
   Get,
   Patch,
   Post,
+  Put,
   Path,
   Query,
   Route,
@@ -12,6 +13,19 @@ import {
   Request,
 } from "tsoa";
 import { FmTicketsService } from "../../services/facility-manager/fmTicketsService";
+import {
+  GetTicketsQuerySchema,
+  LogExpenseSchema,
+  SendMessageSchema,
+  SetPrioritySchema,
+  UpdateStatusSchema,
+  type GetTicketsQuery,
+  type LogExpenseRequest,
+  type SendMessageRequest,
+  type SetPriorityRequest,
+  type UpdateStatusRequest,
+} from "../../dtos/facility-manager/fm.tickets.dto";
+import { validate } from "../../utils/validate";
 
 @Route("facility-manager/tickets")
 @Tags("FM - Tickets")
@@ -20,9 +34,21 @@ export class FmTicketsController extends Controller {
   private fmTicketsService = new FmTicketsService();
 
   /**
+   * Returns summary stats for the FM's ticket dashboard header:
+   *  - avgResponseMinutes: average time (in minutes) between ticket creation and first FM response
+   *  - highPriorityOpenCount: number of HIGH priority tickets with status PENDING
+   *  - weeklyResolutionRate: % of this week's tickets that are resolved
+   */
+  @Get("stats")
+  public async getStats(@Request() req: any) {
+    const data = await this.fmTicketsService.getStats(req.user.userId);
+    return { success: true, message: "Ticket stats retrieved", data };
+  }
+
+  /**
    * Returns all maintenance tickets across the FM's assigned properties.
    * Sorted newest first. Supports search by ticket title or tenant name,
-   * and filters by status, property, priority, category, and date range.
+   * and filters by status, propertyId, propertyType, priority, category, and date range.
    */
   @Get()
   public async getTickets(
@@ -30,26 +56,28 @@ export class FmTicketsController extends Controller {
     @Query() search?: string,
     @Query() status?: string,
     @Query() propertyId?: string,
+    @Query() propertyType?: string,
     @Query() priority?: string,
     @Query() category?: string,
     @Query() dateFrom?: string,
     @Query() dateTo?: string,
   ) {
-    const data = await this.fmTicketsService.getTickets(req.user.userId, {
+    const filters = validate(GetTicketsQuerySchema, {
       search,
       status,
       propertyId,
+      propertyType,
       priority,
       category,
       dateFrom,
       dateTo,
     });
+    const data = await this.fmTicketsService.getTickets(req.user.userId, filters);
     return { success: true, message: "Tickets retrieved", data };
   }
 
   /**
    * Returns all tickets for a specific property managed by this FM.
-   * Includes property metadata in the response alongside the ticket list.
    * Supports the same search/filter query params as the main ticket list.
    */
   @Get("property/{propertyId}")
@@ -63,10 +91,19 @@ export class FmTicketsController extends Controller {
     @Query() dateFrom?: string,
     @Query() dateTo?: string,
   ) {
+    const filters = validate(GetTicketsQuerySchema, {
+      search,
+      status,
+      propertyId,
+      priority,
+      category,
+      dateFrom,
+      dateTo,
+    });
     const data = await this.fmTicketsService.getTicketsByProperty(
       req.user.userId,
       propertyId,
-      { search, status, priority, category, dateFrom, dateTo },
+      filters,
     );
     return { success: true, message: "Property tickets retrieved", data };
   }
@@ -88,20 +125,17 @@ export class FmTicketsController extends Controller {
   }
 
   /**
-   * Sets the priority for a ticket.
-   * The FM is the only role that sets priority on tickets raised in their properties.
+   * Sets the priority for a ticket. FM can set LOW, MEDIUM, or HIGH only.
+   * EMERGENCY is reserved for admin.
    */
   @Patch("{ticketId}/priority")
   public async setPriority(
     @Path() ticketId: string,
     @Request() req: any,
-    @Body() body: { priority: string },
+    @Body() body: SetPriorityRequest,
   ) {
-    await this.fmTicketsService.setPriority(
-      req.user.userId,
-      ticketId,
-      body.priority,
-    );
+    const { priority } = validate(SetPrioritySchema, body);
+    await this.fmTicketsService.setPriority(req.user.userId, ticketId, priority);
     return { success: true, message: "Priority updated" };
   }
 
@@ -109,45 +143,62 @@ export class FmTicketsController extends Controller {
    * Updates the status of a ticket.
    * Allowed transitions: PENDING ↔ IN_PROGRESS, IN_PROGRESS → RESOLVED, RESOLVED → IN_PROGRESS.
    * Returns 409 if the ticket has been closed by admin (CANCELLED).
-   * Resolving locks the chat; reverting from RESOLVED to IN_PROGRESS reopens it.
    */
   @Patch("{ticketId}/status")
   public async updateStatus(
     @Path() ticketId: string,
     @Request() req: any,
-    @Body() body: { status: string },
+    @Body() body: UpdateStatusRequest,
   ) {
-    await this.fmTicketsService.updateStatus(req.user.userId, ticketId, body.status);
+    const { status } = validate(UpdateStatusSchema, body);
+    await this.fmTicketsService.updateStatus(req.user.userId, ticketId, status);
     return { success: true, message: "Status updated" };
   }
 
   /**
-   * Returns all chat messages for a ticket, oldest first.
+   * Returns chat messages for a ticket, oldest first.
+   * Pass ?since=<ISO timestamp> to fetch only messages newer than that time (for polling).
    */
   @Get("{ticketId}/messages")
   public async getMessages(
     @Path() ticketId: string,
     @Request() req: any,
+    @Query() since?: string,
   ) {
-    const data = await this.fmTicketsService.getMessages(req.user.userId, ticketId);
+    const data = await this.fmTicketsService.getMessages(req.user.userId, ticketId, since);
     return { success: true, message: "Messages retrieved", data };
   }
 
   /**
-   * Sends a chat message on a ticket.
-   * Returns 400 if the ticket chat is locked (status is RESOLVED or CANCELLED).
+   * Marks all unread messages on this ticket (sent by others) as read.
+   * Call when FM opens the chat screen to clear the unread badge.
+   */
+  @Put("{ticketId}/messages/read")
+  public async markMessagesRead(
+    @Path() ticketId: string,
+    @Request() req: any,
+  ) {
+    await this.fmTicketsService.markMessagesRead(req.user.userId, ticketId);
+    return { success: true, message: "Messages marked as read" };
+  }
+
+  /**
+   * Sends a chat message on a ticket (text only — no attachments).
+   * Pass isInternalNote: true to create an FM-only note hidden from the tenant.
+   * Returns 400 if the chat is locked (RESOLVED, FIXED, or CANCELLED).
    */
   @Post("{ticketId}/messages")
   public async sendMessage(
     @Path() ticketId: string,
     @Request() req: any,
-    @Body() body: { message: string; attachments?: string[] },
+    @Body() body: SendMessageRequest,
   ) {
+    const { message, isInternalNote } = validate(SendMessageSchema, body);
     const data = await this.fmTicketsService.sendMessage(
       req.user.userId,
       ticketId,
-      body.message,
-      body.attachments,
+      message,
+      isInternalNote,
     );
     return { success: true, message: "Message sent", data };
   }
@@ -166,15 +217,15 @@ export class FmTicketsController extends Controller {
 
   /**
    * Logs a new expense against a ticket.
-   * The expense is automatically linked to the ticket's property and unit.
    */
   @Post("{ticketId}/expenses")
   public async logExpense(
     @Path() ticketId: string,
     @Request() req: any,
-    @Body() body: { amount: number; category: string; description: string; date?: string },
+    @Body() body: LogExpenseRequest,
   ) {
-    const data = await this.fmTicketsService.logExpense(req.user.userId, ticketId, body);
+    const validated = validate(LogExpenseSchema, body);
+    const data = await this.fmTicketsService.logExpense(req.user.userId, ticketId, validated);
     return { success: true, message: "Expense logged", data };
   }
 
