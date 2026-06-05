@@ -102,6 +102,14 @@ enum InviteStatus {
   CHECKED_OUT
 }
 
+enum AgentVisitStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RESCHEDULED_PENDING_AGENT
+  CANCELLED
+}
+
 enum SupportCategory {
   BILLING
   ACCOUNT_ISSUE
@@ -249,6 +257,9 @@ model user {
   isDeleted Boolean   @default(false)
   deletedAt  DateTime?
 
+  agentVisits          AgentVisit[] @relation("agentVisits")
+  proposedReschedules  AgentVisit[] @relation("proposedReschedules")
+
   @@index([userRoleId])
   @@map("user")
 }
@@ -374,6 +385,8 @@ model property {
   units    unit[]
   expenses Expense[]
 
+  agentVisits AgentVisit[]
+
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -407,6 +420,7 @@ model unit {
   maintenanceRequests MaintenanceRequest[]
   visitorGroups       VisitorGroup[]
   expenses            Expense[]
+  agentVisits         AgentVisit[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -590,6 +604,41 @@ model VisitorInvite {
   @@index([groupId])
   @@index([tenantId])
   @@index([unitId])
+}
+
+// ==========================================
+// AGENT VISITS
+// ==========================================
+
+model AgentVisit {
+  id         String           @id @default(uuid())
+  agentId    String
+  propertyId String
+  unitId     String?
+
+  visitDate DateTime
+  purpose   String?
+  notes     String?
+
+  status AgentVisitStatus @default(PENDING)
+
+  proposedDate DateTime?
+  proposedById String?
+
+  rejectionReason String?
+
+  agent      user     @relation("agentVisits", fields: [agentId], references: [userId])
+  property   property @relation(fields: [propertyId], references: [id])
+  unit       unit?    @relation(fields: [unitId], references: [id])
+  proposedBy user?    @relation("proposedReschedules", fields: [proposedById], references: [userId])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([propertyId])
+  @@index([status])
+  @@map("agent_visits")
 }
 
 // ==========================================
