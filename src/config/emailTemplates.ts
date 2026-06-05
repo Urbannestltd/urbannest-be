@@ -793,3 +793,181 @@ export function adminVisitorCheckInEmail(
     `),
   };
 }
+
+// ---------------------------------------------------------------------------
+// 20. Agent visit scheduled — notify FM
+// ---------------------------------------------------------------------------
+export function fmAgentVisitScheduledEmail(
+  fmName: string,
+  agentName: string,
+  propertyName: string,
+  visitDate: string,
+) {
+  return {
+    subject: `New agent visit request — ${propertyName}`,
+    html: base(`
+      ${heading("New agent visit request")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`An agent has submitted a visit request for one of your managed properties.`)}
+      ${metaTable([
+        ["Agent", agentName],
+        ["Property", propertyName],
+        ["Requested date", visitDate],
+      ])}
+      ${para("Please log in to review and take action on this request.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 21. Agent visit approved — notify agent
+// ---------------------------------------------------------------------------
+export function agentVisitApprovedEmail(
+  agentName: string,
+  propertyName: string,
+  visitDate: string,
+) {
+  return {
+    subject: `Your visit request has been approved — ${propertyName}`,
+    html: base(`
+      ${heading("Visit approved")}
+      ${subheading(`Hi ${agentName}`)}
+      ${para(`Your visit request has been reviewed and approved by the facility manager.`)}
+      ${metaTable([
+        ["Property", propertyName],
+        ["Visit date", visitDate],
+        ["Status", "Approved"],
+      ])}
+      ${para("You are confirmed to visit on the scheduled date. Please arrive on time.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 22. Agent visit rejected — notify agent
+// ---------------------------------------------------------------------------
+export function agentVisitRejectedEmail(
+  agentName: string,
+  propertyName: string,
+  visitDate: string,
+  reason?: string,
+) {
+  const reasonBlock = reason
+    ? `<div style="background:#fef2f2;border-left:3px solid #ef4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 4px;font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Reason</p>
+        <p style="margin:0;font-size:14px;color:#7f1d1d;line-height:1.6;">${reason}</p>
+      </div>`
+    : "";
+  return {
+    subject: `Your visit request was not approved — ${propertyName}`,
+    html: base(`
+      ${heading("Visit not approved")}
+      ${subheading(`Hi ${agentName}`)}
+      ${para(`Your visit request for the property below could not be approved at this time.`)}
+      ${metaTable([
+        ["Property", propertyName],
+        ["Requested date", visitDate],
+      ])}
+      ${reasonBlock}
+      ${para("You may submit a new visit request with a different date if needed.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 23. FM reschedules visit — notify agent with proposed date
+// ---------------------------------------------------------------------------
+export function agentVisitRescheduledEmail(
+  agentName: string,
+  propertyName: string,
+  originalDate: string,
+  proposedDate: string,
+) {
+  return {
+    subject: `Visit rescheduled — action required`,
+    html: base(`
+      ${heading("Visit reschedule proposal")}
+      ${subheading(`Hi ${agentName}`)}
+      ${para(`The facility manager has proposed a new date for your visit. Please review and respond.`)}
+      ${metaTable([
+        ["Property", propertyName],
+        ["Original date", originalDate],
+        ["Proposed new date", proposedDate],
+      ])}
+      ${alertBox("Please log in to accept or reject this reschedule proposal.", "info")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 24. Agent accepts reschedule — notify FM
+// ---------------------------------------------------------------------------
+export function fmRescheduleAcceptedEmail(
+  fmName: string,
+  agentName: string,
+  propertyName: string,
+  newDate: string,
+) {
+  return {
+    subject: `Agent accepted reschedule — ${propertyName}`,
+    html: base(`
+      ${heading("Reschedule accepted")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`The agent has accepted the rescheduled visit date.`)}
+      ${metaTable([
+        ["Agent", agentName],
+        ["Property", propertyName],
+        ["Confirmed visit date", newDate],
+        ["Status", "Approved"],
+      ])}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 25. Agent rejects reschedule — notify FM
+// ---------------------------------------------------------------------------
+export function fmRescheduleRejectedEmail(
+  fmName: string,
+  agentName: string,
+  propertyName: string,
+) {
+  return {
+    subject: `Agent declined reschedule — ${propertyName}`,
+    html: base(`
+      ${heading("Reschedule declined")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`The agent has declined the proposed reschedule. The visit request has been closed.`)}
+      ${metaTable([
+        ["Agent", agentName],
+        ["Property", propertyName],
+        ["Status", "Closed"],
+      ])}
+      ${para("The agent may submit a new visit request at a later time if needed.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 26. Agent cancels visit — notify FM
+// ---------------------------------------------------------------------------
+export function fmAgentVisitCancelledEmail(
+  fmName: string,
+  agentName: string,
+  propertyName: string,
+  visitDate: string,
+) {
+  return {
+    subject: `Agent visit cancelled — ${propertyName}`,
+    html: base(`
+      ${heading("Visit cancelled")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`An agent has cancelled their scheduled visit.`)}
+      ${metaTable([
+        ["Agent", agentName],
+        ["Property", propertyName],
+        ["Cancelled visit date", visitDate],
+      ])}
+    `),
+  };
+}
