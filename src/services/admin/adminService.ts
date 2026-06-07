@@ -46,13 +46,21 @@ export class AdminService {
 
     const isNewUser = isCleanSlate;
 
-    const getUnit = await prisma.unit.findUnique({
-      where: { id: params.unitId ?? undefined },
-      include: { property: true },
-    });
+    const isTenantRole = !params.userRole || params.userRole === "TENANT";
 
-    if (!getUnit) {
-      throw new BadRequestError("Specified unit does not exist");
+    if (isTenantRole && !params.unitId) {
+      throw new BadRequestError("unitId is required when creating a tenant");
+    }
+
+    let getUnit: Awaited<ReturnType<typeof prisma.unit.findUnique>> = null;
+    if (params.unitId) {
+      getUnit = await prisma.unit.findUnique({
+        where: { id: params.unitId },
+        include: { property: true },
+      });
+      if (!getUnit) {
+        throw new BadRequestError("Specified unit does not exist");
+      }
     }
 
     // generate bcrypt hash with email as prefix then '$'
@@ -84,15 +92,17 @@ export class AdminService {
             ),
           },
         },
-        leases: {
-          create: {
-            unitId: getUnit.id,
-            rentAmount: getUnit.baseRent || 0,
-            serviceCharge: 0,
-            startDate: new Date(),
-            endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        ...(getUnit && {
+          leases: {
+            create: {
+              unitId: getUnit.id,
+              rentAmount: getUnit.baseRent || 0,
+              serviceCharge: 0,
+              startDate: new Date(),
+              endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            },
           },
-        },
+        }),
         userRole: {
           connectOrCreate: {
             where: {
@@ -107,8 +117,8 @@ export class AdminService {
     });
 
     // Auto-create an initial PAID payment for the default lease (new users only)
-    const baseRent = getUnit.baseRent ?? 0;
-    if (isNewUser && baseRent > 0) {
+    const baseRent = getUnit?.baseRent ?? 0;
+    if (isNewUser && getUnit && baseRent > 0) {
       const defaultLease = await prisma.lease.findFirst({
         where: { tenantId: newUser.userId, unitId: getUnit.id },
         orderBy: { createdAt: "desc" },
