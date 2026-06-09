@@ -795,7 +795,175 @@ export function adminVisitorCheckInEmail(
 }
 
 // ---------------------------------------------------------------------------
-// 20. Agent visit scheduled — notify FM
+// 20. Expense pending admin approval — notify admin (over-budget)
+// ---------------------------------------------------------------------------
+export function expensePendingApprovalEmail(
+  adminName: string,
+  fmName: string,
+  ticketSubject: string,
+  amount: number,
+  description: string,
+  propertyName: string,
+) {
+  return {
+    subject: `Expense approval required — ₦${amount.toLocaleString()}`,
+    html: base(`
+      ${heading("Over-budget expense requires approval")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`A facility manager has logged an expense that exceeds the ticket's approved budget. Please review and approve or reject.`)}
+      ${metaTable([
+        ["Logged by", fmName],
+        ["Property", propertyName],
+        ["Ticket", ticketSubject],
+        ["Expense amount", `₦${amount.toLocaleString()}`],
+        ["Description", description],
+      ])}
+      ${para("Please log in to review this expense.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 21. Expense flagged — notify admin
+// ---------------------------------------------------------------------------
+export function expenseFlaggedEmail(
+  adminName: string,
+  fmName: string,
+  ticketSubject: string,
+  amount: number,
+  flagReason: string,
+  propertyName: string,
+) {
+  return {
+    subject: `Expense flagged for review — ${ticketSubject}`,
+    html: base(`
+      ${heading("Expense flagged")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`A facility manager has flagged an expense for your review.`)}
+      ${metaTable([
+        ["Flagged by", fmName],
+        ["Property", propertyName],
+        ["Ticket", ticketSubject],
+        ["Expense amount", `₦${amount.toLocaleString()}`],
+      ])}
+      <div style="background:${BRAND.softBg};border-left:3px solid ${BRAND.accent};border-radius:0 8px 8px 0;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 4px;font-size:12px;color:${BRAND.muted};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Flag reason</p>
+        <p style="margin:0;font-size:14px;color:${BRAND.text};line-height:1.6;">${flagReason}</p>
+      </div>
+      ${para("Please log in to review this expense.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 22. Expense approved — notify FM
+// ---------------------------------------------------------------------------
+export function expenseApprovedEmail(
+  fmName: string,
+  ticketSubject: string,
+  amount: number,
+  description: string,
+) {
+  return {
+    subject: `Expense approved — ₦${amount.toLocaleString()}`,
+    html: base(`
+      ${heading("Expense approved")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`Your expense has been reviewed and approved.`)}
+      ${metaTable([
+        ["Ticket", ticketSubject],
+        ["Amount", `₦${amount.toLocaleString()}`],
+        ["Description", description],
+        ["Status", "Approved"],
+      ])}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 23. Expense rejected — notify FM
+// ---------------------------------------------------------------------------
+export function expenseRejectedEmail(
+  fmName: string,
+  ticketSubject: string,
+  amount: number,
+  reason: string,
+) {
+  return {
+    subject: `Expense rejected — ${ticketSubject}`,
+    html: base(`
+      ${heading("Expense not approved")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`Your expense submission could not be approved at this time.`)}
+      ${metaTable([
+        ["Ticket", ticketSubject],
+        ["Amount", `₦${amount.toLocaleString()}`],
+      ])}
+      <div style="background:#fef2f2;border-left:3px solid #ef4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 4px;font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Reason</p>
+        <p style="margin:0;font-size:14px;color:#7f1d1d;line-height:1.6;">${reason}</p>
+      </div>
+      ${para("You may submit a revised expense or contact the administrator for further guidance.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 24. Expense rebuttal — admin proposes budget adjustment, notify FM
+// ---------------------------------------------------------------------------
+export function expenseRebuttalEmail(
+  fmName: string,
+  ticketSubject: string,
+  originalAmount: number,
+  newBudget: number,
+  reason: string,
+) {
+  return {
+    subject: `Budget adjusted on your expense — action required`,
+    html: base(`
+      ${heading("Budget adjustment proposed")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`The administrator has reviewed your over-budget expense and proposed a revised budget. Please review and respond.`)}
+      ${metaTable([
+        ["Ticket", ticketSubject],
+        ["Original expense", `₦${originalAmount.toLocaleString()}`],
+        ["Revised budget", `₦${newBudget.toLocaleString()}`],
+      ])}
+      <div style="background:${BRAND.softBg};border-left:3px solid ${BRAND.accent};border-radius:0 8px 8px 0;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 4px;font-size:12px;color:${BRAND.muted};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Admin note</p>
+        <p style="margin:0;font-size:14px;color:${BRAND.text};line-height:1.6;">${reason}</p>
+      </div>
+      ${alertBox("You can accept the revised budget or cancel this expense. Please log in to respond.", "info")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 25. FM accepts rebuttal — notify admin
+// ---------------------------------------------------------------------------
+export function fmAcceptedRebuttalEmail(
+  adminName: string,
+  fmName: string,
+  ticketSubject: string,
+  newBudget: number,
+) {
+  return {
+    subject: `FM accepted budget adjustment — ${ticketSubject}`,
+    html: base(`
+      ${heading("Budget adjustment accepted")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`The facility manager has accepted the proposed budget adjustment.`)}
+      ${metaTable([
+        ["Facility manager", fmName],
+        ["Ticket", ticketSubject],
+        ["Accepted budget", `₦${newBudget.toLocaleString()}`],
+      ])}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 26. Agent visit scheduled — notify FM
 // ---------------------------------------------------------------------------
 export function fmAgentVisitScheduledEmail(
   fmName: string,
