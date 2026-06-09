@@ -1,5 +1,6 @@
 import {
   Body,
+  Delete,
   Get,
   Patch,
   Post,
@@ -14,15 +15,19 @@ import {
 } from "tsoa";
 import { FmTicketsService } from "../../services/facility-manager/fmTicketsService";
 import {
+  FlagExpenseSchema,
   GetTicketsQuerySchema,
   LogExpenseSchema,
   SendMessageSchema,
   SetPrioritySchema,
+  UpdateExpenseSchema,
   UpdateStatusSchema,
+  type FlagExpenseRequest,
   type GetTicketsQuery,
   type LogExpenseRequest,
   type SendMessageRequest,
   type SetPriorityRequest,
+  type UpdateExpenseRequest,
   type UpdateStatusRequest,
 } from "../../dtos/facility-manager/fm.tickets.dto";
 import { validate } from "../../utils/validate";
@@ -209,19 +214,18 @@ export class FmTicketsController extends Controller {
   }
 
   /**
-   * Returns all expenses logged against this ticket.
+   * Returns all expenses logged against this ticket with their current status and action flags.
    */
   @Get("{ticketId}/expenses")
   public async getExpenses(@Path() ticketId: string, @Request() req: any) {
-    const data = await this.fmTicketsService.getExpenses(
-      req.user.userId,
-      ticketId,
-    );
+    const data = await this.fmTicketsService.getExpenses(req.user.userId, ticketId);
     return { success: true, message: "Expenses retrieved", data };
   }
 
   /**
    * Logs a new expense against a ticket.
+   * If it would exceed the assigned budget, expense is created as PENDING_APPROVAL
+   * and admins are notified by email.
    */
   @Post("{ticketId}/expenses")
   public async logExpense(
@@ -239,14 +243,120 @@ export class FmTicketsController extends Controller {
   }
 
   /**
-   * Returns the budget, quoted cost, approval status, and rebuttal note for a ticket.
+   * Updates a LOGGED expense within the 10-minute edit window.
+   * Returns 400 after the window has closed or if the expense is not LOGGED.
+   */
+  @Patch("{ticketId}/expenses/{expenseId}")
+  public async updateExpense(
+    @Path() ticketId: string,
+    @Path() expenseId: string,
+    @Request() req: any,
+    @Body() body: UpdateExpenseRequest,
+  ) {
+    const validated = validate(UpdateExpenseSchema, body);
+    const data = await this.fmTicketsService.updateExpense(
+      req.user.userId,
+      ticketId,
+      expenseId,
+      validated,
+    );
+    return { success: true, message: "Expense updated", data };
+  }
+
+  /**
+   * Deletes a LOGGED expense within the 10-minute delete window.
+   * Returns 400 after the window has closed or if the expense is not LOGGED.
+   */
+  @Delete("{ticketId}/expenses/{expenseId}")
+  public async deleteExpense(
+    @Path() ticketId: string,
+    @Path() expenseId: string,
+    @Request() req: any,
+  ) {
+    await this.fmTicketsService.deleteExpense(req.user.userId, ticketId, expenseId);
+    return { success: true, message: "Expense deleted" };
+  }
+
+  /**
+   * Flags a LOGGED expense for admin review. Only allowed after the 10-minute edit window.
+   * Admins are notified by email.
+   */
+  @Post("{ticketId}/expenses/{expenseId}/flag")
+  public async flagExpense(
+    @Path() ticketId: string,
+    @Path() expenseId: string,
+    @Request() req: any,
+    @Body() body: FlagExpenseRequest,
+  ) {
+    const { reason } = validate(FlagExpenseSchema, body);
+    const data = await this.fmTicketsService.flagExpense(
+      req.user.userId,
+      ticketId,
+      expenseId,
+      reason,
+    );
+    return { success: true, message: "Expense flagged", data };
+  }
+
+  /**
+   * Accepts the admin's rebuttal on a REBUTTED expense.
+   * Expense moves to LOGGED. The budget was already adjusted by admin.
+   */
+  @Post("{ticketId}/expenses/{expenseId}/accept-rebuttal")
+  public async acceptRebuttal(
+    @Path() ticketId: string,
+    @Path() expenseId: string,
+    @Request() req: any,
+  ) {
+    const data = await this.fmTicketsService.acceptRebuttal(
+      req.user.userId,
+      ticketId,
+      expenseId,
+    );
+    return { success: true, message: "Rebuttal accepted", data };
+  }
+
+  /**
+   * Cancels a REBUTTED expense the FM does not wish to proceed with.
+   * Sets expense to REJECTED.
+   */
+  @Post("{ticketId}/expenses/{expenseId}/cancel")
+  public async cancelExpense(
+    @Path() ticketId: string,
+    @Path() expenseId: string,
+    @Request() req: any,
+  ) {
+    const data = await this.fmTicketsService.cancelExpense(
+      req.user.userId,
+      ticketId,
+      expenseId,
+    );
+    return { success: true, message: "Expense cancelled", data };
+  }
+
+  /**
+   * Returns full budget summary: assigned budget, total logged expenses (LOGGED + FLAGGED only),
+   * remaining budget, all expenses with action flags, and budget adjustment history.
    */
   @Get("{ticketId}/budget")
   public async getBudgetStatus(@Path() ticketId: string, @Request() req: any) {
-    const data = await this.fmTicketsService.getBudgetStatus(
+    const data = await this.fmTicketsService.getBudgetStatus(req.user.userId, ticketId);
+    return { success: true, message: "Budget summary retrieved", data };
+  }
+
+  /**
+   * Returns the full budget adjustment history for a ticket: each admin-driven budget change
+   * with old/new amounts, reason, and the expense that triggered the change.
+   */
+  @Get("{ticketId}/budget/history")
+  public async getBudgetAdjustmentHistory(
+    @Path() ticketId: string,
+    @Request() req: any,
+  ) {
+    const data = await this.fmTicketsService.getBudgetAdjustmentHistory(
       req.user.userId,
       ticketId,
     );
-    return { success: true, message: "Budget status retrieved", data };
+    return { success: true, message: "Budget adjustment history retrieved", data };
   }
 }

@@ -8,6 +8,7 @@ import {
   fmRescheduleAcceptedEmail,
   fmRescheduleRejectedEmail,
 } from "../../config/emailTemplates";
+import { getFmNotificationPrefs } from "../facility-manager/fmSettingsService";
 import type {
   ScheduleVisitRequest,
   GetVisitsQuery,
@@ -86,27 +87,30 @@ export class AgentVisitsService {
       select: { userFullName: true },
     });
 
-    if (property.facilityManager) {
-      const visitDateStr = visitDate.toLocaleDateString("en-GB", {
-        weekday: "long",
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-      const email = fmAgentVisitScheduledEmail(
-        property.facilityManager.userFullName ?? "Facility Manager",
-        agent?.userFullName ?? "Agent",
-        property.name ?? property.address,
-        visitDateStr,
-      );
-      await this.emailService.sendEmail(
-        {
-          email: property.facilityManager.userEmail,
-          name: property.facilityManager.userFullName ?? undefined,
-        },
-        email.subject,
-        email.html,
-      );
+    if (property.facilityManager && property.facilityManagerId) {
+      const fmPrefs = await getFmNotificationPrefs(property.facilityManagerId);
+      if (fmPrefs.fmEmailNewAgentVisit) {
+        const visitDateStr = visitDate.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+        const email = fmAgentVisitScheduledEmail(
+          property.facilityManager.userFullName ?? "Facility Manager",
+          agent?.userFullName ?? "Agent",
+          property.name ?? property.address,
+          visitDateStr,
+        );
+        await this.emailService.sendEmail(
+          {
+            email: property.facilityManager.userEmail,
+            name: property.facilityManager.userFullName ?? undefined,
+          },
+          email.subject,
+          email.html,
+        );
+      }
     }
 
     await logActivity({
@@ -187,31 +191,34 @@ export class AgentVisitsService {
       data: { status: "CANCELLED" },
     });
 
-    if (visit.property.facilityManager) {
-      const visitDateStr = visit.visitDate.toLocaleDateString("en-GB", {
-        weekday: "long",
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-      const agent = await prisma.user.findUnique({
-        where: { userId: agentId },
-        select: { userFullName: true },
-      });
-      const email = fmAgentVisitCancelledEmail(
-        visit.property.facilityManager.userFullName ?? "Facility Manager",
-        agent?.userFullName ?? "Agent",
-        visit.property.name ?? visit.property.address,
-        visitDateStr,
-      );
-      await this.emailService.sendEmail(
-        {
-          email: visit.property.facilityManager.userEmail,
-          name: visit.property.facilityManager.userFullName ?? undefined,
-        },
-        email.subject,
-        email.html,
-      );
+    if (visit.property.facilityManager && visit.property.facilityManagerId) {
+      const fmPrefs = await getFmNotificationPrefs(visit.property.facilityManagerId);
+      if (fmPrefs.fmEmailNewAgentVisit) {
+        const visitDateStr = visit.visitDate.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+        const agent = await prisma.user.findUnique({
+          where: { userId: agentId },
+          select: { userFullName: true },
+        });
+        const email = fmAgentVisitCancelledEmail(
+          visit.property.facilityManager.userFullName ?? "Facility Manager",
+          agent?.userFullName ?? "Agent",
+          visit.property.name ?? visit.property.address,
+          visitDateStr,
+        );
+        await this.emailService.sendEmail(
+          {
+            email: visit.property.facilityManager.userEmail,
+            name: visit.property.facilityManager.userFullName ?? undefined,
+          },
+          email.subject,
+          email.html,
+        );
+      }
     }
 
     await logActivity({
@@ -244,31 +251,34 @@ export class AgentVisitsService {
       },
     });
 
-    if (visit.property.facilityManager && visit.proposedDate) {
-      const agent = await prisma.user.findUnique({
-        where: { userId: agentId },
-        select: { userFullName: true },
-      });
-      const newDateStr = visit.proposedDate.toLocaleDateString("en-GB", {
-        weekday: "long",
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-      const email = fmRescheduleAcceptedEmail(
-        visit.property.facilityManager.userFullName ?? "Facility Manager",
-        agent?.userFullName ?? "Agent",
-        visit.property.name ?? visit.property.address,
-        newDateStr,
-      );
-      await this.emailService.sendEmail(
-        {
-          email: visit.property.facilityManager.userEmail,
-          name: visit.property.facilityManager.userFullName ?? undefined,
-        },
-        email.subject,
-        email.html,
-      );
+    if (visit.property.facilityManager && visit.proposedDate && visit.property.facilityManagerId) {
+      const fmPrefs = await getFmNotificationPrefs(visit.property.facilityManagerId);
+      if (fmPrefs.fmEmailAgentReschedule) {
+        const agent = await prisma.user.findUnique({
+          where: { userId: agentId },
+          select: { userFullName: true },
+        });
+        const newDateStr = visit.proposedDate.toLocaleDateString("en-GB", {
+          weekday: "long",
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        });
+        const email = fmRescheduleAcceptedEmail(
+          visit.property.facilityManager.userFullName ?? "Facility Manager",
+          agent?.userFullName ?? "Agent",
+          visit.property.name ?? visit.property.address,
+          newDateStr,
+        );
+        await this.emailService.sendEmail(
+          {
+            email: visit.property.facilityManager.userEmail,
+            name: visit.property.facilityManager.userFullName ?? undefined,
+          },
+          email.subject,
+          email.html,
+        );
+      }
     }
 
     await logActivity({
@@ -297,24 +307,27 @@ export class AgentVisitsService {
       },
     });
 
-    if (visit.property.facilityManager) {
-      const agent = await prisma.user.findUnique({
-        where: { userId: agentId },
-        select: { userFullName: true },
-      });
-      const email = fmRescheduleRejectedEmail(
-        visit.property.facilityManager.userFullName ?? "Facility Manager",
-        agent?.userFullName ?? "Agent",
-        visit.property.name ?? visit.property.address,
-      );
-      await this.emailService.sendEmail(
-        {
-          email: visit.property.facilityManager.userEmail,
-          name: visit.property.facilityManager.userFullName ?? undefined,
-        },
-        email.subject,
-        email.html,
-      );
+    if (visit.property.facilityManager && visit.property.facilityManagerId) {
+      const fmPrefs = await getFmNotificationPrefs(visit.property.facilityManagerId);
+      if (fmPrefs.fmEmailAgentReschedule) {
+        const agent = await prisma.user.findUnique({
+          where: { userId: agentId },
+          select: { userFullName: true },
+        });
+        const email = fmRescheduleRejectedEmail(
+          visit.property.facilityManager.userFullName ?? "Facility Manager",
+          agent?.userFullName ?? "Agent",
+          visit.property.name ?? visit.property.address,
+        );
+        await this.emailService.sendEmail(
+          {
+            email: visit.property.facilityManager.userEmail,
+            name: visit.property.facilityManager.userFullName ?? undefined,
+          },
+          email.subject,
+          email.html,
+        );
+      }
     }
 
     await logActivity({

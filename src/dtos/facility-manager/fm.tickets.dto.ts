@@ -80,6 +80,22 @@ export const LogExpenseSchema = z.object({
 });
 export type LogExpenseRequest = z.infer<typeof LogExpenseSchema>;
 
+export const UpdateExpenseSchema = z.object({
+  amount: z.number().positive("Amount must be greater than 0").optional(),
+  category: z.enum(EXPENSE_CATEGORIES).optional(),
+  description: z.string().min(1, "Description is required").max(500).optional(),
+  date: z
+    .string()
+    .datetime({ offset: true, message: "date must be ISO 8601" })
+    .optional(),
+});
+export type UpdateExpenseRequest = z.infer<typeof UpdateExpenseSchema>;
+
+export const FlagExpenseSchema = z.object({
+  reason: z.string().min(1, "Reason is required").max(500, "Reason too long"),
+});
+export type FlagExpenseRequest = z.infer<typeof FlagExpenseSchema>;
+
 // ── Responses ─────────────────────────────────────────────────────────────────
 
 export interface FmTicketStats {
@@ -154,14 +170,35 @@ export interface FmExpenseItem {
   category: string;
   description: string;
   date: Date;
+  status: string;
+  flagReason: string | null;
   propertyId: string | null;
   unitId: string | null;
   maintenanceRequestId: string | null;
+  createdAt: Date;
+  // Derived action flags based on time window and status
+  canEdit: boolean;
+  canDelete: boolean;
+  canFlag: boolean;
+  canCancel: boolean;
+  canAcceptRebuttal: boolean;
 }
 
-export interface FmBudgetStatus {
-  budget: number | null;
+export interface FmBudgetSummary {
+  assignedBudget: number | null;
+  totalExpenses: number;
+  remainingBudget: number | null;
   quotedCost: number | null;
   approvalStatus: string | null;
   rebuttalNote: string | null;
+  expenses: FmExpenseItem[];
+  budgetAdjustmentHistory: FmBudgetAdjustmentItem[];
+}
+
+export interface FmBudgetAdjustmentItem {
+  id: string;
+  oldBudget: number;
+  newBudget: number;
+  reason: string | null;
+  adjustedAt: Date;
 }

@@ -110,6 +110,14 @@ enum AgentVisitStatus {
   CANCELLED
 }
 
+enum ExpenseStatus {
+  LOGGED
+  FLAGGED
+  PENDING_APPROVAL
+  REJECTED
+  REBUTTED
+}
+
 enum SupportCategory {
   BILLING
   ACCOUNT_ISSUE
@@ -257,8 +265,10 @@ model user {
   isDeleted Boolean   @default(false)
   deletedAt  DateTime?
 
-  agentVisits          AgentVisit[] @relation("agentVisits")
-  proposedReschedules  AgentVisit[] @relation("proposedReschedules")
+  agentVisits          AgentVisit[]       @relation("agentVisits")
+  proposedReschedules  AgentVisit[]       @relation("proposedReschedules")
+  loggedExpenses       Expense[]          @relation("loggedExpenses")
+  budgetAdjustments    BudgetAdjustment[] @relation("budgetAdjustments")
 
   @@index([userRoleId])
   @@map("user")
@@ -709,8 +719,9 @@ model MaintenanceRequest {
   assignedToId String?
   assignedTo   user?   @relation("AssignedTickets", fields: [assignedToId], references: [userId])
 
-  messages MaintenanceMessage[]
-  expenses Expense[]
+  messages          MaintenanceMessage[]
+  expenses          Expense[]
+  budgetAdjustments BudgetAdjustment[]
 
   @@index([unitId])
   @@index([tenantId])
@@ -748,6 +759,10 @@ model Expense {
   description String
   date        DateTime        @default(now())
 
+  status     ExpenseStatus @default(LOGGED)
+  flagReason String?
+  loggedById String?
+
   propertyId String?
   property   property? @relation(fields: [propertyId], references: [id])
   unitId     String?
@@ -755,6 +770,9 @@ model Expense {
 
   maintenanceRequestId String?
   maintenanceRequest   MaintenanceRequest? @relation(fields: [maintenanceRequestId], references: [id])
+  loggedBy             user?               @relation("loggedExpenses", fields: [loggedById], references: [userId])
+
+  budgetAdjustments BudgetAdjustment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -762,7 +780,27 @@ model Expense {
   @@index([propertyId])
   @@index([unitId])
   @@index([maintenanceRequestId])
+  @@index([status])
   @@map("expenses")
+}
+
+model BudgetAdjustment {
+  id           String  @id @default(uuid())
+  ticketId     String
+  expenseId    String?
+  oldBudget    Float
+  newBudget    Float
+  reason       String?
+  adjustedById String
+
+  ticket     MaintenanceRequest @relation(fields: [ticketId], references: [id])
+  expense    Expense?           @relation(fields: [expenseId], references: [id])
+  adjustedBy user               @relation("budgetAdjustments", fields: [adjustedById], references: [userId])
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("budget_adjustments")
 }
 
 // ==========================================
@@ -799,6 +837,14 @@ model NotificationSetting {
 
   pushPayments    Boolean @default(false)
   pushMaintenance Boolean @default(false)
+
+  // FM-specific notification preferences
+  fmEmailNewTicket       Boolean @default(true)
+  fmEmailTenantMessage   Boolean @default(true)
+  fmEmailAdminNote       Boolean @default(true)
+  fmEmailBudgetResponse  Boolean @default(true)
+  fmEmailNewAgentVisit   Boolean @default(true)
+  fmEmailAgentReschedule Boolean @default(true)
 
   user user @relation(fields: [userId], references: [userId], onDelete: Cascade)
 }
