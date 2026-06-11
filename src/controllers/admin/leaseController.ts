@@ -2,6 +2,7 @@ import { Body, Get, Middlewares, Patch, Path, Post, Route, Security, Tags } from
 import { AdminLeaseService } from "../../services/admin/leaseService";
 import {
   CreateLeaseDto,
+  TerminateLeaseDto,
   UpdateLeaseDto,
   RenewLeaseDto,
 } from "../../dtos/admin/lease.dto";
@@ -57,5 +58,14 @@ export class AdminLeaseController {
       message: "Lease renewed successfully",
       data: lease,
     };
+  }
+
+  @Post("{leaseId}/terminate")
+  public async terminateLease(
+    @Path() leaseId: string,
+    @Body() body: TerminateLeaseDto,
+  ) {
+    await this.leaseService.terminateLease(leaseId, body);
+    return { success: true, message: "Lease terminated successfully" };
   }
 }

@@ -1139,3 +1139,58 @@ export function fmAgentVisitCancelledEmail(
     `),
   };
 }
+
+// ---------------------------------------------------------------------------
+// 27. Tenant — Lease terminated by admin
+// ---------------------------------------------------------------------------
+export function tenantLeaseTerminatedEmail(
+  tenantName: string,
+  propertyName: string,
+  unitName: string,
+  terminationDate: Date,
+  reason?: string,
+) {
+  return {
+    subject: `Your lease has been terminated — ${unitName}`,
+    html: base(`
+      ${heading("Lease terminated")}
+      ${subheading(`Hi ${tenantName}`)}
+      ${para(`Your lease for the unit listed below has been terminated by the property management team.`)}
+      ${metaTable([
+        ["Property", propertyName],
+        ["Unit", unitName],
+        ["Termination date", terminationDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })],
+        ...(reason ? [["Reason", reason] as [string, string]] : []),
+      ])}
+      ${para("If you have any questions, please contact your property manager.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 28. Admin — Lease terminated (notify other admins)
+// ---------------------------------------------------------------------------
+export function adminLeaseTerminatedEmail(
+  adminName: string,
+  tenantName: string,
+  propertyName: string,
+  unitName: string,
+  terminationDate: Date,
+  reason?: string,
+) {
+  return {
+    subject: `Lease terminated — ${unitName}`,
+    html: base(`
+      ${heading("Lease terminated")}
+      ${subheading(`Hi ${adminName}`)}
+      ${para(`A lease has been terminated.`)}
+      ${metaTable([
+        ["Tenant", tenantName],
+        ["Property", propertyName],
+        ["Unit", unitName],
+        ["Termination date", terminationDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })],
+        ...(reason ? [["Reason", reason] as [string, string]] : []),
+      ])}
+    `),
+  };
+}

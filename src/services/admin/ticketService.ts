@@ -62,6 +62,9 @@ export class AdminTicketService {
       assignedTo: ticket.assignedTo
         ? { id: ticket.assignedTo.userId, name: ticket.assignedTo.userFullName }
         : null,
+      facilityManager: ticket.unit?.property?.facilityManager
+        ? { id: ticket.unit.property.facilityManager.userId, name: ticket.unit.property.facilityManager.userFullName }
+        : null,
       unit: ticket.unit ? { id: ticket.unit.id, name: ticket.unit.name } : null,
       property: ticket.unit?.property
         ? { id: ticket.unit.property.id, name: ticket.unit.property.name }
@@ -83,7 +86,13 @@ export class AdminTicketService {
         select: {
           id: true,
           name: true,
-          property: { select: { id: true, name: true } },
+          property: {
+            select: {
+              id: true,
+              name: true,
+              facilityManager: { select: { userId: true, userFullName: true } },
+            },
+          },
         },
       },
       messages: {
