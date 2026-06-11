@@ -36,6 +36,10 @@ export interface LeaseDetailDto {
   property: { id: string; name: string | null } | null;
 }
 
+export interface TerminateLeaseDto {
+  reason?: string;
+}
+
 // Renewing an expired/terminated lease creates a new active lease for the same tenant + unit
 export interface RenewLeaseDto {
   startDate: string | Date;

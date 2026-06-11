@@ -1,4 +1,4 @@
-import { ExpenseCategory, ExpenseStatus, MaintenanceCategory, MaintenancePriority, MaintenanceStatus } from "@prisma/client";
+import { ExpenseCategory, ExpenseStatus, MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PropertyType } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
@@ -42,7 +42,11 @@ export class FmTicketsService {
           facilityManagerId: userId,
           isDeleted: false,
           ...(filters.propertyId && { id: filters.propertyId }),
-          ...(filters.propertyType && { type: filters.propertyType as any }),
+          ...(filters.propertyType && {
+            type: filters.propertyType === "COMMERCIAL"
+              ? PropertyType.COMMERCIAL
+              : { in: [PropertyType.MULTI_UNIT, PropertyType.SINGLE_FAMILY] },
+          }),
         },
       },
       ...(filters.status && { status: filters.status as MaintenanceStatus }),

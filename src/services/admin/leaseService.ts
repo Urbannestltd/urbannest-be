@@ -2,12 +2,13 @@ import { UnitStatus, LeaseStatus } from "@prisma/client";
 import {
   CreateLeaseDto,
   LeaseDetailDto,
+  TerminateLeaseDto,
   UpdateLeaseDto,
   RenewLeaseDto,
 } from "../../dtos/admin/lease.dto";
 import { BadRequestError } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
-import { adminLeaseCreatedEmail, adminLeaseRenewedEmail } from "../../config/emailTemplates";
+import { adminLeaseCreatedEmail, adminLeaseRenewedEmail, adminLeaseTerminatedEmail, tenantLeaseTerminatedEmail } from "../../config/emailTemplates";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
 import { prisma } from "../../config/prisma";
 
@@ -241,5 +242,77 @@ export class AdminLeaseService {
     }
 
     return renewedLease;
+  }
+
+  // --- TERMINATE ACTIVE LEASE ---
+  public async terminateLease(leaseId: string, data: TerminateLeaseDto) {
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: {
+        tenant: { select: { userId: true, userFullName: true, userEmail: true } },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            property: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!lease) throw new BadRequestError("Lease not found.");
+    if (lease.status !== LeaseStatus.ACTIVE) {
+      throw new BadRequestError("Only active leases can be terminated.");
+    }
+
+    const terminationDate = new Date();
+
+    await prisma.$transaction([
+      prisma.lease.update({
+        where: { id: leaseId },
+        data: { status: LeaseStatus.TERMINATED },
+      }),
+      prisma.unit.update({
+        where: { id: lease.unitId },
+        data: { status: UnitStatus.AVAILABLE },
+      }),
+    ]);
+
+    const tenantName = lease.tenant?.userFullName ?? "Tenant";
+    const propertyName = lease.unit?.property?.name ?? "Unknown Property";
+    const unitName = lease.unit?.name ?? "Unknown Unit";
+
+    // Notify the tenant
+    if (lease.tenant) {
+      const { subject, html } = tenantLeaseTerminatedEmail(
+        tenantName,
+        propertyName,
+        unitName,
+        terminationDate,
+        data.reason,
+      );
+      await this.emailService.sendEmail(
+        { email: lease.tenant.userEmail, name: tenantName },
+        subject,
+        html,
+      );
+    }
+
+    // Notify admins with lease notifications enabled
+    const adminRecipients = await getAdminRecipients("emailLease");
+    for (const admin of adminRecipients) {
+      const { subject, html } = adminLeaseTerminatedEmail(
+        admin.name ?? "Admin",
+        tenantName,
+        propertyName,
+        unitName,
+        terminationDate,
+        data.reason,
+      );
+      await this.emailService.sendEmail(
+        { email: admin.email, name: admin.name ?? undefined },
+        subject,
+        html,
+      );
+    }
   }
 }

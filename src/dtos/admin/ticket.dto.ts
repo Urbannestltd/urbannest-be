@@ -8,6 +8,7 @@ export interface TicketListResponseDto {
   dateSubmitted: Date;
   status: string;
   assignedTo: { id: string; name: string | null } | null;
+  facilityManager: { id: string; name: string | null } | null;
   unit: { id: string; name: string } | null;
   property: { id: string; name: string | null } | null;
 

@@ -39,7 +39,7 @@ export class AdminPaymentService {
         },
         orderBy: { createdAt: "desc" },
         include: {
-          user: { select: { userId: true, userFullName: true, userEmail: true } },
+          user: { select: { userId: true, userFullName: true, userEmail: true, isDeleted: true } },
           lease: {
             include: {
               unit: { include: { property: { select: { id: true, name: true } } } },
@@ -60,7 +60,11 @@ export class AdminPaymentService {
           dueDate: p.dueDate,
           paidDate: p.paidDate,
           tenant: p.user
-            ? { id: p.user.userId, name: p.user.userFullName ?? p.user.userEmail, email: p.user.userEmail }
+            ? {
+                id: p.user.userId,
+                name: p.user.userFullName ?? "Deleted User",
+                email: p.user.isDeleted ? null : p.user.userEmail,
+              }
             : null,
           unit: p.lease?.unit ? { id: p.lease.unit.id, name: p.lease.unit.name } : null,
           property: p.lease?.unit?.property
@@ -99,7 +103,7 @@ export class AdminPaymentService {
           amount: e.amount,
           date: e.date,
           reference: null,
-          status: null,
+          status: e.status,
           paymentType: null,
           dueDate: null,
           paidDate: null,
