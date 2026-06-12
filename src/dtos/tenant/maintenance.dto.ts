@@ -8,6 +8,8 @@ export const CreateMaintenanceSchema = z.object({
     "APPLIANCE",
     "STRUCTURAL",
     "PEST_CONTROL",
+    "CLEANING",
+    "SAFETY_SECURITY",
     "OTHER",
   ]),
   subject: z.string().min(3, "Subject is required"),
@@ -26,6 +28,8 @@ export interface CreateMaintenanceRequest {
     | "APPLIANCE"
     | "STRUCTURAL"
     | "PEST_CONTROL"
+    | "CLEANING"
+    | "SAFETY_SECURITY"
     | "OTHER";
   subject: string;
   description: string;
@@ -52,6 +56,8 @@ export const UpdateMaintenanceSchema = z.object({
       "APPLIANCE",
       "STRUCTURAL",
       "PEST_CONTROL",
+      "CLEANING",
+      "SAFETY_SECURITY",
       "OTHER",
     ])
     .optional(),
@@ -71,6 +77,8 @@ export interface UpdateMaintenanceRequest {
     | "APPLIANCE"
     | "STRUCTURAL"
     | "PEST_CONTROL"
+    | "CLEANING"
+    | "SAFETY_SECURITY"
     | "OTHER";
   subject?: string;
   description?: string;

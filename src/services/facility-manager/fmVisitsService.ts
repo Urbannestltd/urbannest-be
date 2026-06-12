@@ -21,9 +21,13 @@ function normalizeInviteStatus(
     case "CHECKED_OUT":
     case "COMPLETED":
     case "EXPIRED":
+    case "EXPIRED_NO_SHOW":
       return "COMPLETED";
     case "REVOKED":
+    case "REJECTED":
       return "CANCELLED";
+    case "PENDING":
+      return "PENDING_APPROVAL";
     default:
       return "COMPLETED";
   }

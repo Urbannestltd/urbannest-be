@@ -100,6 +100,9 @@ enum InviteStatus {
   UPCOMING
   CHECKED_IN
   CHECKED_OUT
+  PENDING
+  REJECTED
+  EXPIRED_NO_SHOW
 }
 
 enum AgentVisitStatus {
@@ -175,10 +178,12 @@ enum MaintenanceApprovalStatus {
 }
 
 enum ExpenseCategory {
-  MAINTENANCE
-  UTILITIES
-  INSURANCE
-  LEGAL
+  PARTS
+  SUPPLIES
+  LABOUR
+  EQUIPMENT
+  TRANSPORT_COSTS
+  PERMITS
   OTHER
 }
 
@@ -269,6 +274,7 @@ model user {
   proposedReschedules  AgentVisit[]       @relation("proposedReschedules")
   loggedExpenses       Expense[]          @relation("loggedExpenses")
   budgetAdjustments    BudgetAdjustment[] @relation("budgetAdjustments")
+  fmRegisteredWalkIns  VisitorInvite[]    @relation("fmRegisteredWalkIns")
 
   @@index([userRoleId])
   @@map("user")
@@ -603,8 +609,19 @@ model VisitorInvite {
   status    InviteStatus    @default(ACTIVE)
   isWalkIn  Boolean         @default(false)
 
-  tenant user @relation(fields: [tenantId], references: [userId])
-  unit   unit @relation(fields: [unitId], references: [id])
+  // Walk-in approval workflow fields
+  registeredByFmId  String?
+  approvalToken     String?   @unique
+  approvalExpiresAt DateTime?
+  fallbackRule      String?   // "SEND_UP" | "REFUSE_ENTRY" (commercial only)
+
+  // Gate departure verification fields
+  departureToken     String?   @unique
+  departureRequestAt DateTime?
+
+  tenant         user  @relation(fields: [tenantId], references: [userId])
+  unit           unit  @relation(fields: [unitId], references: [id])
+  registeredByFm user? @relation("fmRegisteredWalkIns", fields: [registeredByFmId], references: [userId])
 
   createdAt    DateTime  @default(now())
   checkedInAt  DateTime?
@@ -614,6 +631,8 @@ model VisitorInvite {
   @@index([groupId])
   @@index([tenantId])
   @@index([unitId])
+  @@index([registeredByFmId])
+  @@index([approvalToken])
 }
 
 // ==========================================

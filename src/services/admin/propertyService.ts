@@ -96,12 +96,21 @@ export class AdminPropertyService {
     });
     if (!property) throw new Error("Property not found");
 
-    // Collect unit IDs belonging to this property so we can terminate their leases
+    // Collect unit IDs and the tenants with active leases on them
     const units = await prisma.unit.findMany({
       where: { propertyId },
-      select: { id: true },
+      select: {
+        id: true,
+        leases: {
+          where: { status: "ACTIVE" },
+          select: { tenantId: true },
+        },
+      },
     });
     const unitIds = units.map((u) => u.id);
+    const displacedTenantIds = [
+      ...new Set(units.flatMap((u) => u.leases.map((l) => l.tenantId))),
+    ];
 
     await prisma.$transaction([
       // Terminate all active leases on this property's units
@@ -118,6 +127,27 @@ export class AdminPropertyService {
         data: { isDeleted: true },
       }),
     ]);
+
+    // After the transaction, deactivate tenants who have no remaining active leases
+    if (displacedTenantIds.length > 0) {
+      const tenantsWithOtherLeases = await prisma.lease.findMany({
+        where: {
+          tenantId: { in: displacedTenantIds },
+          status: "ACTIVE",
+          unitId: { notIn: unitIds },
+        },
+        select: { tenantId: true },
+      });
+      const stillActiveIds = new Set(tenantsWithOtherLeases.map((l) => l.tenantId));
+      const toDeactivate = displacedTenantIds.filter((id) => !stillActiveIds.has(id));
+
+      if (toDeactivate.length > 0) {
+        await prisma.user.updateMany({
+          where: { userId: { in: toDeactivate } },
+          data: { userStatus: "INACTIVE" },
+        });
+      }
+    }
   }
 
   public async getProperties() {
