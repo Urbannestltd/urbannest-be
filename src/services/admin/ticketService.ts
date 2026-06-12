@@ -1,4 +1,4 @@
-import { PrismaClient, MaintenanceStatus } from "@prisma/client";
+import { PrismaClient, MaintenanceStatus, PropertyType } from "@prisma/client";
 import {
   AddCommentDto,
   MaintenanceMetricsDto,
@@ -197,7 +197,11 @@ export class AdminTicketService {
       where.unit = {
         property: {
           ...(filters.propertyId && { id: filters.propertyId }),
-          ...(filters.propertyType && { type: filters.propertyType }),
+          ...(filters.propertyType && {
+            type: filters.propertyType === PropertyType.COMMERCIAL
+              ? PropertyType.COMMERCIAL
+              : { in: [PropertyType.MULTI_UNIT, PropertyType.SINGLE_FAMILY] },
+          }),
         },
       };
     }
@@ -342,6 +346,20 @@ export class AdminTicketService {
           include: { sender: true },
           orderBy: { createdAt: "asc" },
         },
+        expenses: {
+          select: {
+            id: true,
+            amount: true,
+            category: true,
+            description: true,
+            status: true,
+            flagReason: true,
+            date: true,
+            createdAt: true,
+            loggedBy: { select: { userFullName: true } },
+          },
+          orderBy: { date: "desc" },
+        },
       },
     });
 
@@ -421,6 +439,18 @@ export class AdminTicketService {
       quotedCost: ticket.quotedCost ?? null,
       approvalStatus: ticket.approvalStatus ?? null,
       rebuttalNote: ticket.rebuttalNote ?? null,
+
+      expenses: (ticket as any).expenses.map((e: any) => ({
+        id: e.id,
+        amount: e.amount,
+        category: e.category,
+        description: e.description,
+        status: e.status,
+        flagReason: e.flagReason ?? null,
+        date: e.date,
+        loggedBy: e.loggedBy?.userFullName ?? null,
+        createdAt: e.createdAt,
+      })),
     };
   }
 

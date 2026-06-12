@@ -349,7 +349,10 @@ export class AdminService {
     const users = await prisma.user.findMany({
       where: {
         isDeleted: false,
-        ...(filters?.status && { userStatus: filters.status }),
+        // When no status filter is applied, hide INACTIVE users (displaced tenants) by default
+        ...(filters?.status
+          ? { userStatus: filters.status }
+          : { userStatus: { not: "INACTIVE" } }),
         ...(filters?.role && { userRole: { roleName: filters.role } }),
         ...((filters?.createdFrom || filters?.createdTo) && {
           userCreatedAt: {

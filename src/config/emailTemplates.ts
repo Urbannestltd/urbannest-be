@@ -1168,7 +1168,131 @@ export function tenantLeaseTerminatedEmail(
 }
 
 // ---------------------------------------------------------------------------
-// 28. Admin — Lease terminated (notify other admins)
+// 29. Tenant — Walk-in visitor approval request
+// ---------------------------------------------------------------------------
+export function tenantWalkInApprovalEmail(
+  tenantName: string,
+  visitorName: string,
+  visitorPhone: string | null,
+  unitName: string,
+  propertyName: string,
+  approveUrl: string,
+  rejectUrl: string,
+) {
+  const phoneRow: [string, string][] = visitorPhone
+    ? [["Phone", visitorPhone]]
+    : [];
+  return {
+    subject: `Visitor approval needed — ${visitorName}`,
+    html: base(`
+      ${heading("Someone is at the gate")}
+      ${subheading(`Hi ${tenantName}`)}
+      ${para(`A walk-in visitor has been registered at the gate and is requesting entry to your unit. Please approve or deny within <strong>5 minutes</strong>.`)}
+      ${metaTable([
+        ["Visitor", visitorName],
+        ...phoneRow,
+        ["Unit", unitName],
+        ["Property", propertyName],
+      ])}
+      ${ctaButton("Approve Entry", approveUrl)}
+      <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
+        <tr>
+          <td style="background:#ef4444;border-radius:8px;">
+            <a href="${rejectUrl}"
+               style="display:inline-block;padding:14px 32px;color:#ffffff;
+                      font-size:14px;font-weight:600;text-decoration:none;
+                      letter-spacing:0.2px;">Deny Entry</a>
+          </td>
+        </tr>
+      </table>
+      ${alertBox("If you do not respond within 5 minutes, the system will apply the fallback rule set by your facility manager.", "warning")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 30. FM — Walk-in approval timeout notification
+// ---------------------------------------------------------------------------
+export function fmWalkInTimedOutEmail(
+  fmName: string,
+  visitorName: string,
+  tenantName: string,
+  unitName: string,
+  appliedRule: "CHECKED_IN" | "REJECTED",
+) {
+  const outcome =
+    appliedRule === "CHECKED_IN"
+      ? "The visitor has been <strong>automatically checked in</strong> (Send Up rule applied)."
+      : "The visitor has been <strong>automatically denied entry</strong> (Refuse Entry rule applied).";
+  return {
+    subject: `Walk-in approval timed out — ${visitorName}`,
+    html: base(`
+      ${heading("Walk-in approval timed out")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`The tenant did not respond to the walk-in approval request within 5 minutes. The fallback rule has been applied.`)}
+      ${metaTable([
+        ["Visitor", visitorName],
+        ["Tenant", tenantName],
+        ["Unit", unitName],
+        ["Outcome", appliedRule === "CHECKED_IN" ? "Checked In (Send Up)" : "Rejected (Refuse Entry)"],
+      ])}
+      ${para(outcome)}
+      ${alertBox("You may want to follow up with the tenant if this was unexpected.", "info")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 31. Tenant — Visitor arrival notification (FM checked in a pre-authorized visitor)
+// ---------------------------------------------------------------------------
+export function tenantVisitorArrivalEmail(
+  tenantName: string,
+  visitorName: string,
+  visitorPhone: string | null,
+  unitName: string,
+) {
+  const now = new Date();
+  const arrivalTime = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const phoneRow: [string, string][] = visitorPhone ? [["Phone", visitorPhone]] : [];
+  return {
+    subject: `${visitorName} has arrived`,
+    html: base(`
+      ${heading("Your visitor has arrived")}
+      ${subheading(`Hi ${tenantName}`)}
+      ${para(`Your pre-authorized visitor has been checked in at the gate.`)}
+      ${metaTable([
+        ["Visitor", visitorName],
+        ...phoneRow,
+        ["Unit", unitName],
+        ["Arrival time", arrivalTime],
+      ])}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 32. Tenant — Departure verification request
+// ---------------------------------------------------------------------------
+export function tenantDepartureVerificationEmail(
+  tenantName: string,
+  visitorName: string,
+  confirmUrl: string,
+) {
+  return {
+    subject: `Is ${visitorName} still on-site?`,
+    html: base(`
+      ${heading("Departure confirmation needed")}
+      ${subheading(`Hi ${tenantName}`)}
+      ${para(`The facility manager is requesting confirmation that <strong>${visitorName}</strong> has left the premises.`)}
+      ${para("If your visitor has already departed, please click the button below to log their checkout.")}
+      ${ctaButton("Confirm Departure", confirmUrl)}
+      ${alertBox("Only click this button if your visitor has left. This will update the visitor log and close their entry record.", "warning")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 33. Admin — Lease terminated (notify other admins)
 // ---------------------------------------------------------------------------
 export function adminLeaseTerminatedEmail(
   adminName: string,

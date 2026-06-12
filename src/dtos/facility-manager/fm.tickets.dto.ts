@@ -26,10 +26,12 @@ const MAINTENANCE_CATEGORIES = [
 ] as const;
 
 const EXPENSE_CATEGORIES = [
-  "MAINTENANCE",
-  "UTILITIES",
-  "INSURANCE",
-  "LEGAL",
+  "PARTS",
+  "SUPPLIES",
+  "LABOUR",
+  "EQUIPMENT",
+  "TRANSPORT_COSTS",
+  "PERMITS",
   "OTHER",
 ] as const;
 

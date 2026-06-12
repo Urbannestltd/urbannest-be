@@ -63,6 +63,19 @@ export interface TicketDetailResponseDto {
   quotedCost: number | null;
   approvalStatus: MaintenanceApprovalStatus | null;
   rebuttalNote: string | null;
+
+  // FM-logged expenses on this ticket
+  expenses: {
+    id: string;
+    amount: number;
+    category: string;
+    description: string;
+    status: string;
+    flagReason: string | null;
+    date: Date;
+    loggedBy: string | null;
+    createdAt: Date;
+  }[];
 }
 
 export interface MaintenanceMetricsDto {
