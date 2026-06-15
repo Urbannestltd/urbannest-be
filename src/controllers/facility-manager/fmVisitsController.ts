@@ -8,7 +8,10 @@ import {
   Request,
 } from "tsoa";
 import { FmVisitsService } from "../../services/facility-manager/fmVisitsService";
-import { GetFmVisitsQuerySchema } from "../../dtos/facility-manager/fm.visits.dto";
+import {
+  GetFmVisitsQuerySchema,
+  type FmVisitorStats,
+} from "../../dtos/facility-manager/fm.visits.dto";
 import { validate } from "../../utils/validate";
 
 @Route("facility-manager/visits")
@@ -16,6 +19,20 @@ import { validate } from "../../utils/validate";
 @Security("jwt", ["FACILITY_MANAGER"])
 export class FmVisitsController extends Controller {
   private service = new FmVisitsService();
+
+  /**
+   * Returns visitor statistics for the FM's managed properties.
+   * Counts are broken down by period (today, last 15 days, last 30 days).
+   * noShows counts only scheduled visitors (isWalkIn: false) with status EXPIRED_NO_SHOW.
+   * Walk-in visitors are excluded from noShows — they cannot cancel.
+   */
+  @Get("stats")
+  public async getStats(
+    @Request() req: any,
+  ): Promise<{ success: boolean; data: FmVisitorStats }> {
+    const data = await this.service.getStats(req.user.userId);
+    return { success: true, data };
+  }
 
   /**
    * Returns a unified list of all visits (tenant-created + agent-requested)

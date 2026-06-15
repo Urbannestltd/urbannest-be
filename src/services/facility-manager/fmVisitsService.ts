@@ -3,6 +3,8 @@ import { ForbiddenError } from "../../utils/apiError";
 import type {
   GetFmVisitsQuery,
   FmUnifiedVisit,
+  FmVisitorStats,
+  FmVisitorStatsPeriod,
   NormalizedVisitStatus,
 } from "../../dtos/facility-manager/fm.visits.dto";
 import { InviteStatus } from "@prisma/client";
@@ -170,6 +172,8 @@ export class FmVisitsService {
           canApprove: false,
           canReject: false,
           canReschedule: false,
+          checkedInAt: inv.checkedInAt,
+          checkedOutAt: inv.checkedOutAt,
           createdAt: inv.createdAt,
         });
       }
@@ -235,6 +239,8 @@ export class FmVisitsService {
           canApprove: isPending,
           canReject: isPending,
           canReschedule: isPending,
+          checkedInAt: null,
+          checkedOutAt: null,
           createdAt: av.createdAt,
         });
       }
@@ -265,5 +271,47 @@ export class FmVisitsService {
     });
 
     return filtered;
+  }
+
+  public async getStats(fmId: string): Promise<FmVisitorStats> {
+    const { unitIds } = await this.getFmPropertyIds(fmId);
+
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const start15 = new Date(now);
+    start15.setDate(now.getDate() - 15);
+    start15.setHours(0, 0, 0, 0);
+
+    const start30 = new Date(now);
+    start30.setDate(now.getDate() - 30);
+    start30.setHours(0, 0, 0, 0);
+
+    const records = await prisma.visitorInvite.findMany({
+      where: {
+        unitId: { in: unitIds },
+        createdAt: { gte: start30 },
+      },
+      select: { createdAt: true, isWalkIn: true, status: true },
+    });
+
+    const compute = (from: Date): FmVisitorStatsPeriod => {
+      const slice = records.filter((r) => r.createdAt >= from);
+      return {
+        total: slice.length,
+        scheduled: slice.filter((r) => !r.isWalkIn).length,
+        walkIns: slice.filter((r) => r.isWalkIn).length,
+        noShows: slice.filter(
+          (r) => !r.isWalkIn && r.status === "EXPIRED_NO_SHOW",
+        ).length,
+      };
+    };
+
+    return {
+      today: compute(startOfToday),
+      last15Days: compute(start15),
+      last30Days: compute(start30),
+    };
   }
 }

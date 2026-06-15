@@ -35,6 +35,21 @@ export const GetFmVisitsQuerySchema = z.object({
 });
 export type GetFmVisitsQuery = z.infer<typeof GetFmVisitsQuerySchema>;
 
+// ── Stats response ────────────────────────────────────────────────────────────
+
+export interface FmVisitorStatsPeriod {
+  total: number;
+  scheduled: number;
+  walkIns: number;
+  noShows: number; // EXPIRED_NO_SHOW for scheduled visitors only
+}
+
+export interface FmVisitorStats {
+  today: FmVisitorStatsPeriod;
+  last15Days: FmVisitorStatsPeriod;
+  last30Days: FmVisitorStatsPeriod;
+}
+
 // ── Response ──────────────────────────────────────────────────────────────────
 
 export interface FmUnifiedVisit {
@@ -75,6 +90,10 @@ export interface FmUnifiedVisit {
   canApprove: boolean;
   canReject: boolean;
   canReschedule: boolean;
+
+  // Check-in/out timestamps (populated for tenant visits, null for agent visits)
+  checkedInAt: Date | null;
+  checkedOutAt: Date | null;
 
   createdAt: Date;
 }
