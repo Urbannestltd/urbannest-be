@@ -1194,12 +1194,21 @@ export function tenantWalkInApprovalEmail(
         ["Unit", unitName],
         ["Property", propertyName],
       ])}
-      ${ctaButton("Approve Entry", approveUrl)}
-      <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:28px 0 12px;">
         <tr>
-          <td style="background:#ef4444;border-radius:8px;">
+          <td style="background:#16a34a;border-radius:8px;text-align:center;">
+            <a href="${approveUrl}"
+               style="display:block;padding:14px 24px;color:#ffffff;
+                      font-size:14px;font-weight:600;text-decoration:none;
+                      letter-spacing:0.2px;">Approve Entry</a>
+          </td>
+        </tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;">
+        <tr>
+          <td style="background:#ef4444;border-radius:8px;text-align:center;">
             <a href="${rejectUrl}"
-               style="display:inline-block;padding:14px 32px;color:#ffffff;
+               style="display:block;padding:14px 24px;color:#ffffff;
                       font-size:14px;font-weight:600;text-decoration:none;
                       letter-spacing:0.2px;">Deny Entry</a>
           </td>

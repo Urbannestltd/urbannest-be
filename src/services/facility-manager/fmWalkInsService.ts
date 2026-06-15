@@ -1,6 +1,10 @@
 import { randomUUID } from "crypto";
 import { prisma } from "../../config/prisma";
-import { BadRequestError, ForbiddenError, NotFoundError } from "../../utils/apiError";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+} from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { logActivity } from "../../utils/activityLogger";
 import {
@@ -49,19 +53,25 @@ export class FmWalkInsService {
       },
     });
     if (!visit) throw new NotFoundError("Walk-in visit not found");
-    if (!visit.isWalkIn) throw new BadRequestError("This is not a walk-in visit");
+    if (!visit.isWalkIn)
+      throw new BadRequestError("This is not a walk-in visit");
     if (visit.unit.property.facilityManagerId !== fmId) {
       throw new ForbiddenError("You do not manage the property for this visit");
     }
     return visit;
   }
 
-  public async registerWalkIn(fmId: string, data: RegisterWalkInRequest): Promise<WalkInListItem> {
+  public async registerWalkIn(
+    fmId: string,
+    data: RegisterWalkInRequest,
+  ): Promise<WalkInListItem> {
     // Validate unit belongs to an FM-managed property
     const unit = await prisma.unit.findUnique({
       where: { id: data.unitId },
       include: {
-        property: { select: { id: true, name: true, facilityManagerId: true, type: true } },
+        property: {
+          select: { id: true, name: true, facilityManagerId: true, type: true },
+        },
       },
     });
     if (!unit) throw new NotFoundError("Unit not found");
@@ -73,10 +83,13 @@ export class FmWalkInsService {
     const activeLease = await prisma.lease.findFirst({
       where: { unitId: data.unitId, status: "ACTIVE" },
       include: {
-        tenant: { select: { userId: true, userFullName: true, userEmail: true } },
+        tenant: {
+          select: { userId: true, userFullName: true, userEmail: true },
+        },
       },
     });
-    if (!activeLease) throw new BadRequestError("No active tenant found for this unit");
+    if (!activeLease)
+      throw new BadRequestError("No active tenant found for this unit");
 
     const fm = await prisma.user.findUnique({
       where: { userId: fmId },
@@ -134,7 +147,10 @@ export class FmWalkInsService {
 
     this.emailService
       .sendEmail(
-        { email: activeLease.tenant.userEmail, name: activeLease.tenant.userFullName ?? undefined },
+        {
+          email: activeLease.tenant.userEmail,
+          name: activeLease.tenant.userFullName ?? undefined,
+        },
         emailTemplate.subject,
         emailTemplate.html,
       )
@@ -175,20 +191,28 @@ export class FmWalkInsService {
     });
   }
 
-  public async getWalkInStatus(fmId: string, visitId: string): Promise<WalkInStatus> {
+  public async getWalkInStatus(
+    fmId: string,
+    visitId: string,
+  ): Promise<WalkInStatus> {
     const visit = await this.assertFmOwnsVisit(fmId, visitId);
     return {
       id: visit.id,
       status: visit.status,
       approvalExpiresAt: visit.approvalExpiresAt,
       secondsUntilExpiry:
-        visit.status === "PENDING" ? this.secondsUntilExpiry(visit.approvalExpiresAt) : null,
+        visit.status === "PENDING"
+          ? this.secondsUntilExpiry(visit.approvalExpiresAt)
+          : null,
       checkedInAt: visit.checkedInAt,
       checkedOutAt: visit.checkedOutAt,
     };
   }
 
-  public async listWalkIns(fmId: string, filters: WalkInListQuery): Promise<WalkInListItem[]> {
+  public async listWalkIns(
+    fmId: string,
+    filters: WalkInListQuery,
+  ): Promise<WalkInListItem[]> {
     const managedProperties = await prisma.property.findMany({
       where: { facilityManagerId: fmId, isDeleted: false },
       select: { id: true },
@@ -206,15 +230,27 @@ export class FmWalkInsService {
         ...(filters.search
           ? {
               OR: [
-                { visitorName: { contains: filters.search, mode: "insensitive" } },
-                { visitorPhone: { contains: filters.search, mode: "insensitive" } },
+                {
+                  visitorName: {
+                    contains: filters.search,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  visitorPhone: {
+                    contains: filters.search,
+                    mode: "insensitive",
+                  },
+                },
               ],
             }
           : {}),
         ...(filters.dateFrom || filters.dateTo
           ? {
               createdAt: {
-                ...(filters.dateFrom ? { gte: new Date(filters.dateFrom) } : {}),
+                ...(filters.dateFrom
+                  ? { gte: new Date(filters.dateFrom) }
+                  : {}),
                 ...(filters.dateTo ? { lte: new Date(filters.dateTo) } : {}),
               },
             }
@@ -290,7 +326,9 @@ export class FmWalkInsService {
       fallbackRule: visit.fallbackRule,
       approvalExpiresAt: visit.approvalExpiresAt,
       secondsUntilExpiry:
-        visit.status === "PENDING" ? this.secondsUntilExpiry(visit.approvalExpiresAt) : null,
+        visit.status === "PENDING"
+          ? this.secondsUntilExpiry(visit.approvalExpiresAt)
+          : null,
       checkedInAt: visit.checkedInAt,
       checkedOutAt: visit.checkedOutAt,
       createdAt: visit.createdAt,
