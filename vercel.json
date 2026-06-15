@@ -14,5 +14,10 @@
       "src": "/(.*)",
       "dest": "src/server.ts"
     }
+  ],
+  "crons": [
+    { "path": "/cron/reminders", "schedule": "* * * * *" },
+    { "path": "/cron/walk-in-timeout", "schedule": "* * * * *" },
+    { "path": "/cron/no-show", "schedule": "* * * * *" }
   ]
 }

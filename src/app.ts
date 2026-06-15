@@ -10,6 +10,9 @@ import swaggerUi from "swagger-ui-express";
 import { RegisterRoutes } from "./build/routes";
 import swaggerDocument from "./build/swagger.json";
 import { PaymentService } from "./services/paymentService";
+import { ReminderWorker } from "./services/workers/reminderWorker";
+import { WalkInTimeoutWorker } from "./services/workers/walkInTimeoutWorker";
+import { NoShowWorker } from "./services/workers/noShowWorker";
 
 const app: Application = express();
 
@@ -65,6 +68,52 @@ app.use(requestLogger);
 app.use(activityLoggerMiddleware);
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+// ============================================================
+// VERCEL CRON ENDPOINTS
+// Called by Vercel on a schedule. Protected by CRON_SECRET.
+// ============================================================
+function verifyCronSecret(req: Request, res: Response): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (secret && req.headers["authorization"] !== `Bearer ${secret}`) {
+    res.status(401).json({ message: "Unauthorized" });
+    return false;
+  }
+  return true;
+}
+
+app.get("/cron/reminders", async (req: Request, res: Response) => {
+  if (!verifyCronSecret(req, res)) return;
+  try {
+    await new ReminderWorker().processDueReminders();
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[Cron] reminders failed:", err.message);
+    res.status(500).json({ ok: false });
+  }
+});
+
+app.get("/cron/walk-in-timeout", async (req: Request, res: Response) => {
+  if (!verifyCronSecret(req, res)) return;
+  try {
+    await new WalkInTimeoutWorker().processExpiredWalkIns();
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[Cron] walk-in-timeout failed:", err.message);
+    res.status(500).json({ ok: false });
+  }
+});
+
+app.get("/cron/no-show", async (req: Request, res: Response) => {
+  if (!verifyCronSecret(req, res)) return;
+  try {
+    await new NoShowWorker().processNoShows();
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[Cron] no-show failed:", err.message);
+    res.status(500).json({ ok: false });
+  }
+});
 
 RegisterRoutes(app);
 

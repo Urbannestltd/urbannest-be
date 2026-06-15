@@ -61,5 +61,7 @@ export interface RepeatVisitorProfile {
   lastVisitDate: Date;
   lastUnitId: string;
   lastUnitName: string;
+  lastPropertyId: string;
+  lastPropertyName: string | null;
   totalVisits: number;
 }

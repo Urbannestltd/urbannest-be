@@ -89,15 +89,17 @@ export class FmWalkInsController extends Controller {
   }
 
   /**
-   * Looks up the most recent walk-in record matching the given name or phone.
+   * Searches walk-in history by visitor name or phone number.
+   * Returns all distinct visitors whose name or phone matches the search string.
    * Use this to pre-fill the registration form for repeat visitors.
+   * Each entry reflects the visitor's most recent visit details and total visit count.
    */
   @Get("repeat-visitor")
-  public async getRepeatVisitorProfile(
+  public async getRepeatVisitorProfiles(
     @Request() req: any,
     @Query() search: string,
-  ): Promise<{ success: boolean; data: RepeatVisitorProfile | null }> {
-    const data = await this.service.getRepeatVisitorProfile(req.user.userId, search);
+  ): Promise<{ success: boolean; data: RepeatVisitorProfile[] }> {
+    const data = await this.service.getRepeatVisitorProfiles(req.user.userId, search);
     return { success: true, data };
   }
 }

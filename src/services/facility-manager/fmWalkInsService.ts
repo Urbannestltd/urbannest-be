@@ -272,10 +272,10 @@ export class FmWalkInsService {
     return visits.map((v) => this.mapVisit(v));
   }
 
-  public async getRepeatVisitorProfile(
+  public async getRepeatVisitorProfiles(
     fmId: string,
     search: string,
-  ): Promise<RepeatVisitorProfile | null> {
+  ): Promise<RepeatVisitorProfile[]> {
     const managedProperties = await prisma.property.findMany({
       where: { facilityManagerId: fmId, isDeleted: false },
       select: { id: true },
@@ -292,23 +292,40 @@ export class FmWalkInsService {
         ],
       },
       include: {
-        unit: { select: { id: true, name: true } },
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            property: { select: { id: true, name: true } },
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    if (visits.length === 0 || !visits[0]) return null;
+    // Deduplicate by name+phone — keep only the most recent visit per unique visitor
+    const seen = new Map<string, RepeatVisitorProfile>();
+    for (const v of visits) {
+      const key = `${v.visitorName.toLowerCase()}|${v.visitorPhone ?? ""}`;
+      if (!seen.has(key)) {
+        seen.set(key, {
+          visitorName: v.visitorName,
+          visitorPhone: v.visitorPhone,
+          visitorType: v.type,
+          lastVisitDate: v.createdAt,
+          lastUnitId: v.unitId,
+          lastUnitName: v.unit.name,
+          lastPropertyId: v.unit.property.id,
+          lastPropertyName: v.unit.property.name,
+          totalVisits: visits.filter(
+            (x) => x.visitorName.toLowerCase() === v.visitorName.toLowerCase() &&
+                   (x.visitorPhone ?? "") === (v.visitorPhone ?? ""),
+          ).length,
+        });
+      }
+    }
 
-    const last = visits[0];
-    return {
-      visitorName: last.visitorName,
-      visitorPhone: last.visitorPhone,
-      visitorType: last.type,
-      lastVisitDate: last.createdAt,
-      lastUnitId: last.unitId,
-      lastUnitName: last.unit.name,
-      totalVisits: visits.length,
-    };
+    return Array.from(seen.values());
   }
 
   private mapVisit(visit: any): WalkInListItem {
