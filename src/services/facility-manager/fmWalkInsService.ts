@@ -10,6 +10,7 @@ import { logActivity } from "../../utils/activityLogger";
 import {
   tenantWalkInApprovalEmail,
   fmWalkInTimedOutEmail,
+  visitorAccessCodeEmail,
 } from "../../config/emailTemplates";
 import type {
   RegisterWalkInRequest,
@@ -106,6 +107,7 @@ export class FmWalkInsService {
         unitId: data.unitId,
         visitorName: data.visitorName,
         visitorPhone: data.visitorPhone ?? null,
+        visitorEmail: data.visitorEmail ?? null,
         accessCode: randomUUID(),
         validFrom: now,
         validUntil: approvalExpiresAt,
@@ -334,6 +336,7 @@ export class FmWalkInsService {
       visitorName: visit.visitorName,
       visitorPhone: visit.visitorPhone,
       visitorType: visit.type,
+      frequency: visit.frequency,
       status: visit.status,
       unitId: visit.unit.id,
       unitName: visit.unit.name,

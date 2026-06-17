@@ -4,6 +4,7 @@ import { z } from "zod";
 const VisitorInfoSchema = z.object({
   name: z.string().min(2, "Name required"),
   phone: z.string().optional(),
+  email: z.string().email("Invalid email").optional(),
 });
 
 // 1. SINGLE INVITE REQUEST
@@ -36,7 +37,7 @@ export const CreateBulkInviteSchema = z.object({
 });
 
 export interface CreateInviteRequest {
-  visitor: { name: string; phone?: string };
+  visitor: { name: string; phone?: string; email?: string };
   type: "GUEST" | "DELIVERY" | "SERVICE_PROVIDER";
   frequency: "ONE_OFF" | "WHOLE_DAY" | "RECURRING";
   startDate: string;

@@ -1301,7 +1301,45 @@ export function tenantDepartureVerificationEmail(
 }
 
 // ---------------------------------------------------------------------------
-// 33. Admin — Lease terminated (notify other admins)
+// 33. Visitor — Access code delivery
+// ---------------------------------------------------------------------------
+export function visitorAccessCodeEmail(
+  visitorName: string,
+  hostName: string,
+  accessCode: string,
+  validFrom: Date,
+  validUntil: Date,
+) {
+  const fmt = (d: Date) =>
+    d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  return {
+    subject: `Your visitor pass — ${accessCode}`,
+    html: base(`
+      ${heading("Your visitor pass")}
+      ${subheading(`Hi ${visitorName}`)}
+      ${para(`You have been invited by <strong>${hostName}</strong>. Use the code below at the gate.`)}
+      <div style="text-align:center;margin:28px 0;">
+        <span style="display:inline-block;background:#18181b;color:#d4a853;
+                     font-size:32px;font-weight:700;letter-spacing:8px;
+                     padding:16px 32px;border-radius:10px;">${accessCode}</span>
+      </div>
+      ${metaTable([
+        ["Valid from", fmt(validFrom)],
+        ["Valid until", fmt(validUntil)],
+      ])}
+      ${alertBox("Show this code to the facility manager or security officer at the gate. Do not share it with others.", "info")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 34. Admin — Lease terminated (notify other admins)
 // ---------------------------------------------------------------------------
 export function adminLeaseTerminatedEmail(
   adminName: string,

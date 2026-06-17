@@ -7,7 +7,7 @@ import {
 } from "../../dtos/tenant/visitor.dto";
 import { NotFoundError, BadRequestError } from "../../utils/apiError";
 import { ZeptoMailService } from "./../external/zeptoMailService";
-import { adminVisitorCheckInEmail, visitorCheckInEmail } from "../../config/emailTemplates";
+import { adminVisitorCheckInEmail, visitorCheckInEmail, visitorAccessCodeEmail } from "../../config/emailTemplates";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
 import { InviteFrequency, InviteStatus, VisitorType } from "@prisma/client";
 
@@ -49,6 +49,7 @@ export class VisitorService {
         unitId: lease.unitId,
         visitorName: params.visitor.name,
         visitorPhone: params.visitor.phone,
+        visitorEmail: params.visitor.email,
         accessCode: code,
         type: params.type as VisitorType,
         frequency: params.frequency as InviteFrequency,
@@ -56,7 +57,26 @@ export class VisitorService {
         validUntil: new Date(params.endDate),
         status: InviteStatus.UPCOMING,
       },
+      include: { tenant: { select: { userFullName: true } } },
     });
+
+    // Send code directly to visitor if their email was provided
+    if (params.visitor.email) {
+      const emailTemplate = visitorAccessCodeEmail(
+        invite.visitorName,
+        invite.tenant.userFullName ?? "Your host",
+        code,
+        invite.validFrom,
+        invite.validUntil,
+      );
+      this.emailService
+        .sendEmail(
+          { email: params.visitor.email, name: invite.visitorName },
+          emailTemplate.subject,
+          emailTemplate.html,
+        )
+        .catch(() => {});
+    }
 
     return {
       code,
