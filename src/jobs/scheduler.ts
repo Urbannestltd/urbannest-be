@@ -19,6 +19,7 @@ export const initCronJobs = () => {
     }
   });
 
+  // once per day
   cron.schedule("0 0 * * *", async () => {
     try {
       await walkInTimeoutWorker.processExpiredWalkIns();
@@ -26,7 +27,7 @@ export const initCronJobs = () => {
       console.error("🔥 Error in Walk-In Timeout Cron:", error);
     }
   });
-
+  // once per day
   cron.schedule("0 0 * * *", async () => {
     try {
       await noShowWorker.processNoShows();

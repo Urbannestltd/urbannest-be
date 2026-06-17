@@ -16,8 +16,8 @@
     }
   ],
   "crons": [
-    { "path": "/cron/reminders", "schedule": "* * * * *" },
-    { "path": "/cron/walk-in-timeout", "schedule": "* * * * *" },
-    { "path": "/cron/no-show", "schedule": "* * * * *" }
+    { "path": "/cron/reminders", "schedule": "0 0 * * *" },
+    { "path": "/cron/walk-in-timeout", "schedule": "0 0 * * *" },
+    { "path": "/cron/no-show", "schedule": "0 0 * * *" }
   ]
 }
