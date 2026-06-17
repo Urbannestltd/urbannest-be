@@ -73,6 +73,7 @@ export interface FmUnifiedVisit {
 
   // Timing — validFrom for tenant invites, visitDate for agent visits
   visitDate: Date;
+  scheduledUntil: Date | null;
 
   // Agent visit extras (null for tenant visits)
   agentId: string | null;

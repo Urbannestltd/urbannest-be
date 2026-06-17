@@ -10,10 +10,12 @@ export const RegisterWalkInSchema = z.object({
   unitId: z.string().uuid("Invalid unit ID"),
   visitorName: z.string().min(2, "Visitor name is required").max(100),
   visitorPhone: z.string().max(20).optional(),
+  visitorEmail: z.string().email("Invalid email").optional(),
   visitorType: z.enum(VISITOR_TYPES).default("GUEST"),
   fallbackRule: z.enum(FALLBACK_RULES).optional(),
 });
 export type RegisterWalkInRequest = z.infer<typeof RegisterWalkInSchema>;
+
 
 export const WalkInListQuerySchema = z.object({
   search: z.string().optional(),
@@ -31,6 +33,7 @@ export interface WalkInListItem {
   visitorName: string;
   visitorPhone: string | null;
   visitorType: string;
+  frequency: string;
   status: string;
   unitId: string;
   unitName: string;

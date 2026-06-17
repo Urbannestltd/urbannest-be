@@ -136,7 +136,7 @@ export class FmGateService {
         profile,
         error: {
           code: "NOT_YET_ACTIVE",
-          message: `Code not active yet. Valid from ${invite.validFrom.toLocaleString("en-GB")}.`,
+          message: `Code not active yet. Valid from ${invite.validFrom.toISOString()}.`,
         },
       };
     }

@@ -56,6 +56,7 @@ export class WalkInApprovalController extends Controller {
         visitorName: v.visitorName,
         visitorPhone: v.visitorPhone,
         visitorType: v.type,
+        frequency: v.frequency,
         status: v.status,
         unitId: v.unit.id,
         unitName: v.unit.name,
