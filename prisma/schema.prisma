@@ -113,6 +113,14 @@ enum AgentVisitStatus {
   CANCELLED
 }
 
+enum AgentLeadStatus {
+  PENDING
+  FORWARDED_TO_LANDLORD
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
 enum ExpenseStatus {
   LOGGED
   FLAGGED
@@ -272,6 +280,7 @@ model user {
 
   agentVisits          AgentVisit[]       @relation("agentVisits")
   proposedReschedules  AgentVisit[]       @relation("proposedReschedules")
+  agentLeads           AgentLead[]        @relation("agentLeads")
   loggedExpenses       Expense[]          @relation("loggedExpenses")
   budgetAdjustments    BudgetAdjustment[] @relation("budgetAdjustments")
   fmRegisteredWalkIns  VisitorInvite[]    @relation("fmRegisteredWalkIns")
@@ -402,6 +411,7 @@ model property {
   expenses Expense[]
 
   agentVisits AgentVisit[]
+  agentLeads  AgentLead[]
 
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -437,6 +447,7 @@ model unit {
   visitorGroups       VisitorGroup[]
   expenses            Expense[]
   agentVisits         AgentVisit[]
+  agentLeads          AgentLead[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -669,6 +680,45 @@ model AgentVisit {
   @@index([propertyId])
   @@index([status])
   @@map("agent_visits")
+}
+
+// ==========================================
+// AGENT LEADS (Tenant Applications)
+// ==========================================
+
+model AgentLead {
+  id         String          @id @default(uuid())
+  agentId    String
+  propertyId String
+  unitId     String?
+
+  prospectName  String
+  prospectEmail String?
+  prospectPhone String?
+  proposedRent  Float?
+  notes         String?
+
+  occupation      String?
+  monthlyIncome   Float?
+  employerName    String?
+  employerAddress String?
+  documents       String[]
+
+  status          AgentLeadStatus @default(FORWARDED_TO_LANDLORD)
+  rejectionReason String?
+  decidedAt       DateTime?
+
+  agent    user     @relation("agentLeads",    fields: [agentId],    references: [userId])
+  property property @relation(fields: [propertyId], references: [id])
+  unit     unit?    @relation(fields: [unitId],     references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([propertyId])
+  @@index([status])
+  @@map("agent_leads")
 }
 
 // ==========================================

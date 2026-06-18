@@ -1339,7 +1339,125 @@ export function visitorAccessCodeEmail(
 }
 
 // ---------------------------------------------------------------------------
-// 34. Admin — Lease terminated (notify other admins)
+// 35. Agent — their lead was approved by landlord
+// ---------------------------------------------------------------------------
+export function landlordLeadApprovedAgentEmail(
+  agentName: string,
+  prospectName: string,
+  propertyName: string,
+  unitName: string | null,
+) {
+  const unitRow: [string, string][] = unitName ? [["Unit", unitName]] : [];
+  return {
+    subject: `Application approved — ${prospectName}`,
+    html: base(`
+      ${heading("Application approved")}
+      ${subheading(`Hi ${agentName}`)}
+      ${para(`The application you submitted for <strong>${prospectName}</strong> has been reviewed and approved by the landlord.`)}
+      ${metaTable([
+        ["Applicant", prospectName],
+        ["Property", propertyName],
+        ...unitRow,
+        ["Status", "Approved"],
+      ])}
+      ${para("The tenant will be formally onboarded by the facility management team. You will be notified once the lease is active.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 36. Agent — their lead was rejected by landlord
+// ---------------------------------------------------------------------------
+export function landlordLeadRejectedAgentEmail(
+  agentName: string,
+  prospectName: string,
+  propertyName: string,
+  unitName: string | null,
+  reason?: string,
+) {
+  const unitRow: [string, string][] = unitName ? [["Unit", unitName]] : [];
+  const reasonBlock = reason
+    ? `<div style="background:#fef2f2;border-left:3px solid #ef4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 4px;font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Reason</p>
+        <p style="margin:0;font-size:14px;color:#7f1d1d;line-height:1.6;">${reason}</p>
+      </div>`
+    : "";
+  return {
+    subject: `Application not approved — ${prospectName}`,
+    html: base(`
+      ${heading("Application not approved")}
+      ${subheading(`Hi ${agentName}`)}
+      ${para(`The application you submitted for <strong>${prospectName}</strong> was reviewed but could not be approved at this time.`)}
+      ${metaTable([
+        ["Applicant", prospectName],
+        ["Property", propertyName],
+        ...unitRow,
+      ])}
+      ${reasonBlock}
+      ${para("Please contact the landlord if you need further clarification.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 37. Prospect — they were approved (sent only when prospectEmail exists)
+// ---------------------------------------------------------------------------
+export function landlordLeadApprovedProspectEmail(
+  prospectName: string,
+  propertyName: string,
+  unitName: string | null,
+  nextSteps: string,
+) {
+  const unitRow: [string, string][] = unitName ? [["Unit", unitName]] : [];
+  return {
+    subject: `Your rental application has been approved`,
+    html: base(`
+      ${heading("Application approved")}
+      ${subheading(`Hi ${prospectName}`)}
+      ${para(`Congratulations! Your rental application has been reviewed and approved.`)}
+      ${metaTable([
+        ["Property", propertyName],
+        ...unitRow,
+        ["Status", "Approved"],
+      ])}
+      ${alertBox(nextSteps, "info")}
+      ${para("A member of the management team will be in touch shortly to complete your onboarding.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 38. Prospect — rental application not approved
+// ---------------------------------------------------------------------------
+export function landlordLeadRejectedProspectEmail(
+  prospectName: string,
+  propertyName: string,
+  unitName: string | null,
+  reason?: string,
+) {
+  const unitRow: [string, string][] = unitName ? [["Unit", unitName]] : [];
+  const reasonBox = reason
+    ? alertBox(`Reason: ${reason}`, "warning")
+    : "";
+  return {
+    subject: `Update on your rental application`,
+    html: base(`
+      ${heading("Application update")}
+      ${subheading(`Hi ${prospectName}`)}
+      ${para(`Thank you for your interest. After careful review, your rental application for the property below was not approved at this time.`)}
+      ${metaTable([
+        ["Property", propertyName],
+        ...unitRow,
+        ["Status", "Not approved"],
+      ])}
+      ${reasonBox}
+      ${para("We encourage you to explore other available listings. Thank you for your understanding.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 39. Admin — Lease terminated (notify other admins)
 // ---------------------------------------------------------------------------
 export function adminLeaseTerminatedEmail(
   adminName: string,
