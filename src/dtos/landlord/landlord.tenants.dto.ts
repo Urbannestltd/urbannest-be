@@ -25,3 +25,21 @@ export interface LandlordTenantItem {
   leaseStartDate: Date;
   leaseEndDate: Date;
 }
+
+export interface LandlordTenantDetail {
+  tenantId: string;
+  tenantName: string | null;
+  tenantEmail: string | null;
+  tenantPhone: string | null;
+  leases: {
+    leaseId: string;
+    propertyId: string;
+    propertyName: string | null;
+    unitId: string;
+    unitName: string;
+    leaseStatus: string;
+    rentAmount: number;
+    leaseStartDate: Date;
+    leaseEndDate: Date;
+  }[];
+}

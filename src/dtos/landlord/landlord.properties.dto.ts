@@ -30,4 +30,6 @@ export interface LandlordPropertyItem {
   state: string;
   totalUnits: number;
   occupancyRate: number;
+  expectedRent: number;
+  collectedRent: number;
 }

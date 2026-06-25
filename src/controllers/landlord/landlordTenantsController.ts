@@ -1,8 +1,9 @@
-import { Get, Query, Route, Controller, Tags, Security, Request } from "tsoa";
+import { Get, Path, Query, Route, Controller, Tags, Security, Request } from "tsoa";
 import { LandlordTenantsService } from "../../services/landlord/landlordTenantsService";
 import {
   LandlordTenantsQuerySchema,
   type LandlordTenantItem,
+  type LandlordTenantDetail,
 } from "../../dtos/landlord/landlord.tenants.dto";
 import { validate } from "../../utils/validate";
 
@@ -44,6 +45,20 @@ export class LandlordTenantsController extends Controller {
       sortBy,
     });
     const data = await this.service.getTenants(req.user.userId, query);
+    return { success: true, data };
+  }
+
+  /**
+   * Returns detailed information for a specific tenant.
+   * Includes all of their leases for your properties, with lease terms and rent amounts.
+   * Returns 403 if the tenant has no leases with your properties.
+   */
+  @Get("{tenantId}")
+  public async getTenantDetail(
+    @Path() tenantId: string,
+    @Request() req: any,
+  ): Promise<{ success: boolean; data: LandlordTenantDetail }> {
+    const data = await this.service.getTenantDetail(req.user.userId, tenantId);
     return { success: true, data };
   }
 }

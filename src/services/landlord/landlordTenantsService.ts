@@ -1,8 +1,9 @@
 import { prisma } from "../../config/prisma";
-import { ForbiddenError } from "../../utils/apiError";
+import { ForbiddenError, NotFoundError } from "../../utils/apiError";
 import type {
   LandlordTenantsQuery,
   LandlordTenantItem,
+  LandlordTenantDetail,
 } from "../../dtos/landlord/landlord.tenants.dto";
 
 export class LandlordTenantsService {
@@ -109,5 +110,66 @@ export class LandlordTenantsService {
     }
 
     return results;
+  }
+
+  public async getTenantDetail(
+    landlordId: string,
+    tenantId: string,
+  ): Promise<LandlordTenantDetail> {
+    // Fetch tenant with all their leases for this landlord's properties
+    const tenant = await prisma.user.findUnique({
+      where: { userId: tenantId },
+      select: {
+        userId: true,
+        userFullName: true,
+        userEmail: true,
+        userPhone: true,
+        leases: {
+          where: {
+            unit: {
+              property: { landlordId, isDeleted: false },
+            },
+          },
+          select: {
+            id: true,
+            status: true,
+            rentAmount: true,
+            startDate: true,
+            endDate: true,
+            unit: {
+              select: {
+                id: true,
+                name: true,
+                propertyId: true,
+                property: { select: { name: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!tenant || tenant.leases.length === 0) {
+      throw new NotFoundError("Tenant not found or has no leases with your properties");
+    }
+
+    return {
+      tenantId: tenant.userId,
+      tenantName: tenant.userFullName,
+      tenantEmail: tenant.userEmail,
+      tenantPhone: tenant.userPhone,
+      leases: tenant.leases.map((l) => ({
+        leaseId: l.id,
+        propertyId: l.unit.propertyId,
+        propertyName: l.unit.property.name,
+        unitId: l.unit.id,
+        unitName: l.unit.name,
+        leaseStatus: l.status,
+        rentAmount: l.rentAmount,
+        leaseStartDate: l.startDate,
+        leaseEndDate: l.endDate,
+      })),
+    };
   }
 }

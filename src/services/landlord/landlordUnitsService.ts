@@ -48,21 +48,50 @@ export class LandlordUnitsService {
         baseRent: true,
         property: { select: { name: true } },
         leases: {
-          where: { status: "ACTIVE" },
           select: {
-            tenant: { select: { userFullName: true } },
+            id: true,
+            tenant: { select: { userId: true, userFullName: true } },
             startDate: true,
             endDate: true,
+            status: true,
           },
           orderBy: { createdAt: "desc" },
-          take: 1,
+        },
+        maintenanceRequests: {
+          select: { status: true },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
+    const today = new Date();
+
     let results: LandlordUnitItem[] = units.map((u) => {
-      const activeLease = u.leases[0];
+      const activeLease = u.leases.find((l) => l.status === "ACTIVE");
+
+      // Calculate complaints percentage
+      const totalComplaints = u.maintenanceRequests.length;
+      const unresolvedComplaints = u.maintenanceRequests.filter(
+        (m) => m.status !== "RESOLVED" && m.status !== "FIXED" && m.status !== "CANCELLED"
+      ).length;
+      const complaintsPercentage = totalComplaints === 0
+        ? 0
+        : Math.round((unresolvedComplaints / totalComplaints) * 100);
+
+      // Calculate lease expiry percentage (how close to expiration)
+      let leaseExpiryPercentage = 0;
+      if (activeLease) {
+        const leaseStart = activeLease.startDate.getTime();
+        const leaseEnd = activeLease.endDate.getTime();
+        const now = today.getTime();
+        const leaseDuration = leaseEnd - leaseStart;
+        const timeElapsed = now - leaseStart;
+        leaseExpiryPercentage = Math.max(0, Math.min(100, Math.round((timeElapsed / leaseDuration) * 100)));
+      }
+
+      // Calculate members (number of active leases = number of occupants)
+      const members = u.leases.filter((l) => l.status === "ACTIVE").length;
+
       return {
         id: u.id,
         propertyId: u.propertyId,
@@ -70,9 +99,13 @@ export class LandlordUnitsService {
         unitName: u.name,
         status: u.status,
         baseRent: u.baseRent,
+        tenantId: activeLease?.tenant?.userId ?? null,
         tenantName: activeLease?.tenant?.userFullName ?? null,
         leaseStartDate: activeLease?.startDate ?? null,
         leaseEndDate: activeLease?.endDate ?? null,
+        complaintsPercentage,
+        leaseExpiryPercentage,
+        members,
       };
     });
 

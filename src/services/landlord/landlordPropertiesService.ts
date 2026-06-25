@@ -20,6 +20,17 @@ export class LandlordPropertiesService {
       throw new ForbiddenError("You do not own this property");
   }
 
+  private monthsOverlap(start: Date, end: Date, yearStart: Date, yearEnd: Date): number {
+    const overlapStart = start > yearStart ? start : yearStart;
+    const overlapEnd = end < yearEnd ? end : yearEnd;
+    if (overlapStart >= overlapEnd) return 0;
+    const months =
+      (overlapEnd.getFullYear() - overlapStart.getFullYear()) * 12 +
+      (overlapEnd.getMonth() - overlapStart.getMonth()) +
+      (overlapEnd.getDate() - overlapStart.getDate()) / 30;
+    return Math.max(0, months);
+  }
+
   public async getPropertyDetail(
     landlordId: string,
     propertyId: string,
@@ -32,6 +43,10 @@ export class LandlordPropertiesService {
     landlordId: string,
     query: LandlordPropertiesQuery,
   ): Promise<LandlordPropertyItem[]> {
+    const currentYear = new Date().getFullYear();
+    const yearStart = new Date(currentYear, 0, 1);
+    const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59, 999);
+
     const properties = await prisma.property.findMany({
       where: {
         landlordId,
@@ -56,26 +71,64 @@ export class LandlordPropertiesService {
         state: true,
         units: {
           where: { status: { not: "DELETED" } },
-          select: { status: true },
+          select: {
+            id: true,
+            status: true,
+            leases: {
+              where: { status: "ACTIVE", startDate: { lte: yearEnd }, endDate: { gte: yearStart } },
+              select: { rentAmount: true, startDate: true, endDate: true },
+            },
+          },
         },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    let results: LandlordPropertyItem[] = properties.map((p) => {
-      const totalUnits = p.units.length;
-      const occupiedUnits = p.units.filter((u) => u.status === "OCCUPIED").length;
+    // Fetch payments for collected rent
+    const payments = await prisma.payment.findMany({
+      where: {
+        type: "RENT",
+        status: "PAID",
+        createdAt: { gte: yearStart, lte: yearEnd },
+        lease: { unit: { property: { landlordId, isDeleted: false } } },
+      },
+      select: { amount: true, lease: { select: { unit: { select: { propertyId: true } } } } },
+    });
+
+    const collectedByProperty = new Map<string, number>();
+    for (const p of payments) {
+      const propId = p.lease?.unit?.propertyId;
+      if (propId) {
+        collectedByProperty.set(propId, (collectedByProperty.get(propId) ?? 0) + p.amount);
+      }
+    }
+
+    let results: LandlordPropertyItem[] = properties.map((prop) => {
+      const totalUnits = prop.units.length;
+      const occupiedUnits = prop.units.filter((u) => u.status === "OCCUPIED").length;
       const occupancyRate =
         totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
+
+      // Calculate expected rent for this property
+      let expectedRent = 0;
+      for (const unit of prop.units) {
+        for (const lease of unit.leases) {
+          const months = this.monthsOverlap(lease.startDate, lease.endDate, yearStart, yearEnd);
+          expectedRent += lease.rentAmount * months;
+        }
+      }
+
       return {
-        id: p.id,
-        name: p.name,
-        type: p.type,
-        address: p.address,
-        city: p.city,
-        state: p.state,
+        id: prop.id,
+        name: prop.name,
+        type: prop.type,
+        address: prop.address,
+        city: prop.city,
+        state: prop.state,
         totalUnits,
         occupancyRate,
+        expectedRent: Math.round(expectedRent),
+        collectedRent: Math.round(collectedByProperty.get(prop.id) ?? 0),
       };
     });
 
