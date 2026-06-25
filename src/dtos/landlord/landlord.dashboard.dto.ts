@@ -32,6 +32,7 @@ export interface LandlordRevenueByProperty {
   propertyName: string | null;
   expectedRevenue: number;
   collectedRevenue: number;
+  collectionRate: number;
 }
 
 export interface LandlordRevenueByUnit {
@@ -39,6 +40,7 @@ export interface LandlordRevenueByUnit {
   unitName: string;
   expectedRent: number;
   collectedRent: number;
+  collectionRate: number;
 }
 
 export interface LandlordPendingApprovalItem {

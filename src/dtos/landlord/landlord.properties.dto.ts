@@ -15,6 +15,8 @@ export const LandlordPropertiesQuerySchema = z.object({
   type: z.enum(PROPERTY_TYPES).optional(),
   minUnits: z.coerce.number().int().min(0).optional(),
   maxUnits: z.coerce.number().int().min(0).optional(),
+  minOccupancy: z.coerce.number().int().min(0).max(100).optional(),
+  maxOccupancy: z.coerce.number().int().min(0).max(100).optional(),
   sortBy: z.enum(SORT_OPTIONS).optional(),
 });
 export type LandlordPropertiesQuery = z.infer<typeof LandlordPropertiesQuerySchema>;

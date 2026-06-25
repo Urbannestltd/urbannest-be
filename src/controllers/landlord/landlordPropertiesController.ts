@@ -21,6 +21,7 @@ export class LandlordPropertiesController extends Controller {
    *  - search: partial match on property name, address, or city
    *  - type: MULTI_UNIT | SINGLE_FAMILY | COMMERCIAL | RESIDENTIAL
    *  - minUnits / maxUnits: filter by total unit count range
+   *  - minOccupancy / maxOccupancy: filter by occupancy percentage range (0-100)
    *
    * Sort options (sortBy):
    *  - name_asc / name_desc — alphabetical
@@ -36,6 +37,8 @@ export class LandlordPropertiesController extends Controller {
     @Query() type?: string,
     @Query() minUnits?: number,
     @Query() maxUnits?: number,
+    @Query() minOccupancy?: number,
+    @Query() maxOccupancy?: number,
     @Query() sortBy?: string,
   ): Promise<{ success: boolean; data: LandlordPropertyItem[] }> {
     const query = validate(LandlordPropertiesQuerySchema, {
@@ -43,6 +46,8 @@ export class LandlordPropertiesController extends Controller {
       type,
       minUnits,
       maxUnits,
+      minOccupancy,
+      maxOccupancy,
       sortBy,
     });
     const data = await this.service.getProperties(req.user.userId, query);

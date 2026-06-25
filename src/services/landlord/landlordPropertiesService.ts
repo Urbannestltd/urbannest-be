@@ -87,6 +87,14 @@ export class LandlordPropertiesService {
       results = results.filter((p) => p.totalUnits <= query.maxUnits!);
     }
 
+    // Occupancy rate filter
+    if (query.minOccupancy !== undefined) {
+      results = results.filter((p) => p.occupancyRate >= query.minOccupancy!);
+    }
+    if (query.maxOccupancy !== undefined) {
+      results = results.filter((p) => p.occupancyRate <= query.maxOccupancy!);
+    }
+
     // Sorting
     switch (query.sortBy) {
       case "name_asc":
