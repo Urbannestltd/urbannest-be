@@ -148,12 +148,21 @@ export class LandlordDashboardService {
         if (uid) collectedByUnit.set(uid, (collectedByUnit.get(uid) ?? 0) + p.amount);
       }
 
-      return units.map((u): LandlordRevenueByUnit => ({
-        unitId: u.id,
-        unitName: u.name,
-        expectedRent: Math.round(expectedByUnit.get(u.id) ?? (u.baseRent ? u.baseRent * 12 : 0)),
-        collectedRent: Math.round(collectedByUnit.get(u.id) ?? 0),
-      }));
+      const unitResults = units.map((u): LandlordRevenueByUnit => {
+        const expected = Math.round(expectedByUnit.get(u.id) ?? (u.baseRent ? u.baseRent * 12 : 0));
+        const collected = Math.round(collectedByUnit.get(u.id) ?? 0);
+        return {
+          unitId: u.id,
+          unitName: u.name,
+          expectedRent: expected,
+          collectedRent: collected,
+          collectionRate: expected > 0 ? Math.round((collected / expected) * 100) : 0,
+        };
+      });
+
+      return unitResults
+        .sort((a, b) => b.collectionRate - a.collectionRate)
+        .slice(0, 10);
     } else {
       // ── Group by property ───────────────────────────────────────────────────
       const [properties, leases, payments] = await Promise.all([
@@ -201,12 +210,21 @@ export class LandlordDashboardService {
         if (pid) collectedByProperty.set(pid, (collectedByProperty.get(pid) ?? 0) + p.amount);
       }
 
-      return properties.map((prop): LandlordRevenueByProperty => ({
-        propertyId: prop.id,
-        propertyName: prop.name,
-        expectedRevenue: Math.round(expectedByProperty.get(prop.id) ?? 0),
-        collectedRevenue: Math.round(collectedByProperty.get(prop.id) ?? 0),
-      }));
+      const propertyResults = properties.map((prop): LandlordRevenueByProperty => {
+        const expected = Math.round(expectedByProperty.get(prop.id) ?? 0);
+        const collected = Math.round(collectedByProperty.get(prop.id) ?? 0);
+        return {
+          propertyId: prop.id,
+          propertyName: prop.name,
+          expectedRevenue: expected,
+          collectedRevenue: collected,
+          collectionRate: expected > 0 ? Math.round((collected / expected) * 100) : 0,
+        };
+      });
+
+      return propertyResults
+        .sort((a, b) => b.collectionRate - a.collectionRate)
+        .slice(0, 10);
     }
   }
 
