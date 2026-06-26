@@ -27,19 +27,50 @@ export interface LandlordTenantItem {
 }
 
 export interface LandlordTenantDetail {
-  tenantId: string;
-  tenantName: string | null;
-  tenantEmail: string | null;
-  tenantPhone: string | null;
-  leases: {
+  // Header
+  id: string;
+  fullName: string;
+  profilePic: string | null;
+  status: "Active Lease" | "No Active Lease";
+
+  // General Information
+  email: string;
+  phone: string | null;
+  emergencyContact: string | null;
+  dateOfBirth: Date | null;
+  occupation: string | null;
+  employer: string | null;
+
+  // Lease Information (Current)
+  currentLease: {
     leaseId: string;
     propertyId: string;
     propertyName: string | null;
     unitId: string;
     unitName: string;
-    leaseStatus: string;
     rentAmount: number;
-    leaseStartDate: Date;
-    leaseEndDate: Date;
+    serviceCharge: number;
+    leaseExpiryPercentage: string;
+    leaseLength: string;
+    startDate: Date;
+    endDate: Date;
+    moveOutNotice: string | null;
+    agreementUrl: string | null;
+  } | null;
+
+  // Histories & Lists
+  leaseHistory: {
+    leaseId: string;
+    propertyName: string | null;
+    unitName: string;
+    startDate: Date;
+    endDate: Date;
+    agreementUrl: string | null;
+  }[];
+  paymentHistory: {
+    type: string;
+    amount: number;
+    date: Date;
+    status: string;
   }[];
 }
