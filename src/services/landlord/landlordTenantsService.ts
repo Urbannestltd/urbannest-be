@@ -116,59 +116,101 @@ export class LandlordTenantsService {
     landlordId: string,
     tenantId: string,
   ): Promise<LandlordTenantDetail> {
-    // Fetch tenant with all their leases for this landlord's properties
     const tenant = await prisma.user.findUnique({
       where: { userId: tenantId },
-      select: {
-        userId: true,
-        userFullName: true,
-        userEmail: true,
-        userPhone: true,
+      include: {
         leases: {
-          where: {
-            unit: {
-              property: { landlordId, isDeleted: false },
-            },
-          },
-          select: {
-            id: true,
-            status: true,
-            rentAmount: true,
-            startDate: true,
-            endDate: true,
-            unit: {
-              select: {
-                id: true,
-                name: true,
-                propertyId: true,
-                property: { select: { name: true } },
-              },
-            },
-          },
+          where: { unit: { property: { landlordId, isDeleted: false } } },
+          include: { unit: { include: { property: true } } },
+          orderBy: { startDate: "desc" },
+        },
+        payments: {
+          where: { lease: { unit: { property: { landlordId, isDeleted: false } } } },
           orderBy: { createdAt: "desc" },
+          take: 10,
         },
       },
     });
 
-    if (!tenant || tenant.leases.length === 0) {
-      throw new NotFoundError("Tenant not found or has no leases with your properties");
+    if (!tenant) {
+      throw new NotFoundError("Tenant not found");
+    }
+
+    // Separate Active Lease from History
+    const activeLease = tenant.leases.find((l) => l.status === "ACTIVE");
+    const pastLeases = tenant.leases.filter((l) => l.status !== "ACTIVE");
+
+    // Calculate Current Lease Specifics
+    let currentLeaseData = null;
+    if (activeLease) {
+      const start = new Date(activeLease.startDate).getTime();
+      const end = new Date(activeLease.endDate).getTime();
+      const now = new Date().getTime();
+
+      // Expiry Circle
+      const totalDuration = end - start;
+      const remaining = end - now;
+      let percentage = totalDuration > 0 ? Math.round((remaining / totalDuration) * 100) : 0;
+      percentage = Math.max(0, Math.min(100, percentage));
+
+      // Lease Length String (e.g., "4 years")
+      const diffInMonths =
+        (new Date(activeLease.endDate).getFullYear() -
+          new Date(activeLease.startDate).getFullYear()) *
+          12 +
+        (new Date(activeLease.endDate).getMonth() -
+          new Date(activeLease.startDate).getMonth());
+      const leaseLength =
+        diffInMonths >= 12
+          ? `${Math.round(diffInMonths / 12)} years`
+          : `${diffInMonths} months`;
+
+      currentLeaseData = {
+        leaseId: activeLease.id,
+        propertyId: activeLease.unit.propertyId,
+        propertyName: activeLease.unit.property.name,
+        unitId: activeLease.unitId,
+        unitName: activeLease.unit.name,
+        rentAmount: activeLease.rentAmount,
+        serviceCharge: activeLease.serviceCharge || 0,
+        leaseExpiryPercentage: `${percentage}%`,
+        leaseLength,
+        startDate: activeLease.startDate,
+        endDate: activeLease.endDate,
+        moveOutNotice: activeLease.moveOutNotice,
+        agreementUrl: activeLease.documentUrl,
+      };
     }
 
     return {
-      tenantId: tenant.userId,
-      tenantName: tenant.userFullName,
-      tenantEmail: tenant.userEmail,
-      tenantPhone: tenant.userPhone,
-      leases: tenant.leases.map((l) => ({
+      id: tenant.userId,
+      fullName: tenant.userFullName || "Unknown",
+      profilePic: tenant.userProfileUrl,
+      status: activeLease ? "Active Lease" : "No Active Lease",
+
+      email: tenant.userEmail,
+      phone: tenant.userPhone,
+      emergencyContact: tenant.userEmergencyContact,
+      dateOfBirth: tenant.dateOfBirth,
+      occupation: tenant.occupation,
+      employer: tenant.employer,
+
+      currentLease: currentLeaseData,
+
+      leaseHistory: pastLeases.map((l) => ({
         leaseId: l.id,
-        propertyId: l.unit.propertyId,
         propertyName: l.unit.property.name,
-        unitId: l.unit.id,
         unitName: l.unit.name,
-        leaseStatus: l.status,
-        rentAmount: l.rentAmount,
-        leaseStartDate: l.startDate,
-        leaseEndDate: l.endDate,
+        startDate: l.startDate,
+        endDate: l.endDate,
+        agreementUrl: l.documentUrl,
+      })),
+
+      paymentHistory: tenant.payments.map((p) => ({
+        type: p.type,
+        amount: p.amount,
+        date: p.createdAt,
+        status: p.status === "PAID" ? "Payment Successful" : p.status,
       })),
     };
   }
