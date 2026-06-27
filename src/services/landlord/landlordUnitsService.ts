@@ -1,8 +1,10 @@
 import { prisma } from "../../config/prisma";
 import { ForbiddenError } from "../../utils/apiError";
+import { normalizeFloor } from "../admin/propertyService";
 import type {
   LandlordUnitsQuery,
   LandlordUnitItem,
+  LandlordUnit,
 } from "../../dtos/landlord/landlord.units.dto";
 
 export class LandlordUnitsService {
@@ -19,7 +21,7 @@ export class LandlordUnitsService {
   public async getUnits(
     landlordId: string,
     query: LandlordUnitsQuery,
-  ): Promise<LandlordUnitItem[]> {
+  ): Promise<LandlordUnitItem> {
     // If propertyId is specified, verify ownership
     if (query.propertyId) {
       await this.assertLandlordOwnsProperty(landlordId, query.propertyId);
@@ -44,6 +46,7 @@ export class LandlordUnitsService {
         id: true,
         propertyId: true,
         name: true,
+        floor: true,
         status: true,
         baseRent: true,
         property: { select: { name: true } },
@@ -66,7 +69,8 @@ export class LandlordUnitsService {
 
     const today = new Date();
 
-    let results: LandlordUnitItem[] = units.map((u) => {
+    // Map units with calculated fields
+    const unitsList: LandlordUnit[] = units.map((u) => {
       const activeLease = u.leases.find((l) => l.status === "ACTIVE");
 
       // Calculate complaints percentage
@@ -109,22 +113,51 @@ export class LandlordUnitsService {
       };
     });
 
-    // Sorting
-    switch (query.sortBy) {
-      case "name_asc":
-        results.sort((a, b) => a.unitName.localeCompare(b.unitName));
-        break;
-      case "name_desc":
-        results.sort((a, b) => b.unitName.localeCompare(a.unitName));
-        break;
-      case "status_asc":
-        results.sort((a, b) => a.status.localeCompare(b.status));
-        break;
-      case "status_desc":
-        results.sort((a, b) => b.status.localeCompare(a.status));
-        break;
+    // Group units by normalized floor
+    const grouped = new Map<string, LandlordUnit[]>();
+    for (const unit of unitsList) {
+      const normalizedFloor = normalizeFloor(units.find(u => u.id === unit.id)?.floor);
+      if (!grouped.has(normalizedFloor)) {
+        grouped.set(normalizedFloor, []);
+      }
+      grouped.get(normalizedFloor)!.push(unit);
     }
 
-    return results;
+    // Sort floors numerically
+    const sortFloors = (a: string, b: string) => {
+      const isUnassignedA = a === "Unassigned";
+      const isUnassignedB = b === "Unassigned";
+
+      if (isUnassignedA && !isUnassignedB) return 1;
+      if (!isUnassignedA && isUnassignedB) return -1;
+      if (isUnassignedA && isUnassignedB) return 0;
+
+      const numA = parseInt(a.match(/\d+/)?.[0] || "999");
+      const numB = parseInt(b.match(/\d+/)?.[0] || "999");
+      return numA - numB;
+    };
+
+    // Sort units within each floor by the requested criteria
+    const sortUnitsInFloor = (units: LandlordUnit[]) => {
+      switch (query.sortBy) {
+        case "name_asc":
+          return units.sort((a, b) => a.unitName.localeCompare(b.unitName));
+        case "name_desc":
+          return units.sort((a, b) => b.unitName.localeCompare(a.unitName));
+        case "status_asc":
+          return units.sort((a, b) => a.status.localeCompare(b.status));
+        case "status_desc":
+          return units.sort((a, b) => b.status.localeCompare(a.status));
+        default:
+          return units;
+      }
+    };
+
+    // Build the final grouped response
+    const floorOrder = Array.from(grouped.keys()).sort(sortFloors);
+    return floorOrder.map((floor) => ({
+      floor,
+      units: sortUnitsInFloor(grouped.get(floor) || []),
+    }));
   }
 }

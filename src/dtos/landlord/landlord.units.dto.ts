@@ -10,7 +10,7 @@ export const LandlordUnitsQuerySchema = z.object({
 });
 export type LandlordUnitsQuery = z.infer<typeof LandlordUnitsQuerySchema>;
 
-export interface LandlordUnitItem {
+export interface LandlordUnit {
   id: string;
   propertyId: string;
   propertyName: string | null;
@@ -25,3 +25,10 @@ export interface LandlordUnitItem {
   leaseExpiryPercentage: number;
   members: number;
 }
+
+export interface LandlordUnitsByFloor {
+  floor: string;
+  units: LandlordUnit[];
+}
+
+export type LandlordUnitItem = LandlordUnitsByFloor[];
