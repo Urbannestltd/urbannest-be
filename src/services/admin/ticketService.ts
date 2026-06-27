@@ -135,13 +135,14 @@ export class AdminTicketService {
         select: { status: true },
       }),
 
-      // 3. Sum of budgets for non-cancelled tickets
-      prisma.maintenanceRequest.aggregate({
+      // 3. Sum of expenses logged for non-cancelled tickets
+      prisma.expense.aggregate({
         where: {
-          status: { notIn: ["CANCELLED"] },
-          budget: { not: null },
+          maintenanceRequest: {
+            status: { notIn: ["CANCELLED"] },
+          },
         },
-        _sum: { budget: true },
+        _sum: { amount: true },
       }),
 
       // 4. First message timestamp per ticket (for avg response time)
