@@ -46,11 +46,11 @@ export class LandlordMaintenanceService {
 
     const [openTickets, expenseAgg, resolvedTickets, ticketsByYear, expensesByProperty] =
       await Promise.all([
-        // 1. Open ticket count (not year-filtered — reflects current state)
+        // 1. Total tickets count for the year and category
         prisma.maintenanceRequest.count({
           where: {
             unitId: { in: unitIds },
-            status: { notIn: OPEN_EXCLUDE_STATUSES as any },
+            createdAt: { gte: start, lte: end },
             ...categoryFilter,
           },
         }),
