@@ -10,6 +10,24 @@ import type { PropertyDetailsResponseDto } from "../../dtos/admin/property.dto";
 export class LandlordPropertiesService {
   private adminPropertyService = new AdminPropertyService();
 
+  private mapPropertyType(dbType: string): string {
+    const typeMap: Record<string, string> = {
+      MULTI_UNIT: "RESIDENTIAL",
+      SINGLE_FAMILY: "RESIDENTIAL",
+      COMMERCIAL: "COMMERCIAL",
+      RESIDENTIAL: "RESIDENTIAL",
+    };
+    return typeMap[dbType] || dbType;
+  }
+
+  private mapPropertyTypeToDb(displayType: string): string[] {
+    const typeMap: Record<string, string[]> = {
+      RESIDENTIAL: ["MULTI_UNIT", "SINGLE_FAMILY"],
+      COMMERCIAL: ["COMMERCIAL"],
+    };
+    return typeMap[displayType] || [displayType];
+  }
+
   private async assertOwnership(landlordId: string, propertyId: string) {
     const property = await prisma.property.findUnique({
       where: { id: propertyId },
@@ -47,11 +65,13 @@ export class LandlordPropertiesService {
     const yearStart = new Date(currentYear, 0, 1);
     const yearEnd = new Date(currentYear, 11, 31, 23, 59, 59, 999);
 
+    const dbTypes = query.type ? this.mapPropertyTypeToDb(query.type) : undefined;
+
     const properties = await prisma.property.findMany({
       where: {
         landlordId,
         isDeleted: false,
-        ...(query.type ? { type: query.type as any } : {}),
+        ...(dbTypes ? { type: { in: dbTypes as any } } : {}),
         ...(query.search
           ? {
               OR: [
@@ -105,7 +125,8 @@ export class LandlordPropertiesService {
 
     let results: LandlordPropertyItem[] = properties.map((prop) => {
       const totalUnits = prop.units.length;
-      const occupiedUnits = prop.units.filter((u) => u.status === "OCCUPIED").length;
+      // Count units with active leases (actual occupancy)
+      const occupiedUnits = prop.units.filter((u) => u.leases.length > 0).length;
       const occupancyRate =
         totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
 
@@ -121,11 +142,12 @@ export class LandlordPropertiesService {
       return {
         id: prop.id,
         name: prop.name,
-        type: prop.type,
+        type: this.mapPropertyType(prop.type),
         address: prop.address,
         city: prop.city,
         state: prop.state,
         totalUnits,
+        occupiedUnits,
         occupancyRate,
         expectedRent: Math.round(expectedRent),
         collectedRent: Math.round(collectedByProperty.get(prop.id) ?? 0),

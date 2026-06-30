@@ -14,11 +14,13 @@ export class LandlordUnitsController extends Controller {
 
   /**
    * Returns all units belonging to the landlord's properties.
-   * Each item includes: id, propertyId, propertyName, unitName, floor (normalized), status, baseRent, tenantName, lease dates.
+   * Each item includes: id, propertyId, propertyName, unitName, floor (normalized), status, baseRent, tenantId, tenantName,
+   * complaintsPercentage, leaseExpiryPercentage, members, and lease dates.
    * Floor names are normalized (e.g., "7", "Floor 7", "Seventh Floor" → "Floor 7").
    *
    * Filters:
    *  - propertyId: limit to a specific property
+   *  - unitId: get a specific unit
    *  - search: partial match on unit name or property name
    *  - status: AVAILABLE | OCCUPIED | MAINTENANCE
    *
@@ -32,12 +34,14 @@ export class LandlordUnitsController extends Controller {
   public async getUnits(
     @Request() req: any,
     @Query() propertyId?: string,
+    @Query() unitId?: string,
     @Query() search?: string,
     @Query() status?: string,
     @Query() sortBy?: string,
   ): Promise<{ success: boolean; data: LandlordUnitItem }> {
     const query = validate(LandlordUnitsQuerySchema, {
       propertyId,
+      unitId,
       search,
       status,
       sortBy,

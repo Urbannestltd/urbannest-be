@@ -56,7 +56,7 @@ export class LandlordDashboardService {
     const propScope = this.scopedProperty(landlordId, query.propertyId);
     const { start, end } = this.resolveYear(query.year);
 
-    const [totalProperties, unitGroups, revenueResult, pendingApprovalsCount] =
+    const [totalProperties, unitGroups, occupiedUnitsCount, revenueResult, pendingApprovalsCount] =
       await Promise.all([
         prisma.property.count({ where: propScope }),
 
@@ -64,6 +64,14 @@ export class LandlordDashboardService {
           by: ["status"],
           where: { property: propScope },
           _count: { id: true },
+        }),
+
+        prisma.unit.count({
+          where: {
+            property: propScope,
+            status: { not: "DELETED" as any },
+            leases: { some: { status: "ACTIVE" } },
+          },
         }),
 
         prisma.payment.aggregate({
@@ -81,15 +89,15 @@ export class LandlordDashboardService {
         }),
       ]);
 
-    const occupiedCount =
-      unitGroups.find((g) => g.status === "OCCUPIED")?._count.id ?? 0;
     const totalUnits = unitGroups
       .filter((g) => g.status !== "DELETED")
       .reduce((acc, g) => acc + g._count.id, 0);
-    const occupancyRate = totalUnits === 0 ? 0 : Math.round((occupiedCount / totalUnits) * 100);
+    const occupancyRate = totalUnits === 0 ? 0 : Math.round((occupiedUnitsCount / totalUnits) * 100);
 
     return {
       totalProperties,
+      totalUnits,
+      occupiedUnits: occupiedUnitsCount,
       occupancyRate,
       revenueCollected: revenueResult._sum.amount ?? 0,
       pendingApprovalsCount,

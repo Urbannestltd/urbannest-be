@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const PROPERTY_TYPES = ["MULTI_UNIT", "SINGLE_FAMILY", "COMMERCIAL", "RESIDENTIAL"] as const;
+const PROPERTY_TYPES = ["RESIDENTIAL", "COMMERCIAL"] as const;
 const SORT_OPTIONS = [
   "name_asc",
   "name_desc",
@@ -29,6 +29,7 @@ export interface LandlordPropertyItem {
   city: string | null;
   state: string;
   totalUnits: number;
+  occupiedUnits: number;
   occupancyRate: number;
   expectedRent: number;
   collectedRent: number;
