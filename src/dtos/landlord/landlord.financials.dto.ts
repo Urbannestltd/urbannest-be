@@ -28,6 +28,7 @@ export type FinancialsExportQuery = z.infer<typeof FinancialsExportQuerySchema>;
 export interface FinancialsSummary {
   totalRevenueCollected: number;
   totalOutstandingRent: number;
+  totalExpenses: number;
   activeLeasesCount: number;
   totalUnitsCount: number;
 }
@@ -63,13 +64,17 @@ export interface FinancialArrearItem {
 }
 
 export interface FinancialTransactionItem {
+  recordType: "PAYMENT" | "EXPENSE";
   transactionId: string;
   transactionDate: Date;
   tenantName: string | null;
   propertyName: string | null;
   unitName: string | null;
   amount: number;
-  paymentType: string;
-  paymentStatus: string;
-  reference: string;
+  paymentType?: string;
+  paymentStatus?: string;
+  reference?: string;
+  expenseCategory?: string;
+  expenseDescription?: string;
+  expenseStatus?: string;
 }

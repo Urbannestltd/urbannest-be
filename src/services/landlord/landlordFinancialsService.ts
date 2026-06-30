@@ -61,7 +61,7 @@ export class LandlordFinancialsService {
     const propScope = this.scopedProperty(landlordId, query.propertyId);
     const { start, end } = this.resolveYear(query.year);
 
-    const [revenueResult, outstandingResult, activeLeasesCount, unitGroups] = await Promise.all([
+    const [revenueResult, outstandingResult, expensesResult, activeLeasesCount, unitGroups] = await Promise.all([
       prisma.payment.aggregate({
         where: {
           type: "RENT",
@@ -77,6 +77,14 @@ export class LandlordFinancialsService {
           type: "RENT",
           status: { in: ["PENDING", "OVERDUE"] },
           lease: { unit: { property: propScope } },
+        },
+        _sum: { amount: true },
+      }),
+
+      prisma.expense.aggregate({
+        where: {
+          property: propScope,
+          date: { gte: start, lte: end },
         },
         _sum: { amount: true },
       }),
@@ -102,6 +110,7 @@ export class LandlordFinancialsService {
     return {
       totalRevenueCollected: Math.round(revenueResult._sum.amount ?? 0),
       totalOutstandingRent: Math.round(outstandingResult._sum.amount ?? 0),
+      totalExpenses: Math.round(expensesResult._sum.amount ?? 0),
       activeLeasesCount,
       totalUnitsCount,
     };
@@ -158,12 +167,18 @@ export class LandlordFinancialsService {
         if (uid) collectedByUnit.set(uid, (collectedByUnit.get(uid) ?? 0) + p.amount);
       }
 
-      return units.map((u): FinancialRevenueByUnit => ({
-        unitId: u.id,
-        unitName: u.name,
-        expectedRent: Math.round(expectedByUnit.get(u.id) ?? (u.baseRent ? u.baseRent * 12 : 0)),
-        collectedRent: Math.round(collectedByUnit.get(u.id) ?? 0),
-      }));
+      return units.map((u): FinancialRevenueByUnit => {
+        // Use expected from active leases if available, otherwise use collected (actual rent paid)
+        // as proxy for expected rent when lease date range doesn't match query year
+        const expected = expectedByUnit.get(u.id);
+        const collected = collectedByUnit.get(u.id) ?? 0;
+        return {
+          unitId: u.id,
+          unitName: u.name,
+          expectedRent: Math.round(expected ?? collected ?? (u.baseRent ? u.baseRent * 12 : 0)),
+          collectedRent: Math.round(collected),
+        };
+      });
     } else {
       const [properties, leases, payments] = await Promise.all([
         prisma.property.findMany({
@@ -208,12 +223,17 @@ export class LandlordFinancialsService {
         if (pid) collectedByProperty.set(pid, (collectedByProperty.get(pid) ?? 0) + p.amount);
       }
 
-      return properties.map((prop): FinancialRevenueByProperty => ({
-        propertyId: prop.id,
-        propertyName: prop.name,
-        expectedRevenue: Math.round(expectedByProperty.get(prop.id) ?? 0),
-        collectedRevenue: Math.round(collectedByProperty.get(prop.id) ?? 0),
-      }));
+      return properties.map((prop): FinancialRevenueByProperty => {
+        // Use expected from active leases if available, otherwise use collected as proxy
+        const expected = expectedByProperty.get(prop.id);
+        const collected = collectedByProperty.get(prop.id) ?? 0;
+        return {
+          propertyId: prop.id,
+          propertyName: prop.name,
+          expectedRevenue: Math.round(expected ?? collected ?? 0),
+          collectedRevenue: Math.round(collected),
+        };
+      });
     }
   }
 
@@ -369,21 +389,19 @@ export class LandlordFinancialsService {
 
     const propScope = this.scopedProperty(landlordId, query.propertyId);
 
-    const dateFilter =
-      query.startDate || query.endDate
-        ? {
-            createdAt: {
-              ...(query.startDate ? { gte: new Date(query.startDate) } : {}),
-              ...(query.endDate
-                ? { lte: new Date(`${query.endDate}T23:59:59.999Z`) }
-                : {}),
-            },
-          }
-        : {};
+    const dateFilter = query.startDate || query.endDate
+      ? {
+          gte: query.startDate ? new Date(query.startDate) : undefined,
+          lte: query.endDate ? new Date(`${query.endDate}T23:59:59.999Z`) : undefined,
+        }
+      : undefined;
 
+    const results: FinancialTransactionItem[] = [];
+
+    // ── Payments ────────────────────────────────────────────────────────────
     const payments = await prisma.payment.findMany({
       where: {
-        ...dateFilter,
+        ...(dateFilter && { createdAt: dateFilter }),
         lease: { unit: { property: propScope } },
       },
       select: {
@@ -408,17 +426,58 @@ export class LandlordFinancialsService {
       orderBy: { createdAt: "desc" },
     });
 
-    return payments.map((p): FinancialTransactionItem => ({
-      transactionId: p.id,
-      transactionDate: p.createdAt,
-      tenantName: p.lease?.tenant?.userFullName ?? null,
-      propertyName: p.lease?.unit?.property?.name ?? null,
-      unitName: p.lease?.unit?.name ?? null,
-      amount: p.amount,
-      paymentType: p.type,
-      paymentStatus: p.status,
-      reference: p.reference,
-    }));
+    results.push(
+      ...payments.map((p): FinancialTransactionItem => ({
+        recordType: "PAYMENT",
+        transactionId: p.id,
+        transactionDate: p.createdAt,
+        tenantName: p.lease?.tenant?.userFullName ?? null,
+        propertyName: p.lease?.unit?.property?.name ?? null,
+        unitName: p.lease?.unit?.name ?? null,
+        amount: p.amount,
+        paymentType: p.type,
+        paymentStatus: p.status,
+        reference: p.reference,
+      })),
+    );
+
+    // ── Expenses ─────────────────────────────────────────────────────────────
+    const expenses = await prisma.expense.findMany({
+      where: {
+        property: propScope,
+        ...(dateFilter && { date: dateFilter }),
+      },
+      select: {
+        id: true,
+        amount: true,
+        category: true,
+        description: true,
+        status: true,
+        date: true,
+        property: { select: { name: true } },
+        unit: { select: { name: true } },
+      },
+      orderBy: { date: "desc" },
+    });
+
+    results.push(
+      ...expenses.map((e): FinancialTransactionItem => ({
+        recordType: "EXPENSE",
+        transactionId: e.id,
+        transactionDate: e.date,
+        tenantName: null,
+        propertyName: e.property?.name ?? null,
+        unitName: e.unit?.name ?? null,
+        amount: e.amount,
+        expenseCategory: e.category,
+        expenseDescription: e.description,
+        expenseStatus: e.status,
+      })),
+    );
+
+    // Sort combined results by date descending
+    results.sort((a, b) => b.transactionDate.getTime() - a.transactionDate.getTime());
+    return results;
   }
 
   // ── Export Ledger ────────────────────────────────────────────────────────────
@@ -434,17 +493,18 @@ export class LandlordFinancialsService {
       endDate: query.endDate,
     });
 
-    const headers = ["Date", "Tenant", "Property", "Unit", "Amount", "Type", "Status", "Reference"];
+    const headers = ["Date", "Record Type", "Tenant", "Property", "Unit", "Amount", "Category/Payment Type", "Status", "Description/Reference"];
 
     const rows = transactions.map((t) => [
       t.transactionDate.toISOString().slice(0, 10),
+      t.recordType,
       t.tenantName ?? "",
       t.propertyName ?? "",
       t.unitName ?? "",
       t.amount,
-      t.paymentType,
-      t.paymentStatus,
-      t.reference,
+      t.recordType === "PAYMENT" ? t.paymentType : t.expenseCategory,
+      t.recordType === "PAYMENT" ? t.paymentStatus : t.expenseStatus,
+      t.recordType === "PAYMENT" ? t.reference : t.expenseDescription,
     ]);
 
     if (query.format === "xlsx") {

@@ -30,6 +30,7 @@ export class LandlordUnitsService {
     const units = await prisma.unit.findMany({
       where: {
         ...(query.propertyId ? { propertyId: query.propertyId } : {}),
+        ...(query.unitId ? { id: query.unitId } : {}),
         property: { landlordId, isDeleted: false },
         status: { not: "DELETED" as any },
         ...(query.status ? { status: query.status as any } : {}),
@@ -107,6 +108,7 @@ export class LandlordUnitsService {
         tenantName: activeLease?.tenant?.userFullName ?? null,
         leaseStartDate: activeLease?.startDate ?? null,
         leaseEndDate: activeLease?.endDate ?? null,
+        floor: normalizeFloor(u.floor),
         complaintsPercentage,
         leaseExpiryPercentage,
         members,
@@ -155,9 +157,12 @@ export class LandlordUnitsService {
 
     // Build the final grouped response
     const floorOrder = Array.from(grouped.keys()).sort(sortFloors);
-    return floorOrder.map((floor) => ({
-      floor,
-      units: sortUnitsInFloor(grouped.get(floor) || []),
-    }));
+    return {
+      totalUnits: unitsList.length,
+      floors: floorOrder.map((floor) => ({
+        floor,
+        units: sortUnitsInFloor(grouped.get(floor) || []),
+      })),
+    };
   }
 }

@@ -4,6 +4,7 @@ const UNIT_STATUSES = ["AVAILABLE", "OCCUPIED", "MAINTENANCE"] as const;
 
 export const LandlordUnitsQuerySchema = z.object({
   propertyId: z.string().uuid("Invalid property ID").optional(),
+  unitId: z.string().uuid("Invalid unit ID").optional(),
   search: z.string().max(100).optional(),
   status: z.enum(UNIT_STATUSES).optional(),
   sortBy: z.enum(["name_asc", "name_desc", "status_asc", "status_desc"]).optional(),
@@ -21,6 +22,7 @@ export interface LandlordUnit {
   tenantName: string | null;
   leaseStartDate: Date | null;
   leaseEndDate: Date | null;
+  floor: string | null;
   complaintsPercentage: number;
   leaseExpiryPercentage: number;
   members: number;
@@ -31,4 +33,9 @@ export interface LandlordUnitsByFloor {
   units: LandlordUnit[];
 }
 
-export type LandlordUnitItem = LandlordUnitsByFloor[];
+export interface LandlordUnitsResponse {
+  totalUnits: number;
+  floors: LandlordUnitsByFloor[];
+}
+
+export type LandlordUnitItem = LandlordUnitsResponse;

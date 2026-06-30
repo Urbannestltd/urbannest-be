@@ -22,6 +22,8 @@ export type RejectLeadBody = z.infer<typeof RejectLeadBodySchema>;
 
 export interface LandlordDashboardSummary {
   totalProperties: number;
+  totalUnits: number;
+  occupiedUnits: number;
   occupancyRate: number;
   revenueCollected: number;
   pendingApprovalsCount: number;
