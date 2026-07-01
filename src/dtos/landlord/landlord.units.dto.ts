@@ -18,6 +18,7 @@ export interface LandlordUnit {
   unitName: string;
   status: string;
   baseRent: number | null;
+  rentAmount: number | string | null;
   tenantId: string | null;
   tenantName: string | null;
   leaseStartDate: Date | null;

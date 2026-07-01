@@ -104,6 +104,7 @@ export class LandlordUnitsService {
         unitName: u.name,
         status: u.status,
         baseRent: u.baseRent,
+        rentAmount: activeLease?.rentAmount ?? "N/A",
         tenantId: activeLease?.tenant?.userId ?? null,
         tenantName: activeLease?.tenant?.userFullName ?? null,
         leaseStartDate: activeLease?.startDate ?? null,
