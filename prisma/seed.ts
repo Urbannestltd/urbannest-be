@@ -72,6 +72,7 @@ async function main() {
     { name: "TENANT", desc: "Resident" },
     { name: "VENDOR", desc: "Service Provider / Maintenance Worker" },
     { name: "FACILITY_MANAGER", desc: "Manages property facilities and operations" },
+    { name: "AGENT", desc: "Field agent who markets properties and manages leads" },
   ];
 
   // We no longer need the createdRoles dictionary!
@@ -149,6 +150,20 @@ async function main() {
     },
   });
 
+  // Agent: Amaka Nwosu
+  const agent = await prisma.user.upsert({
+    where: { userEmail: "amaka@urbannest.com" },
+    update: {},
+    create: {
+      userEmail: "amaka@urbannest.com",
+      userFullName: "Amaka Nwosu",
+      userPhone: "08023456789",
+      userStatus: UserStatus.ACTIVE,
+      userPassword: defaultPassword,
+      userRole: { connect: { roleName: "AGENT" } },
+    },
+  });
+
   // ==================================================
   // 4. CREATE PROPERTY & UNITS (Lagos Context)
   // ==================================================
@@ -161,7 +176,14 @@ async function main() {
   if (property) {
     property = await prisma.property.update({
       where: { id: property.id },
-      data: { facilityManagerId: facilityManager.userId },
+      data: {
+        facilityManagerId: facilityManager.userId,
+        agentId: agent.userId,
+        price: property.price ?? 4500000,
+        amenities: property.amenities.length
+          ? property.amenities
+          : ["24/7 Power", "Swimming Pool", "Gym", "Secure Parking"],
+      },
     });
   } else {
     property = await prisma.property.create({
@@ -174,6 +196,9 @@ async function main() {
         landlordId: landlord.userId,
         type: PropertyType.MULTI_UNIT, // Fix: Use Enum instead of raw string
         facilityManagerId: facilityManager.userId,
+        agentId: agent.userId,
+        price: 4500000,
+        amenities: ["24/7 Power", "Swimming Pool", "Gym", "Secure Parking"],
         units: {
           create: [
             {
@@ -238,6 +263,49 @@ async function main() {
   }
 
   // ==================================================
+  // 6. CREATE AGENT LEADS (Sample Pipeline)
+  // ==================================================
+  console.log("...creating agent leads");
+
+  const availableUnit = units.find((u) => u.name === "Block C4, Flat 402");
+
+  const existingDraftLead = await prisma.agentLead.findFirst({
+    where: { agentId: agent.userId, prospectName: "Chidi Okafor" },
+  });
+  if (!existingDraftLead) {
+    await prisma.agentLead.create({
+      data: {
+        agentId: agent.userId,
+        propertyId: property.id,
+        unitId: availableUnit?.id,
+        prospectName: "Chidi Okafor",
+        prospectEmail: "chidi.okafor@example.com",
+        prospectPhone: "08034567890",
+        proposedRent: 4500000,
+        status: "PENDING",
+      },
+    });
+  }
+
+  const existingForwardedLead = await prisma.agentLead.findFirst({
+    where: { agentId: agent.userId, prospectName: "Ngozi Umeh" },
+  });
+  if (!existingForwardedLead) {
+    await prisma.agentLead.create({
+      data: {
+        agentId: agent.userId,
+        propertyId: property.id,
+        unitId: availableUnit?.id,
+        prospectName: "Ngozi Umeh",
+        prospectEmail: "ngozi.umeh@example.com",
+        prospectPhone: "08045678901",
+        proposedRent: 4500000,
+        status: "FORWARDED_TO_LANDLORD",
+      },
+    });
+  }
+
+  // ==================================================
   // FINISH
   // ==================================================
   console.log("==================================================");
@@ -246,6 +314,7 @@ async function main() {
   console.log(`🔑 Admin Email: ${adminEmail} | Pass: Password1$`);
   console.log(`🔑 Landlord Email: obi@properties.ng | Pass: Password1$`);
   console.log(`🔑 Tenant Email: tunde@gmail.com | Pass: Password1$`);
+  console.log(`🔑 Agent Email: amaka@urbannest.com | Pass: Password1$`);
   console.log("==================================================");
 }
 

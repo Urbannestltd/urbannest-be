@@ -29,3 +29,27 @@ export interface AgentLeadResponse {
   status: string;
   createdAt: Date;
 }
+
+// ── List / Filter ─────────────────────────────────────────────────────────────
+
+export const GetLeadsQuerySchema = z.object({
+  search: z.string().max(100).optional(),
+  status: z.enum(["ALL", "DRAFT", "FORWARDED", "APPROVED", "REJECTED"]).default("ALL"),
+  propertyId: z.string().uuid("Invalid property ID").optional(),
+});
+export type GetLeadsQuery = z.infer<typeof GetLeadsQuerySchema>;
+
+export interface AgentLeadListItem {
+  leadId: string;
+  prospectName: string;
+  propertyName: string | null;
+  unitNumber: string | null;
+  status: string;
+  dateAdded: Date;
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+
+export interface DeleteLeadResponse {
+  leadId: string;
+}

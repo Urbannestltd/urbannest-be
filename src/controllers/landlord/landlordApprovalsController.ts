@@ -3,10 +3,12 @@ import { LandlordApprovalsService } from "../../services/landlord/landlordApprov
 import {
   ApprovalsListQuerySchema,
   RejectApplicationBodySchema,
+  ApproveApplicationBodySchema,
   type ApprovalListItem,
   type ApprovalHistoryItem,
   type ApplicantDossier,
   type RejectApplicationBody,
+  type ApproveApplicationBody,
 } from "../../dtos/landlord/landlord.approvals.dto";
 import { validate } from "../../utils/validate";
 
@@ -84,8 +86,10 @@ export class LandlordApprovalsController extends Controller {
   public async approve(
     @Path() leadId: string,
     @Request() req: any,
+    @Body() body: ApproveApplicationBody,
   ): Promise<{ success: boolean; message: string }> {
-    await this.service.approve(req.user.userId, leadId);
+    const { agentFeeAmount } = validate(ApproveApplicationBodySchema, body);
+    await this.service.approve(req.user.userId, leadId, agentFeeAmount);
     return { success: true, message: "Application approved" };
   }
 

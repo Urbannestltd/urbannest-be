@@ -121,6 +121,12 @@ enum AgentLeadStatus {
   WITHDRAWN
 }
 
+enum AgentFeeStatus {
+  PENDING_ADMIN_CONFIRMATION
+  CONFIRMED
+  REJECTED
+}
+
 enum ExpenseStatus {
   LOGGED
   FLAGGED
@@ -281,6 +287,7 @@ model user {
   agentVisits          AgentVisit[]       @relation("agentVisits")
   proposedReschedules  AgentVisit[]       @relation("proposedReschedules")
   agentLeads           AgentLead[]        @relation("agentLeads")
+  agentFees            AgentFee[]         @relation("agentFees")
   loggedExpenses       Expense[]          @relation("loggedExpenses")
   budgetAdjustments    BudgetAdjustment[] @relation("budgetAdjustments")
   fmRegisteredWalkIns  VisitorInvite[]    @relation("fmRegisteredWalkIns")
@@ -412,6 +419,7 @@ model property {
 
   agentVisits AgentVisit[]
   agentLeads  AgentLead[]
+  agentFees   AgentFee[]
 
   isDeleted Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -711,6 +719,7 @@ model AgentLead {
   agent    user     @relation("agentLeads",    fields: [agentId],    references: [userId])
   property property @relation(fields: [propertyId], references: [id])
   unit     unit?    @relation(fields: [unitId],     references: [id])
+  fee      AgentFee?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -719,6 +728,27 @@ model AgentLead {
   @@index([propertyId])
   @@index([status])
   @@map("agent_leads")
+}
+
+model AgentFee {
+  id         String         @id @default(uuid())
+  agentId    String
+  leadId     String         @unique
+  propertyId String
+  amount     Float
+  status     AgentFeeStatus @default(PENDING_ADMIN_CONFIRMATION)
+
+  agent    user      @relation("agentFees", fields: [agentId], references: [userId])
+  lead     AgentLead @relation(fields: [leadId], references: [id])
+  property property  @relation(fields: [propertyId], references: [id])
+
+  confirmedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([status])
+  @@map("agent_fees")
 }
 
 // ==========================================

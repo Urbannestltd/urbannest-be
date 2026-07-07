@@ -13,6 +13,11 @@ export const RejectApplicationBodySchema = z.object({
 });
 export type RejectApplicationBody = z.infer<typeof RejectApplicationBodySchema>;
 
+export const ApproveApplicationBodySchema = z.object({
+  agentFeeAmount: z.number().positive("Agent fee amount must be greater than 0"),
+});
+export type ApproveApplicationBody = z.infer<typeof ApproveApplicationBodySchema>;
+
 export interface ApprovalListItem {
   leadId: string;
   applicantName: string;

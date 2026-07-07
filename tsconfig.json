@@ -1,7 +1,7 @@
 {
   // Visit https://aka.ms/tsconfig to read more about this file
   "include": ["src/**/*"],
-  "exclude": ["prisma.config.ts"],
+  "exclude": ["prisma.config.ts", "**/*.test.ts"],
   "compilerOptions": {
     // File Layout
     "rootDir": "./src",
