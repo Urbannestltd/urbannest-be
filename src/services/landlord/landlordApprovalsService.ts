@@ -137,7 +137,7 @@ export class LandlordApprovalsService {
     };
   }
 
-  public async approve(landlordId: string, leadId: string): Promise<void> {
+  public async approve(landlordId: string, leadId: string, agentFeeAmount: number): Promise<void> {
     const lead = await this.fetchLeadWithOwnershipCheck(landlordId, leadId);
 
     if (lead.status !== "FORWARDED_TO_LANDLORD") {
@@ -147,6 +147,15 @@ export class LandlordApprovalsService {
     await prisma.agentLead.update({
       where: { id: leadId },
       data: { status: "APPROVED", decidedAt: new Date() },
+    });
+
+    await prisma.agentFee.create({
+      data: {
+        agentId: lead.agent.userId,
+        leadId: lead.id,
+        propertyId: lead.propertyId,
+        amount: agentFeeAmount,
+      },
     });
 
     const agentTpl = landlordLeadApprovedAgentEmail(

@@ -186,7 +186,7 @@ export class AdminTicketService {
       weeklyCompletionPercent,
       weeklyTicketsTotal: weeklyTotal,
       weeklyTicketsCompleted: weeklyCompleted,
-      maintenanceCostEstimate: costAggregate._sum.budget ?? 0,
+      maintenanceCostEstimate: costAggregate._sum.amount ?? 0,
     };
   }
 

@@ -58,6 +58,7 @@ export class LandlordUnitsService {
             startDate: true,
             endDate: true,
             status: true,
+            rentAmount: true,
           },
           orderBy: { createdAt: "desc" },
         },
