@@ -3,6 +3,7 @@ import { AgentPropertyDetailService } from "./agentPropertyDetailService";
 jest.mock("../../config/prisma", () => ({
   prisma: {
     property: { findFirst: jest.fn() },
+    unit: { findMany: jest.fn() },
   },
 }));
 
@@ -15,6 +16,7 @@ import { logActivity } from "../../utils/activityLogger";
 
 const mockedPrisma = prisma as unknown as {
   property: { findFirst: jest.Mock };
+  unit: { findMany: jest.Mock };
 };
 const mockedLogActivity = logActivity as jest.Mock;
 
@@ -157,6 +159,44 @@ describe("AgentPropertyDetailService", () => {
         statusCode: 403,
       });
       expect(mockedLogActivity).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getVacantUnits", () => {
+    it("returns only AVAILABLE units for the property, scoped to the agent", async () => {
+      mockedPrisma.property.findFirst.mockResolvedValue(baseProperty());
+      mockedPrisma.unit.findMany.mockResolvedValue([
+        { id: "unit-1", name: "A3" },
+        { id: "unit-2", name: "B1" },
+      ]);
+
+      const result = await service.getVacantUnits(agentId, propertyId);
+
+      expect(mockedPrisma.unit.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { propertyId, status: "AVAILABLE" } }),
+      );
+      expect(result).toEqual([
+        { unitId: "unit-1", unitName: "A3" },
+        { unitId: "unit-2", unitName: "B1" },
+      ]);
+    });
+
+    it("returns an empty array when the property has no vacant units", async () => {
+      mockedPrisma.property.findFirst.mockResolvedValue(baseProperty());
+      mockedPrisma.unit.findMany.mockResolvedValue([]);
+
+      const result = await service.getVacantUnits(agentId, propertyId);
+
+      expect(result).toEqual([]);
+    });
+
+    it("throws 403 when the agent is not assigned to the property", async () => {
+      mockedPrisma.property.findFirst.mockResolvedValue(baseProperty({ agentId: "someone-else" }));
+
+      await expect(service.getVacantUnits(agentId, propertyId)).rejects.toMatchObject({
+        statusCode: 403,
+      });
+      expect(mockedPrisma.unit.findMany).not.toHaveBeenCalled();
     });
   });
 });

@@ -30,3 +30,8 @@ export interface AgentPropertyDetail {
 export interface MediaDownloadResponse {
   url: string;
 }
+
+export interface VacantUnitItem {
+  unitId: string;
+  unitName: string;
+}

@@ -114,12 +114,22 @@ export class FmAgentVisitsService {
       );
     }
 
+    // If the agent countered with a new time (proposeNewTime), adopt it as the
+    // confirmed visit date instead of the original request's stale visitDate.
+    const hasAgentCounterProposal = Boolean(visit.proposedDate && visit.proposedById);
+    const effectiveVisitDate = hasAgentCounterProposal ? visit.proposedDate! : visit.visitDate;
+
     await prisma.agentVisit.update({
       where: { id: visitId },
-      data: { status: "APPROVED" },
+      data: {
+        status: "APPROVED",
+        ...(hasAgentCounterProposal
+          ? { visitDate: effectiveVisitDate, proposedDate: null, proposedById: null }
+          : {}),
+      },
     });
 
-    const visitDateStr = visit.visitDate.toLocaleDateString("en-GB", {
+    const visitDateStr = effectiveVisitDate.toLocaleDateString("en-GB", {
       weekday: "long",
       day: "2-digit",
       month: "long",

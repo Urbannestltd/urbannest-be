@@ -7,6 +7,7 @@ import {
   fmAgentVisitCancelledEmail,
   fmRescheduleAcceptedEmail,
   fmRescheduleRejectedEmail,
+  fmVisitCounterProposedEmail,
 } from "../../config/emailTemplates";
 import { getFmNotificationPrefs } from "../facility-manager/fmSettingsService";
 import type {
@@ -14,7 +15,11 @@ import type {
   GetVisitsQuery,
   AgentVisitListItem,
   AgentVisitDetail,
+  AgentVisitSummary,
 } from "../../dtos/agent/agent.visits.dto";
+
+const ACTIVE_STATUSES = ["PENDING", "APPROVED", "RESCHEDULED_PENDING_AGENT"] as const;
+const RESOLVED_STATUSES = ["CANCELLED", "REJECTED"] as const;
 
 export class AgentVisitsService {
   private emailService = new ZeptoMailService();
@@ -136,10 +141,17 @@ export class AgentVisitsService {
         property: { select: { name: true, address: true } },
         unit: { select: { name: true } },
       },
-      orderBy: { createdAt: "desc" },
+      // Fetched ascending so the "active" bucket below is already soonest-first;
+      // the "resolved" bucket is reversed to become most-recent-first.
+      orderBy: { visitDate: "asc" },
     });
 
-    return visits.map((v) => ({
+    const active = visits.filter((v) => (ACTIVE_STATUSES as readonly string[]).includes(v.status));
+    const resolved = visits
+      .filter((v) => (RESOLVED_STATUSES as readonly string[]).includes(v.status))
+      .reverse();
+
+    return [...active, ...resolved].map((v) => ({
       id: v.id,
       propertyId: v.propertyId,
       propertyName: v.property.name,
@@ -147,12 +159,33 @@ export class AgentVisitsService {
       unitId: v.unitId,
       unitName: v.unit?.name ?? null,
       visitDate: v.visitDate,
+      visitType: "INSPECTION" as const,
       purpose: v.purpose,
       status: v.status,
       proposedDate: v.proposedDate,
       rejectionReason: v.rejectionReason,
       createdAt: v.createdAt,
     }));
+  }
+
+  public async getSummary(agentId: string): Promise<AgentVisitSummary> {
+    const [totalUpcoming, totalPending, totalCancelledRejected] = await Promise.all([
+      prisma.agentVisit.count({
+        where: {
+          agentId,
+          status: { in: [...ACTIVE_STATUSES] },
+          visitDate: { gte: new Date() },
+        },
+      }),
+      prisma.agentVisit.count({
+        where: { agentId, status: "PENDING" },
+      }),
+      prisma.agentVisit.count({
+        where: { agentId, status: { in: [...RESOLVED_STATUSES] } },
+      }),
+    ]);
+
+    return { totalUpcoming, totalPending, totalCancelledRejected };
   }
 
   public async getVisitDetail(
@@ -168,6 +201,7 @@ export class AgentVisitsService {
       unitId: v.unitId,
       unitName: v.unit?.name ?? null,
       visitDate: v.visitDate,
+      visitType: "INSPECTION" as const,
       purpose: v.purpose,
       notes: v.notes,
       status: v.status,
@@ -335,6 +369,75 @@ export class AgentVisitsService {
       action: "AGENT_VISIT_RESCHEDULE_REJECTED",
       description: `Rejected reschedule for visit ${visitId}`,
       metadata: { visitId },
+    });
+  }
+
+  public async proposeNewTime(
+    agentId: string,
+    visitId: string,
+    proposedDateStr: string,
+  ): Promise<void> {
+    const visit = await this.assertAgentOwnsVisit(agentId, visitId);
+
+    if (visit.status !== "RESCHEDULED_PENDING_AGENT") {
+      throw new BadRequestError(
+        `No pending reschedule proposal found for this visit`,
+      );
+    }
+
+    const newDate = new Date(proposedDateStr);
+    if (newDate <= new Date()) {
+      throw new BadRequestError("Proposed date must be in the future");
+    }
+
+    const originalFmProposedDate = visit.proposedDate;
+
+    await prisma.agentVisit.update({
+      where: { id: visitId },
+      data: {
+        status: "PENDING",
+        proposedDate: newDate,
+        proposedById: agentId,
+      },
+    });
+
+    if (visit.property.facilityManager && visit.property.facilityManagerId) {
+      const fmPrefs = await getFmNotificationPrefs(visit.property.facilityManagerId);
+      if (fmPrefs.fmEmailAgentReschedule) {
+        const agent = await prisma.user.findUnique({
+          where: { userId: agentId },
+          select: { userFullName: true },
+        });
+        const dateFmt = (d: Date) =>
+          d.toLocaleDateString("en-GB", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          });
+        const email = fmVisitCounterProposedEmail(
+          visit.property.facilityManager.userFullName ?? "Facility Manager",
+          agent?.userFullName ?? "Agent",
+          visit.property.name ?? visit.property.address,
+          originalFmProposedDate ? dateFmt(originalFmProposedDate) : dateFmt(visit.visitDate),
+          dateFmt(newDate),
+        );
+        await this.emailService.sendEmail(
+          {
+            email: visit.property.facilityManager.userEmail,
+            name: visit.property.facilityManager.userFullName ?? undefined,
+          },
+          email.subject,
+          email.html,
+        );
+      }
+    }
+
+    await logActivity({
+      userId: agentId,
+      action: "AGENT_VISIT_COUNTER_PROPOSED",
+      description: `Proposed a new time for visit ${visitId}`,
+      metadata: { visitId, proposedDate: proposedDateStr },
     });
   }
 }

@@ -2,17 +2,16 @@ import { z } from "zod";
 
 export const SubmitLeadSchema = z.object({
   propertyId: z.string().uuid("Invalid property ID"),
-  unitId: z.string().uuid("Invalid unit ID").optional(),
+  unitId: z.string().uuid("Invalid unit ID"),
   prospectName: z.string().min(2, "Prospect name is required").max(100),
-  prospectEmail: z.string().email("Invalid email").optional(),
-  prospectPhone: z.string().max(20).optional(),
-  proposedRent: z.number().positive("Proposed rent must be positive").optional(),
+  prospectEmail: z.string().email("Invalid email"),
+  prospectPhone: z.string().min(7, "Invalid phone number").max(20),
+  proposedRent: z.number().positive("Rent offer must be positive"),
   notes: z.string().max(1000).optional(),
   occupation: z.string().max(100).optional(),
-  monthlyIncome: z.number().positive().optional(),
   employerName: z.string().max(100).optional(),
-  employerAddress: z.string().max(200).optional(),
-  documents: z.array(z.string().url("Each document must be a valid URL")).max(10).optional(),
+  employmentDuration: z.string().max(100).optional(),
+  annualIncome: z.number().positive().optional(),
 });
 export type SubmitLeadRequest = z.infer<typeof SubmitLeadSchema>;
 
@@ -52,4 +51,68 @@ export interface AgentLeadListItem {
 
 export interface DeleteLeadResponse {
   leadId: string;
+}
+
+// ── Save (partial update / auto-save) ───────────────────────────────────────────
+
+export const UpdateLeadSchema = z
+  .object({
+    prospectName: z.string().min(2, "Prospect name is required").max(100),
+    prospectEmail: z.string().email("Invalid email"),
+    prospectPhone: z.string().min(7, "Invalid phone number").max(20),
+    proposedRent: z.number().positive("Rent offer must be positive"),
+    notes: z.string().max(1000),
+    occupation: z.string().max(100),
+    employerName: z.string().max(100),
+    employmentDuration: z.string().max(100),
+    annualIncome: z.number().positive(),
+  })
+  .partial();
+export type UpdateLeadRequest = z.infer<typeof UpdateLeadSchema>;
+
+// ── Detail ────────────────────────────────────────────────────────────────────
+
+export interface AgentLeadDocumentItem {
+  id: string;
+  category: string;
+  type: string;
+  url: string;
+  fileName: string;
+  fileSizeBytes: number;
+  createdAt: Date;
+}
+
+export interface AgentLeadDetail {
+  id: string;
+  propertyId: string;
+  propertyName: string | null;
+  unitId: string | null;
+  unitNumber: string | null;
+  prospectName: string;
+  prospectEmail: string | null;
+  prospectPhone: string | null;
+  proposedRent: number | null;
+  notes: string | null;
+  occupation: string | null;
+  employerName: string | null;
+  employerAddress: string | null;
+  employmentDuration: string | null;
+  annualIncome: number | null;
+  documents: AgentLeadDocumentItem[];
+  status: string;
+  rejectionReason: string | null;
+  decidedAt: Date | null;
+  createdAt: Date;
+}
+
+// ── Forward / Resubmit ───────────────────────────────────────────────────────
+
+export interface ForwardLeadResponse {
+  leadId: string;
+  status: string;
+}
+
+export interface ResubmitLeadResponse {
+  leadId: string;
+  status: string;
 }

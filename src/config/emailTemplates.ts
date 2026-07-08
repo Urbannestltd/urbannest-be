@@ -1141,6 +1141,33 @@ export function fmAgentVisitCancelledEmail(
 }
 
 // ---------------------------------------------------------------------------
+// 26b. Agent proposes a counter-time — notify FM
+// ---------------------------------------------------------------------------
+export function fmVisitCounterProposedEmail(
+  fmName: string,
+  agentName: string,
+  propertyName: string,
+  originalProposedDate: string,
+  counterProposedDate: string,
+) {
+  return {
+    subject: `Agent proposed a new time — ${propertyName}`,
+    html: base(`
+      ${heading("Counter-proposal received")}
+      ${subheading(`Hi ${fmName}`)}
+      ${para(`The agent could not make the rescheduled time you proposed and has suggested an alternative.`)}
+      ${metaTable([
+        ["Agent", agentName],
+        ["Property", propertyName],
+        ["Your proposed date", originalProposedDate],
+        ["Agent's counter-proposed date", counterProposedDate],
+      ])}
+      ${alertBox("Please log in to review and approve or reject this visit request.", "info")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 27. Tenant — Lease terminated by admin
 // ---------------------------------------------------------------------------
 export function tenantLeaseTerminatedEmail(
@@ -1457,7 +1484,35 @@ export function landlordLeadRejectedProspectEmail(
 }
 
 // ---------------------------------------------------------------------------
-// 39. Admin — Lease terminated (notify other admins)
+// 39. Landlord — agent forwarded a new application for review
+// ---------------------------------------------------------------------------
+export function landlordLeadForwardedEmail(
+  landlordName: string,
+  agentName: string,
+  prospectName: string,
+  propertyName: string,
+  unitName: string | null,
+) {
+  const unitRow: [string, string][] = unitName ? [["Unit", unitName]] : [];
+  return {
+    subject: `New application forwarded — ${prospectName}`,
+    html: base(`
+      ${heading("New application for review")}
+      ${subheading(`Hi ${landlordName}`)}
+      ${para(`Agent <strong>${agentName}</strong> has forwarded a tenant application for your review.`)}
+      ${metaTable([
+        ["Applicant", prospectName],
+        ["Agent", agentName],
+        ["Property", propertyName],
+        ...unitRow,
+      ])}
+      ${para("Please log in to review the application and its supporting documents.")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 40. Admin — Lease terminated (notify other admins)
 // ---------------------------------------------------------------------------
 export function adminLeaseTerminatedEmail(
   adminName: string,
