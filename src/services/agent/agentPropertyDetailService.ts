@@ -6,6 +6,7 @@ import type {
   AgentPropertyDetail,
   PropertyMediaItem,
   MediaDownloadResponse,
+  VacantUnitItem,
 } from "../../dtos/agent/agent.property-detail.dto";
 
 export class AgentPropertyDetailService {
@@ -84,5 +85,17 @@ export class AgentPropertyDetailService {
     });
 
     return { url };
+  }
+
+  public async getVacantUnits(agentId: string, propertyId: string): Promise<VacantUnitItem[]> {
+    await this.assertAgentOwnsProperty(agentId, propertyId);
+
+    const units = await prisma.unit.findMany({
+      where: { propertyId, status: "AVAILABLE" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+
+    return units.map((u) => ({ unitId: u.id, unitName: u.name }));
   }
 }

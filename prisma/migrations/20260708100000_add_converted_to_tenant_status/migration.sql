@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "AgentLeadStatus" ADD VALUE 'CONVERTED_TO_TENANT';

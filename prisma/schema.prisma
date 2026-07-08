@@ -119,11 +119,13 @@ enum AgentLeadStatus {
   APPROVED
   REJECTED
   WITHDRAWN
+  CONVERTED_TO_TENANT
 }
 
 enum AgentFeeStatus {
   PENDING_ADMIN_CONFIRMATION
   CONFIRMED
+  PAID
   REJECTED
 }
 
@@ -706,20 +708,22 @@ model AgentLead {
   proposedRent  Float?
   notes         String?
 
-  occupation      String?
-  monthlyIncome   Float?
-  employerName    String?
-  employerAddress String?
-  documents       String[]
+  occupation        String?
+  monthlyIncome     Float?
+  employerName      String?
+  employerAddress   String?
+  employmentDuration String?
+  annualIncome      Float?
 
-  status          AgentLeadStatus @default(FORWARDED_TO_LANDLORD)
+  status          AgentLeadStatus @default(PENDING)
   rejectionReason String?
   decidedAt       DateTime?
 
-  agent    user     @relation("agentLeads",    fields: [agentId],    references: [userId])
-  property property @relation(fields: [propertyId], references: [id])
-  unit     unit?    @relation(fields: [unitId],     references: [id])
-  fee      AgentFee?
+  agent     user                 @relation("agentLeads",    fields: [agentId],    references: [userId])
+  property  property             @relation(fields: [propertyId], references: [id])
+  unit      unit?                @relation(fields: [unitId],     references: [id])
+  fee       AgentFee?
+  documents AgentLeadDocument[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -728,6 +732,42 @@ model AgentLead {
   @@index([propertyId])
   @@index([status])
   @@map("agent_leads")
+}
+
+enum AgentLeadDocumentCategory {
+  ID
+  PROOF_OF_INCOME
+  PROOF_OF_ADDRESS
+}
+
+enum AgentLeadDocumentType {
+  PASSPORT
+  NATIONAL_ID
+  DRIVERS_LICENSE
+  VOTERS_CARD
+  BANK_STATEMENT
+  EMPLOYMENT_LETTER
+  PAYSLIP
+  PROOF_OF_BUSINESS
+  UTILITY_BILL
+}
+
+model AgentLeadDocument {
+  id     String @id @default(uuid())
+  leadId String
+
+  category AgentLeadDocumentCategory
+  type     AgentLeadDocumentType
+  url      String
+  fileName String
+  fileSizeBytes Int
+
+  lead AgentLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@map("agent_lead_documents")
 }
 
 model AgentFee {

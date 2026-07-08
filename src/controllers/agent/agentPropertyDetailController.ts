@@ -38,4 +38,17 @@ export class AgentPropertyDetailController extends Controller {
     const data = await this.service.getMediaDownloadUrl(req.user.userId, propertyId, validatedUrl);
     return { success: true, message: "Download link generated", data };
   }
+
+  /**
+   * Returns vacant (AVAILABLE) units for a property assigned to the logged-in
+   * agent — powers the cascading Unit dropdown on the Add Lead form.
+   */
+  @Get("{propertyId}/vacant-units")
+  public async getVacantUnits(
+    @Path() propertyId: string,
+    @Request() req: any,
+  ) {
+    const data = await this.service.getVacantUnits(req.user.userId, propertyId);
+    return { success: true, message: "Vacant units retrieved", data };
+  }
 }

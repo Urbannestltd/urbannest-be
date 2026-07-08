@@ -15,7 +15,9 @@ import { AgentVisitsService } from "../../services/agent/agentVisitsService";
 import {
   ScheduleVisitSchema,
   GetVisitsQuerySchema,
+  ProposeNewTimeSchema,
   type ScheduleVisitRequest,
+  type ProposeNewTimeRequest,
 } from "../../dtos/agent/agent.visits.dto";
 import { validate } from "../../utils/validate";
 
@@ -52,6 +54,16 @@ export class AgentVisitsController extends Controller {
     const filters = validate(GetVisitsQuerySchema, { status });
     const data = await this.service.getVisits(req.user.userId, filters);
     return { success: true, message: "Visits retrieved", data };
+  }
+
+  /**
+   * Returns the agent's visit summary metrics: total upcoming (active, future
+   * bookings), total pending (awaiting FM decision), and total cancelled/rejected.
+   */
+  @Get("summary")
+  public async getSummary(@Request() req: any) {
+    const data = await this.service.getSummary(req.user.userId);
+    return { success: true, message: "Visit summary retrieved", data };
   }
 
   /**
@@ -106,5 +118,21 @@ export class AgentVisitsController extends Controller {
   ) {
     await this.service.rejectReschedule(req.user.userId, visitId);
     return { success: true, message: "Reschedule rejected, visit closed" };
+  }
+
+  /**
+   * Counter-proposes a new date/time in response to the FM's reschedule offer.
+   * Visit status reverts to PENDING and the FM is notified to review the new time.
+   * Only valid when visit status is RESCHEDULED_PENDING_AGENT.
+   */
+  @Patch("{visitId}/propose-new-time")
+  public async proposeNewTime(
+    @Path() visitId: string,
+    @Request() req: any,
+    @Body() body: ProposeNewTimeRequest,
+  ) {
+    const { proposedDate } = validate(ProposeNewTimeSchema, body);
+    await this.service.proposeNewTime(req.user.userId, visitId, proposedDate);
+    return { success: true, message: "New time proposed, awaiting FM review" };
   }
 }

@@ -18,6 +18,11 @@ export const GetVisitsQuerySchema = z.object({
 });
 export type GetVisitsQuery = z.infer<typeof GetVisitsQuerySchema>;
 
+export const ProposeNewTimeSchema = z.object({
+  proposedDate: z.string().datetime({ offset: true, message: "proposedDate must be ISO 8601" }),
+});
+export type ProposeNewTimeRequest = z.infer<typeof ProposeNewTimeSchema>;
+
 // ── Responses ─────────────────────────────────────────────────────────────────
 
 export interface AgentVisitListItem {
@@ -28,6 +33,7 @@ export interface AgentVisitListItem {
   unitId: string | null;
   unitName: string | null;
   visitDate: Date;
+  visitType: "INSPECTION";
   purpose: string | null;
   status: string;
   proposedDate: Date | null;
@@ -37,4 +43,10 @@ export interface AgentVisitListItem {
 
 export interface AgentVisitDetail extends AgentVisitListItem {
   notes: string | null;
+}
+
+export interface AgentVisitSummary {
+  totalUpcoming: number;
+  totalPending: number;
+  totalCancelledRejected: number;
 }

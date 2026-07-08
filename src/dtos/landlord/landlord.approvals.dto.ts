@@ -37,6 +37,16 @@ export interface ApprovalHistoryItem extends ApprovalListItem {
   rejectionReason: string | null;
 }
 
+export interface ApplicantDossierDocument {
+  id: string;
+  category: string;
+  type: string;
+  url: string;
+  fileName: string;
+  fileSizeBytes: number;
+  createdAt: Date;
+}
+
 export interface ApplicantDossier {
   leadId: string;
   applicantName: string;
@@ -47,7 +57,8 @@ export interface ApplicantDossier {
   annualIncome: number | null;
   employerName: string | null;
   employerAddress: string | null;
-  documents: string[];
+  employmentDuration: string | null;
+  documents: ApplicantDossierDocument[];
   proposedRent: number | null;
   notes: string | null;
   propertyId: string;

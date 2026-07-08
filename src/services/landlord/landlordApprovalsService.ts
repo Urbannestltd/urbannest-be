@@ -19,6 +19,7 @@ const LEAD_INCLUDE = {
   agent: { select: { userId: true, userFullName: true, userEmail: true } },
   property: { select: { id: true, name: true, landlordId: true } },
   unit: { select: { id: true, name: true, baseRent: true } },
+  documents: true,
 } as const;
 
 export class LandlordApprovalsService {
@@ -120,10 +121,19 @@ export class LandlordApprovalsService {
       applicantPhone: lead.prospectPhone,
       occupation: lead.occupation,
       monthlyIncome: lead.monthlyIncome,
-      annualIncome: lead.monthlyIncome != null ? Math.round(lead.monthlyIncome * 12) : null,
+      annualIncome: lead.annualIncome ?? (lead.monthlyIncome != null ? Math.round(lead.monthlyIncome * 12) : null),
       employerName: lead.employerName,
       employerAddress: lead.employerAddress,
-      documents: lead.documents,
+      employmentDuration: lead.employmentDuration,
+      documents: lead.documents.map((d) => ({
+        id: d.id,
+        category: d.category,
+        type: d.type,
+        url: d.url,
+        fileName: d.fileName,
+        fileSizeBytes: d.fileSizeBytes,
+        createdAt: d.createdAt,
+      })),
       proposedRent: lead.proposedRent,
       notes: lead.notes,
       propertyId: lead.property.id,
@@ -206,14 +216,27 @@ export class LandlordApprovalsService {
   public async reject(landlordId: string, leadId: string, reason: string): Promise<void> {
     const lead = await this.fetchLeadWithOwnershipCheck(landlordId, leadId);
 
-    if (lead.status !== "FORWARDED_TO_LANDLORD") {
+    // Rejectable either before approval (FORWARDED_TO_LANDLORD) or after — the
+    // "Safety Switch": the deal falls through after approval but before signing.
+    if (lead.status !== "FORWARDED_TO_LANDLORD" && lead.status !== "APPROVED") {
       throw new ConflictError("This application has already been actioned");
     }
+
+    const wasApproved = lead.status === "APPROVED";
 
     await prisma.agentLead.update({
       where: { id: leadId },
       data: { status: "REJECTED", rejectionReason: reason, decidedAt: new Date() },
     });
+
+    if (wasApproved) {
+      // Reverse the pending commission — it drops out of the agent's
+      // pending/approved/paid totals since those only sum non-REJECTED fees.
+      await prisma.agentFee.updateMany({
+        where: { leadId, status: "PENDING_ADMIN_CONFIRMATION" },
+        data: { status: "REJECTED" },
+      });
+    }
 
     const agentTpl = landlordLeadRejectedAgentEmail(
       lead.agent.userFullName ?? "Agent",
