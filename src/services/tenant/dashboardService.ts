@@ -92,6 +92,7 @@ export class DashboardService {
       id: v.id,
       visitorName: v.visitorName,
       visitorPhone: v.visitorPhone || "-",
+      accessCode: v.accessCode,
       groupName: v.group?.name ? `Group Invite (${v.groupId})` : null,
       isGroupInvite: !!v.groupId,
       status: v.status,

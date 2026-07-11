@@ -29,7 +29,7 @@ export function normalizeFloor(raw: string | null | undefined): string {
   if (WORD_TO_NUM[lower]) return `Floor ${WORD_TO_NUM[lower]}`;
   return s;
 }
-function normalizePropertyType(type: string): "RESIDENTIAL" | "COMMERCIAL" {
+export function normalizePropertyType(type: string): "RESIDENTIAL" | "COMMERCIAL" {
   return type === "COMMERCIAL" ? "COMMERCIAL" : "RESIDENTIAL";
 }
 

@@ -80,7 +80,11 @@ describe("AgentFeesService", () => {
 
       const result = await service.getSummary(agentId);
 
-      expect(result).toEqual({ totalPending: 0, totalApproved: 0, totalPaid: 0 });
+      expect(result).toEqual({
+        totalPending: 0,
+        totalApproved: 0,
+        totalPaid: 0,
+      });
     });
   });
 
@@ -130,17 +134,20 @@ describe("AgentFeesService", () => {
       ["PENDING", "PENDING_ADMIN_CONFIRMATION"],
       ["APPROVED", "CONFIRMED"],
       ["PAID", "PAID"],
-    ])("maps status filter %s to internal status %s", async (filterStatus, internalStatus) => {
-      mockedPrisma.agentFee.findMany.mockResolvedValue([]);
+    ])(
+      "maps status filter %s to internal status %s",
+      async (filterStatus, internalStatus) => {
+        mockedPrisma.agentFee.findMany.mockResolvedValue([]);
 
-      await service.getFees(agentId, { status: filterStatus as any });
+        await service.getFees(agentId, { status: filterStatus as any });
 
-      expect(mockedPrisma.agentFee.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ status: internalStatus }),
-        }),
-      );
-    });
+        expect(mockedPrisma.agentFee.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ status: internalStatus }),
+          }),
+        );
+      },
+    );
 
     it("does not filter by status when status is omitted", async () => {
       mockedPrisma.agentFee.findMany.mockResolvedValue([]);
@@ -166,7 +173,10 @@ describe("AgentFeesService", () => {
     it("combines status and propertyId filters", async () => {
       mockedPrisma.agentFee.findMany.mockResolvedValue([]);
 
-      await service.getFees(agentId, { status: "APPROVED", propertyId: "prop-1" });
+      await service.getFees(agentId, {
+        status: "APPROVED",
+        propertyId: "prop-1",
+      });
 
       expect(mockedPrisma.agentFee.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -201,7 +211,10 @@ describe("AgentFeesService", () => {
     it("returns an empty list when a filter combination matches nothing (no filter results state)", async () => {
       mockedPrisma.agentFee.findMany.mockResolvedValue([]);
 
-      const result = await service.getFees(agentId, { status: "PAID", propertyId: "prop-1" });
+      const result = await service.getFees(agentId, {
+        status: "PAID",
+        propertyId: "prop-1",
+      });
 
       expect(result).toEqual({ fees: [], totalAmount: 0 });
     });

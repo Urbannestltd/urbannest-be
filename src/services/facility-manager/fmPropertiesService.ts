@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { ForbiddenError, NotFoundError } from "../../utils/apiError";
 import { AdminPropertyService } from "../admin/propertyService";
 import { AdminUnitService } from "../admin/unitService";
+import { DateRangePreset } from "../../utils/dateRangePreset";
 
 type OccupancyRange = "0-20" | "21-40" | "41-60" | "61-80" | "81-100";
 
@@ -48,7 +49,7 @@ export class FmPropertiesService {
     userId: string,
     propertyId: string,
     tenantId: string,
-    visitorPeriod?: "today" | "last_week" | "last_month",
+    visitorPeriod?: DateRangePreset,
   ) {
     await this.checkFmAccess(userId, propertyId);
     const tenantOnProperty = await prisma.lease.findFirst({

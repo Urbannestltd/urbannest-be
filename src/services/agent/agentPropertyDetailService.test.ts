@@ -53,7 +53,7 @@ describe("AgentPropertyDetailService", () => {
       expect(result).toEqual({
         propertyId,
         propertyName: "Zephyr Towers",
-        propertyType: "MULTI_UNIT",
+        propertyType: "RESIDENTIAL",
         address: "12 Marina Rd",
         rent: 500000,
         noOfUnits: 3,

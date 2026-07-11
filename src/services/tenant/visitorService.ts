@@ -10,6 +10,7 @@ import { ZeptoMailService } from "./../external/zeptoMailService";
 import { adminVisitorCheckInEmail, visitorCheckInEmail, visitorAccessCodeEmail } from "../../config/emailTemplates";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
 import { InviteFrequency, InviteStatus, VisitorType } from "@prisma/client";
+import { resolveDateRangePreset } from "../../utils/dateRangePreset";
 
 export class VisitorService {
   private emailService = new ZeptoMailService();
@@ -314,22 +315,7 @@ export class VisitorService {
     period: VisitorPeriodFilter,
     tenantId: string,
   ): Promise<VisitorStatsResponse> {
-    const now = new Date();
-    let startDate = new Date();
-
-    switch (period) {
-      case "TODAY":
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case "LAST_WEEK":
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case "LAST_MONTH":
-        startDate.setDate(now.getDate() - 30);
-        break;
-      default:
-        startDate.setHours(0, 0, 0, 0);
-    }
+    const { start: startDate, end: now } = resolveDateRangePreset(period);
 
     const baseWhere = {
       createdAt: {

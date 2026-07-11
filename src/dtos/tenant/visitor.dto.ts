@@ -53,7 +53,7 @@ export interface CreateBulkInviteRequest {
   endDate: string;
 }
 
-export type VisitorPeriodFilter = "TODAY" | "LAST_WEEK" | "LAST_MONTH";
+export type { DateRangePreset as VisitorPeriodFilter } from "../../utils/dateRangePreset";
 
 export interface VisitorStatsResponse {
   totalVisitors: number;

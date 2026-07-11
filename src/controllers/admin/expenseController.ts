@@ -1,9 +1,23 @@
-import { Body, Get, Middlewares, Post, Path, Query, Request, Route, Security, Tags } from "tsoa";
+import {
+  Body,
+  Get,
+  Middlewares,
+  Post,
+  Path,
+  Query,
+  Request,
+  Route,
+  Security,
+  Tags,
+} from "tsoa";
 import { AdminExpenseService } from "../../services/admin/expenseService";
 import { AdminExpenseApprovalService } from "../../services/admin/adminExpenseService";
 import { CreateExpenseDto } from "../../dtos/admin/expense.dto";
 import { Permission } from "@prisma/client";
-import { requirePermission, requireAnyPermission } from "../../middlewares/permissionMiddleware";
+import {
+  requirePermission,
+  requireAnyPermission,
+} from "../../middlewares/permissionMiddleware";
 import { z } from "zod";
 import { validate } from "../../utils/validate";
 
@@ -38,7 +52,10 @@ export class AdminExpenseController {
     @Query() propertyId?: string,
     @Query() unitId?: string,
   ) {
-    const expenses = await this.expenseService.getExpenses({ propertyId, unitId });
+    const expenses = await this.expenseService.getExpenses({
+      propertyId,
+      unitId,
+    });
     return {
       success: true,
       message: "Expenses retrieved successfully",
@@ -77,7 +94,11 @@ export class AdminExpenseController {
     @Body() body: { reason: string },
   ) {
     const { reason } = validate(RejectExpenseSchema, body);
-    await this.approvalService.rejectExpense(req.user.userId, expenseId, reason);
+    await this.approvalService.rejectExpense(
+      req.user.userId,
+      expenseId,
+      reason,
+    );
     return { success: true, message: "Expense rejected" };
   }
 
@@ -95,7 +116,12 @@ export class AdminExpenseController {
     @Body() body: { newBudget: number; reason: string },
   ) {
     const { newBudget, reason } = validate(RebuttalExpenseSchema, body);
-    await this.approvalService.rebuttalExpense(req.user.userId, expenseId, newBudget, reason);
+    await this.approvalService.rebuttalExpense(
+      req.user.userId,
+      expenseId,
+      newBudget,
+      reason,
+    );
     return { success: true, message: "Rebuttal issued, FM notified" };
   }
 }

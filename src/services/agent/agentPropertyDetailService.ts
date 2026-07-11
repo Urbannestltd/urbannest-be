@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { ForbiddenError } from "../../utils/apiError";
 import { logActivity } from "../../utils/activityLogger";
-import { normalizeFloor } from "../admin/propertyService";
+import { normalizeFloor, normalizePropertyType } from "../admin/propertyService";
 import type {
   AgentPropertyDetail,
   PropertyMediaItem,
@@ -55,7 +55,7 @@ export class AgentPropertyDetailService {
     return {
       propertyId: property.id,
       propertyName: property.name,
-      propertyType: property.type,
+      propertyType: normalizePropertyType(property.type),
       address: property.address,
       rent: property.price,
       noOfUnits,

@@ -12,6 +12,7 @@ import {
   type FinancialTransactionItem,
 } from "../../dtos/landlord/landlord.financials.dto";
 import { validate } from "../../utils/validate";
+import { DateRangePreset } from "../../utils/dateRangePreset";
 
 @Route("landlord/financials")
 @Tags("Landlord - Financials")
@@ -99,16 +100,15 @@ export class LandlordFinancialsController extends Controller {
    *
    * Filters:
    * - propertyId: scope to a single property
-   * - startDate / endDate: ISO date strings (YYYY-MM-DD) to bound the date range
+   * - dateRange: TODAY | LAST_7_DAYS | LAST_30_DAYS | THIS_MONTH | THIS_YEAR
    */
   @Get("transactions")
   public async getTransactions(
     @Request() req: any,
     @Query() propertyId?: string,
-    @Query() startDate?: string,
-    @Query() endDate?: string,
+    @Query() dateRange?: DateRangePreset,
   ): Promise<{ success: boolean; data: FinancialTransactionItem[] }> {
-    const query = validate(FinancialsTransactionsQuerySchema, { propertyId, startDate, endDate });
+    const query = validate(FinancialsTransactionsQuerySchema, { propertyId, dateRange });
     const data = await this.service.getTransactions(req.user.userId, query);
     return { success: true, data };
   }
@@ -126,10 +126,9 @@ export class LandlordFinancialsController extends Controller {
     @Request() req: any,
     @Query() format?: string,
     @Query() propertyId?: string,
-    @Query() startDate?: string,
-    @Query() endDate?: string,
+    @Query() dateRange?: DateRangePreset,
   ): Promise<void> {
-    const query = validate(FinancialsExportQuerySchema, { format, propertyId, startDate, endDate });
+    const query = validate(FinancialsExportQuerySchema, { format, propertyId, dateRange });
     await this.service.exportLedger(req.user.userId, query, req.res);
   }
 }

@@ -2,6 +2,7 @@ import { Response } from "express";
 import ExcelJS from "exceljs";
 import { prisma } from "../../config/prisma";
 import { ForbiddenError } from "../../utils/apiError";
+import { resolveDateRangePreset } from "../../utils/dateRangePreset";
 import type {
   FinancialsSummaryQuery,
   FinancialsSummary,
@@ -158,7 +159,8 @@ export class LandlordFinancialsService {
       const expectedByUnit = new Map<string, number>();
       for (const l of leases) {
         const months = this.monthsOverlap(l.startDate, l.endDate, start, end);
-        expectedByUnit.set(l.unitId, (expectedByUnit.get(l.unitId) ?? 0) + l.rentAmount * months);
+        // rentAmount is the total annual rent for the lease; prorate by the fraction of the year covered
+        expectedByUnit.set(l.unitId, (expectedByUnit.get(l.unitId) ?? 0) + l.rentAmount * (months / 12));
       }
 
       const collectedByUnit = new Map<string, number>();
@@ -214,7 +216,8 @@ export class LandlordFinancialsService {
       for (const l of leases) {
         const pid = l.unit.propertyId;
         const months = this.monthsOverlap(l.startDate, l.endDate, start, end);
-        expectedByProperty.set(pid, (expectedByProperty.get(pid) ?? 0) + l.rentAmount * months);
+        // rentAmount is the total annual rent for the lease; prorate by the fraction of the year covered
+        expectedByProperty.set(pid, (expectedByProperty.get(pid) ?? 0) + l.rentAmount * (months / 12));
       }
 
       const collectedByProperty = new Map<string, number>();
@@ -389,11 +392,11 @@ export class LandlordFinancialsService {
 
     const propScope = this.scopedProperty(landlordId, query.propertyId);
 
-    const dateFilter = query.startDate || query.endDate
-      ? {
-          gte: query.startDate ? new Date(query.startDate) : undefined,
-          lte: query.endDate ? new Date(`${query.endDate}T23:59:59.999Z`) : undefined,
-        }
+    const dateFilter = query.dateRange
+      ? (() => {
+          const { start, end } = resolveDateRangePreset(query.dateRange);
+          return { gte: start, lte: end };
+        })()
       : undefined;
 
     const results: FinancialTransactionItem[] = [];
@@ -489,8 +492,7 @@ export class LandlordFinancialsService {
   ): Promise<void> {
     const transactions = await this.getTransactions(landlordId, {
       propertyId: query.propertyId,
-      startDate: query.startDate,
-      endDate: query.endDate,
+      dateRange: query.dateRange,
     });
 
     const headers = ["Date", "Record Type", "Tenant", "Property", "Unit", "Amount", "Category/Payment Type", "Status", "Description/Reference"];
