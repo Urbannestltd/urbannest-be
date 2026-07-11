@@ -135,7 +135,8 @@ export class LandlordPropertiesService {
       for (const unit of prop.units) {
         for (const lease of unit.leases) {
           const months = this.monthsOverlap(lease.startDate, lease.endDate, yearStart, yearEnd);
-          expectedRent += lease.rentAmount * months;
+          // rentAmount is the total annual rent for the lease; prorate by the fraction of the year covered
+          expectedRent += lease.rentAmount * (months / 12);
         }
       }
 

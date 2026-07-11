@@ -3,6 +3,7 @@ import { AdminUnitService } from "../../services/admin/unitService";
 import { CreateUnitAdminDto, UpdateUnitAdminDto } from "../../dtos/admin/property.dto";
 import { Permission } from "@prisma/client";
 import { requirePermission } from "../../middlewares/permissionMiddleware";
+import { DateRangePreset } from "../../utils/dateRangePreset";
 
 @Route("admin/units")
 @Tags("Admin - Property Units")
@@ -78,7 +79,7 @@ export class AdminUnitController {
   @Get("{tenantId}")
   public async getTenantProfile(
     @Path() tenantId: string,
-    @Query() visitorPeriod?: "today" | "last_week" | "last_month",
+    @Query() visitorPeriod?: DateRangePreset,
   ) {
     const profile = await this.unitService.getTenantProfile(tenantId, visitorPeriod);
     return {

@@ -147,7 +147,8 @@ export class LandlordDashboardService {
       const expectedByUnit = new Map<string, number>();
       for (const l of leases) {
         const months = this.monthsOverlap(l.startDate, l.endDate, start, end);
-        expectedByUnit.set(l.unitId, (expectedByUnit.get(l.unitId) ?? 0) + l.rentAmount * months);
+        // rentAmount is the total annual rent for the lease; prorate by the fraction of the year covered
+        expectedByUnit.set(l.unitId, (expectedByUnit.get(l.unitId) ?? 0) + l.rentAmount * (months / 12));
       }
 
       const collectedByUnit = new Map<string, number>();
@@ -209,7 +210,8 @@ export class LandlordDashboardService {
       for (const l of leases) {
         const pid = l.unit.propertyId;
         const months = this.monthsOverlap(l.startDate, l.endDate, start, end);
-        expectedByProperty.set(pid, (expectedByProperty.get(pid) ?? 0) + l.rentAmount * months);
+        // rentAmount is the total annual rent for the lease; prorate by the fraction of the year covered
+        expectedByProperty.set(pid, (expectedByProperty.get(pid) ?? 0) + l.rentAmount * (months / 12));
       }
 
       const collectedByProperty = new Map<string, number>();

@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { normalizePropertyType } from "../admin/propertyService";
 import type {
   AgentPropertiesQuery,
   AgentPropertyListItem,
@@ -36,7 +37,7 @@ export class AgentPropertiesService {
       return {
         propertyId: p.id,
         propertyName: p.name,
-        propertyType: p.type,
+        propertyType: normalizePropertyType(p.type),
         address: p.address,
         dateAssigned: p.createdAt,
         availabilityStatus: availableUnitCount > 0 ? "AVAILABLE" : "FULLY_OCCUPIED",

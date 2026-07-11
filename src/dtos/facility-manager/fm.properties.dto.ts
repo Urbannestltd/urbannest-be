@@ -1,9 +1,9 @@
 import { z } from "zod";
+import { DateRangePresetSchema } from "../../utils/dateRangePreset";
 
 // ── Requests (query params) ───────────────────────────────────────────────────
 
 const OCCUPANCY_RANGES = ["0-20", "21-40", "41-60", "61-80", "81-100"] as const;
-const VISITOR_PERIODS = ["today", "last_week", "last_month"] as const;
 
 export const GetPropertiesQuerySchema = z.object({
   search: z.string().optional(),
@@ -17,7 +17,7 @@ export const GetPropertiesQuerySchema = z.object({
 export type GetPropertiesQuery = z.infer<typeof GetPropertiesQuerySchema>;
 
 export const GetTenantProfileQuerySchema = z.object({
-  visitorPeriod: z.enum(VISITOR_PERIODS).optional(),
+  visitorPeriod: DateRangePresetSchema.optional(),
 });
 export type GetTenantProfileQuery = z.infer<typeof GetTenantProfileQuerySchema>;
 

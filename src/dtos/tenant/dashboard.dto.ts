@@ -36,6 +36,7 @@ export interface DashboardOverviewResponse {
       id: string;
       visitorName: string;
       visitorPhone: string;
+      accessCode: string;
       isGroupInvite: boolean;
       groupName: string | null; // e.g., "Group Invite (groupId)"
       status: InviteStatus;

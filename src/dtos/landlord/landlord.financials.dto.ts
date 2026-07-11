@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DateRangePresetSchema } from "../../utils/dateRangePreset";
 
 // ── Requests ──────────────────────────────────────────────────────────────────
 
@@ -10,16 +11,14 @@ export type FinancialsSummaryQuery = z.infer<typeof FinancialsSummaryQuerySchema
 
 export const FinancialsTransactionsQuerySchema = z.object({
   propertyId: z.string().uuid("Invalid property ID").optional(),
-  startDate: z.string().date("Invalid start date (YYYY-MM-DD)").optional(),
-  endDate: z.string().date("Invalid end date (YYYY-MM-DD)").optional(),
+  dateRange: DateRangePresetSchema.optional(),
 });
 export type FinancialsTransactionsQuery = z.infer<typeof FinancialsTransactionsQuerySchema>;
 
 export const FinancialsExportQuerySchema = z.object({
   format: z.enum(["csv", "xlsx"]).default("csv"),
   propertyId: z.string().uuid("Invalid property ID").optional(),
-  startDate: z.string().date("Invalid start date (YYYY-MM-DD)").optional(),
-  endDate: z.string().date("Invalid end date (YYYY-MM-DD)").optional(),
+  dateRange: DateRangePresetSchema.optional(),
 });
 export type FinancialsExportQuery = z.infer<typeof FinancialsExportQuerySchema>;
 

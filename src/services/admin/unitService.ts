@@ -7,6 +7,7 @@ import {
 } from "../../dtos/admin/property.dto";
 import { TenantProfileResponseDto } from "../../dtos/admin/tenant.dto";
 import { BadRequestError } from "../../utils/apiError";
+import { DateRangePreset, resolveDateRangePreset } from "../../utils/dateRangePreset";
 
 export class AdminUnitService {
   // --- 1. ADD UNIT TO PROPERTY ---
@@ -463,20 +464,9 @@ export class AdminUnitService {
 
   public async getTenantProfile(
     tenantId: string,
-    visitorPeriod?: "today" | "last_week" | "last_month",
+    visitorPeriod?: DateRangePreset,
   ): Promise<TenantProfileResponseDto> {
-    const now = new Date();
-    let visitorFrom: Date | undefined;
-    if (visitorPeriod === "today") {
-      visitorFrom = new Date(now);
-      visitorFrom.setHours(0, 0, 0, 0);
-    } else if (visitorPeriod === "last_week") {
-      visitorFrom = new Date(now);
-      visitorFrom.setDate(visitorFrom.getDate() - 7);
-    } else if (visitorPeriod === "last_month") {
-      visitorFrom = new Date(now);
-      visitorFrom.setMonth(visitorFrom.getMonth() - 1);
-    }
+    const visitorFrom = visitorPeriod ? resolveDateRangePreset(visitorPeriod).start : undefined;
 
     const tenant = await prisma.user.findUnique({
       where: { userId: tenantId },

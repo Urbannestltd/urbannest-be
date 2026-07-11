@@ -81,7 +81,7 @@ export class FmPropertiesController extends Controller {
 
   /**
    * Returns the full tenant profile (general info, lease, visitor history, payment history, cohabitants).
-   * Optional filter: ?visitorPeriod=today|last_week|last_month
+   * Optional filter: ?visitorPeriod=TODAY|LAST_7_DAYS|LAST_30_DAYS|THIS_MONTH|THIS_YEAR
    * Returns 403 if FM access has been revoked, 404 if tenant does not belong to this property.
    */
   @Get("{propertyId}/tenants/{tenantId}")
