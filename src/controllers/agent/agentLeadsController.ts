@@ -72,9 +72,10 @@ export class AgentLeadsController extends Controller {
   }
 
   /**
-   * Deletes a draft lead owned by the agent.
-   * Only leads with status DRAFT (PENDING) can be deleted — once forwarded to a
-   * landlord, the lead is no longer solely under the agent's control.
+   * Deletes a lead owned by the agent.
+   * Allowed for any status up to a landlord decision (PENDING, FORWARDED_TO_LANDLORD,
+   * REJECTED, WITHDRAWN). Returns 409 once the landlord has approved it (APPROVED
+   * or CONVERTED_TO_TENANT) — an approved lead is no longer solely under the agent's control.
    */
   @Delete("{leadId}")
   public async deleteLead(

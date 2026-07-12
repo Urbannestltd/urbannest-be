@@ -14,6 +14,75 @@ import { date } from "zod";
 
 export class AdminService {
   private zeptoMailService = new ZeptoMailService();
+
+  private readonly SLA = {
+    EMERGENCY: { responseHours: 1,  fixHours: 4   },
+    HIGH:      { responseHours: 4,  fixHours: 24  },
+    MEDIUM:    { responseHours: 24, fixHours: 72  },
+    LOW:       { responseHours: 72, fixHours: 168 },
+  };
+
+  /**
+   * Per-property maintenance metrics for a facility manager, shown on their
+   * admin user-detail page. "Last inspection" has no dedicated tracking in
+   * the system — it's approximated as the FM's most recent message on any
+   * ticket for that property (their last hands-on engagement with it).
+   */
+  private async getFmPropertyMetrics(facilityManagerId: string, propertyId: string) {
+    const [tickets, lastFmMessage] = await Promise.all([
+      prisma.maintenanceRequest.findMany({
+        where: { unit: { propertyId } },
+        select: {
+          status: true,
+          priority: true,
+          createdAt: true,
+          messages: { orderBy: { createdAt: "asc" }, take: 1, select: { createdAt: true } },
+        },
+      }),
+      prisma.maintenanceMessage.findFirst({
+        where: { senderId: facilityManagerId, ticket: { unit: { propertyId } } },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const now = new Date();
+    const activeOrders = tickets.filter(
+      (t) => !["RESOLVED", "FIXED", "CANCELLED"].includes(t.status),
+    ).length;
+
+    const responseTimes = tickets
+      .filter((t) => t.messages.length > 0)
+      .map((t) => (t.messages[0]!.createdAt.getTime() - t.createdAt.getTime()) / 60000);
+    const responseTimeMinutes =
+      responseTimes.length > 0
+        ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+        : null;
+
+    let maintenanceScore: number | null = null;
+    if (tickets.length > 0) {
+      const onTimeCount = tickets.filter((t) => {
+        const sla = this.SLA[t.priority as keyof typeof this.SLA] ?? this.SLA.MEDIUM;
+        const deadline = new Date(t.createdAt.getTime() + sla.responseHours * 60 * 60 * 1000);
+        const firstMessage = t.messages[0] ?? null;
+        const isResolved = ["RESOLVED", "FIXED", "CANCELLED"].includes(t.status);
+        const isLate = firstMessage ? firstMessage.createdAt > deadline : !isResolved && now > deadline;
+        return !isLate;
+      }).length;
+      const resolvedCount = tickets.filter((t) => ["RESOLVED", "FIXED"].includes(t.status)).length;
+
+      const responseComplianceRate = onTimeCount / tickets.length;
+      const resolutionRate = resolvedCount / tickets.length;
+      maintenanceScore = Math.round(((responseComplianceRate + resolutionRate) / 2) * 100);
+    }
+
+    return {
+      responseTimeMinutes,
+      maintenanceScore,
+      activeOrders,
+      lastInspection: lastFmMessage?.createdAt ?? null,
+    };
+  }
   public async createUser(
     params: AdminCreateUserRequest,
   ): Promise<ApiResponse<any>> {
@@ -427,7 +496,20 @@ export class AdminService {
 
     if (!user) throw new BadRequestError("User not found");
 
-    return this.mapUserProperties(user);
+    const mapped = this.mapUserProperties(user);
+
+    if (mapped.properties.asFacilityManager.length > 0) {
+      const metrics = await Promise.all(
+        mapped.properties.asFacilityManager.map((p: { id: string }) =>
+          this.getFmPropertyMetrics(userId, p.id),
+        ),
+      );
+      mapped.properties.asFacilityManager = mapped.properties.asFacilityManager.map(
+        (p: { id: string; name: string }, i: number) => ({ ...p, ...metrics[i] }),
+      );
+    }
+
+    return mapped;
   }
 
   public async changePassword(

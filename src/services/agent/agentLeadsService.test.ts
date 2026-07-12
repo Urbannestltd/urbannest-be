@@ -205,6 +205,7 @@ describe("AgentLeadsService", () => {
         prospectName: "Chidi Okafor",
         propertyId: "prop-1",
       });
+      mockedPrisma.agentFee.findUnique.mockResolvedValue(null);
 
       const result = await service.deleteLead(agentId, "lead-1");
 
@@ -235,7 +236,7 @@ describe("AgentLeadsService", () => {
       expect(mockedPrisma.agentLead.delete).not.toHaveBeenCalled();
     });
 
-    it("throws BadRequestError (400) when the lead is not in DRAFT/PENDING status", async () => {
+    it("allows deleting a FORWARDED_TO_LANDLORD lead (not yet decided)", async () => {
       mockedPrisma.agentLead.findUnique.mockResolvedValue({
         id: "lead-1",
         agentId,
@@ -243,8 +244,51 @@ describe("AgentLeadsService", () => {
         prospectName: "Chidi Okafor",
         propertyId: "prop-1",
       });
+      mockedPrisma.agentFee.findUnique.mockResolvedValue(null);
 
-      await expect(service.deleteLead(agentId, "lead-1")).rejects.toMatchObject({ statusCode: 400 });
+      const result = await service.deleteLead(agentId, "lead-1");
+
+      expect(mockedPrisma.agentLead.delete).toHaveBeenCalledWith({ where: { id: "lead-1" } });
+      expect(result).toEqual({ leadId: "lead-1" });
+    });
+
+    it("throws ConflictError (409) when the lead has already been approved", async () => {
+      mockedPrisma.agentLead.findUnique.mockResolvedValue({
+        id: "lead-1",
+        agentId,
+        status: "APPROVED",
+        prospectName: "Chidi Okafor",
+        propertyId: "prop-1",
+      });
+
+      await expect(service.deleteLead(agentId, "lead-1")).rejects.toMatchObject({ statusCode: 409 });
+      expect(mockedPrisma.agentLead.delete).not.toHaveBeenCalled();
+    });
+
+    it("throws ConflictError (409) when the lead was converted to a tenant", async () => {
+      mockedPrisma.agentLead.findUnique.mockResolvedValue({
+        id: "lead-1",
+        agentId,
+        status: "CONVERTED_TO_TENANT",
+        prospectName: "Chidi Okafor",
+        propertyId: "prop-1",
+      });
+
+      await expect(service.deleteLead(agentId, "lead-1")).rejects.toMatchObject({ statusCode: 409 });
+      expect(mockedPrisma.agentLead.delete).not.toHaveBeenCalled();
+    });
+
+    it("throws ConflictError (409) when a REJECTED lead still has an AgentFee (rejected after approval)", async () => {
+      mockedPrisma.agentLead.findUnique.mockResolvedValue({
+        id: "lead-1",
+        agentId,
+        status: "REJECTED",
+        prospectName: "Chidi Okafor",
+        propertyId: "prop-1",
+      });
+      mockedPrisma.agentFee.findUnique.mockResolvedValue({ id: "fee-1", leadId: "lead-1" });
+
+      await expect(service.deleteLead(agentId, "lead-1")).rejects.toMatchObject({ statusCode: 409 });
       expect(mockedPrisma.agentLead.delete).not.toHaveBeenCalled();
     });
   });

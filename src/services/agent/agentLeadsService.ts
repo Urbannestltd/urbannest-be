@@ -130,8 +130,15 @@ export class AgentLeadsService {
     if (lead.agentId !== agentId) {
       throw new ForbiddenError("You do not own this lead");
     }
-    if (lead.status !== "PENDING") {
-      throw new BadRequestError("Only draft leads can be deleted");
+    if (lead.status === "APPROVED" || lead.status === "CONVERTED_TO_TENANT") {
+      throw new ConflictError("This lead has already been approved by the landlord and can no longer be deleted");
+    }
+
+    // A lead rejected after approval (the "Safety Switch") still has an AgentFee
+    // row pointing at it — deleting the lead would violate that foreign key.
+    const existingFee = await prisma.agentFee.findUnique({ where: { leadId } });
+    if (existingFee) {
+      throw new ConflictError("This lead has already been approved by the landlord and can no longer be deleted");
     }
 
     await prisma.agentLead.delete({ where: { id: leadId } });
@@ -139,8 +146,8 @@ export class AgentLeadsService {
     void logActivity({
       userId: agentId,
       action: "AGENT_LEAD_DELETED",
-      description: `Agent deleted draft lead for prospect ${lead.prospectName}`,
-      metadata: { leadId, propertyId: lead.propertyId },
+      description: `Agent deleted lead for prospect ${lead.prospectName}`,
+      metadata: { leadId, propertyId: lead.propertyId, statusAtDeletion: lead.status },
     });
 
     return { leadId };
