@@ -188,7 +188,7 @@ export class AdminPropertyService {
 
     // 1. Fetch the core property data and its relations
     const property = await prisma.property.findUnique({
-      where: { id: propertyId },
+      where: { id: propertyId, isDeleted: false },
       include: {
         facilityManager: true,
         landlord: true,
@@ -448,7 +448,7 @@ export class AdminPropertyService {
   ) {
     // 1. Verify property exists
     const property = await prisma.property.findUnique({
-      where: { id: propertyId },
+      where: { id: propertyId, isDeleted: false },
     });
     if (!property) throw new Error("Property not found");
 

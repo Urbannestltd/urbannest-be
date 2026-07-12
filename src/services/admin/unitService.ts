@@ -200,6 +200,7 @@ export class AdminUnitService {
       where: {
         propertyId,
         status: { not: UnitStatus.DELETED },
+        property: { isDeleted: false },
         ...(q && {
           OR: [
             { name: { contains: q, mode: "insensitive" } },

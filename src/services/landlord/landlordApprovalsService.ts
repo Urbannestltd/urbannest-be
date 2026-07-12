@@ -1,5 +1,9 @@
 import { prisma } from "../../config/prisma";
-import { ConflictError, ForbiddenError, NotFoundError } from "../../utils/apiError";
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { logActivity } from "../../utils/activityLogger";
 import {
@@ -33,7 +37,10 @@ export class LandlordApprovalsService {
     };
   }
 
-  private annualRent(proposedRent: number | null, baseRent: number | null | undefined): number | null {
+  private annualRent(
+    proposedRent: number | null,
+    baseRent: number | null | undefined,
+  ): number | null {
     if (proposedRent != null) return Math.round(proposedRent * 12);
     if (baseRent != null) return Math.round(baseRent * 12);
     return null;
@@ -56,22 +63,35 @@ export class LandlordApprovalsService {
 
   private buildDateFilter(dateFrom?: Date, dateTo?: Date) {
     if (!dateFrom && !dateTo) return {};
-    return { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } };
+    return {
+      createdAt: {
+        ...(dateFrom ? { gte: dateFrom } : {}),
+        ...(dateTo ? { lte: dateTo } : {}),
+      },
+    };
   }
 
-  private async fetchLeadWithOwnershipCheck(landlordId: string, leadId: string) {
+  private async fetchLeadWithOwnershipCheck(
+    landlordId: string,
+    leadId: string,
+  ) {
     const lead = await prisma.agentLead.findUnique({
       where: { id: leadId },
       include: LEAD_INCLUDE,
     });
     if (!lead) throw new NotFoundError("Application not found");
     if (lead.property.landlordId !== landlordId) {
-      throw new ForbiddenError("You do not own the property for this application");
+      throw new ForbiddenError(
+        "You do not own the property for this application",
+      );
     }
     return lead;
   }
 
-  public async listPending(landlordId: string, query: ApprovalsListQuery): Promise<ApprovalListItem[]> {
+  public async listPending(
+    landlordId: string,
+    query: ApprovalsListQuery,
+  ): Promise<ApprovalListItem[]> {
     const leads = await prisma.agentLead.findMany({
       where: {
         status: "FORWARDED_TO_LANDLORD",
@@ -85,7 +105,10 @@ export class LandlordApprovalsService {
     return leads.map((l) => this.mapToListItem(l));
   }
 
-  public async listHistory(landlordId: string, query: ApprovalsListQuery): Promise<ApprovalHistoryItem[]> {
+  public async listHistory(
+    landlordId: string,
+    query: ApprovalsListQuery,
+  ): Promise<ApprovalHistoryItem[]> {
     const leads = await prisma.agentLead.findMany({
       where: {
         status: { in: ["APPROVED", "REJECTED"] },
@@ -96,15 +119,20 @@ export class LandlordApprovalsService {
       include: LEAD_INCLUDE,
       orderBy: { decidedAt: "desc" },
     });
-    return leads.map((l): ApprovalHistoryItem => ({
-      ...this.mapToListItem(l),
-      outcome: l.status as "APPROVED" | "REJECTED",
-      decidedAt: l.decidedAt,
-      rejectionReason: l.rejectionReason,
-    }));
+    return leads.map(
+      (l): ApprovalHistoryItem => ({
+        ...this.mapToListItem(l),
+        outcome: l.status as "APPROVED" | "REJECTED",
+        decidedAt: l.decidedAt,
+        rejectionReason: l.rejectionReason,
+      }),
+    );
   }
 
-  public async getDossier(landlordId: string, leadId: string): Promise<ApplicantDossier> {
+  public async getDossier(
+    landlordId: string,
+    leadId: string,
+  ): Promise<ApplicantDossier> {
     const lead = await this.fetchLeadWithOwnershipCheck(landlordId, leadId);
 
     void logActivity({
@@ -121,7 +149,11 @@ export class LandlordApprovalsService {
       applicantPhone: lead.prospectPhone,
       occupation: lead.occupation,
       monthlyIncome: lead.monthlyIncome,
-      annualIncome: lead.annualIncome ?? (lead.monthlyIncome != null ? Math.round(lead.monthlyIncome * 12) : null),
+      annualIncome:
+        lead.annualIncome ??
+        (lead.monthlyIncome != null
+          ? Math.round(lead.monthlyIncome * 12)
+          : null),
       employerName: lead.employerName,
       employerAddress: lead.employerAddress,
       employmentDuration: lead.employmentDuration,
@@ -147,7 +179,11 @@ export class LandlordApprovalsService {
     };
   }
 
-  public async approve(landlordId: string, leadId: string, agentFeeAmount: number): Promise<void> {
+  public async approve(
+    landlordId: string,
+    leadId: string,
+    agentFeeAmount: number,
+  ): Promise<void> {
     const lead = await this.fetchLeadWithOwnershipCheck(landlordId, leadId);
 
     if (lead.status !== "FORWARDED_TO_LANDLORD") {
@@ -176,7 +212,10 @@ export class LandlordApprovalsService {
     );
     this.emailService
       .sendEmail(
-        { email: lead.agent.userEmail, name: lead.agent.userFullName ?? undefined },
+        {
+          email: lead.agent.userEmail,
+          name: lead.agent.userFullName ?? undefined,
+        },
         agentTpl.subject,
         agentTpl.html,
       )
@@ -189,7 +228,9 @@ export class LandlordApprovalsService {
         lead.unit?.name ?? null,
         "Our facility management team will contact you shortly to complete your onboarding.",
       );
+
       this.emailService
+
         .sendEmail(
           { email: lead.prospectEmail, name: lead.prospectName },
           prospectTpl.subject,
@@ -209,11 +250,19 @@ export class LandlordApprovalsService {
       userId: landlordId,
       action: "AGENT_FEE_TRIGGERED",
       description: `Agent fee workflow triggered for agent ${lead.agent.userId}`,
-      metadata: { leadId, agentId: lead.agent.userId, propertyId: lead.propertyId },
+      metadata: {
+        leadId,
+        agentId: lead.agent.userId,
+        propertyId: lead.propertyId,
+      },
     });
   }
 
-  public async reject(landlordId: string, leadId: string, reason: string): Promise<void> {
+  public async reject(
+    landlordId: string,
+    leadId: string,
+    reason: string,
+  ): Promise<void> {
     const lead = await this.fetchLeadWithOwnershipCheck(landlordId, leadId);
 
     // Rejectable either before approval (FORWARDED_TO_LANDLORD) or after — the
@@ -226,7 +275,11 @@ export class LandlordApprovalsService {
 
     await prisma.agentLead.update({
       where: { id: leadId },
-      data: { status: "REJECTED", rejectionReason: reason, decidedAt: new Date() },
+      data: {
+        status: "REJECTED",
+        rejectionReason: reason,
+        decidedAt: new Date(),
+      },
     });
 
     if (wasApproved) {
@@ -247,7 +300,10 @@ export class LandlordApprovalsService {
     );
     this.emailService
       .sendEmail(
-        { email: lead.agent.userEmail, name: lead.agent.userFullName ?? undefined },
+        {
+          email: lead.agent.userEmail,
+          name: lead.agent.userFullName ?? undefined,
+        },
         agentTpl.subject,
         agentTpl.html,
       )
