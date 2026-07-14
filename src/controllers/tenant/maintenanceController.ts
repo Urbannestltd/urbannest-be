@@ -91,8 +91,7 @@ export class MaintenanceController extends Controller {
   @Get("{ticketId}/messages")
   @Security("jwt")
   public async getMessages(@Request() req: any, @Path() ticketId: string) {
-    // Optional: Add logic here to ensure req.user.userId is allowed to view this ticket
-    const result = await this.maintenanceService.getTicketMessages(ticketId);
+    const result = await this.maintenanceService.getTicketMessages(ticketId, req.user.userId);
     return successResponse(result, "Messages retrieved");
   }
 

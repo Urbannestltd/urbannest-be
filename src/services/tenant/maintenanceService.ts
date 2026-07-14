@@ -4,7 +4,7 @@ import {
   CreateMaintenanceRequest,
   UpdateMaintenanceRequest,
 } from "../../dtos/tenant/maintenance.dto";
-import { BadRequestError, NotFoundError } from "../../utils/apiError";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../../utils/apiError";
 import {
   MaintenanceCategory,
   MaintenancePriority,
@@ -92,7 +92,10 @@ export class MaintenanceService {
     return prisma.maintenanceRequest.findMany({
       where: { tenantId },
       orderBy: { createdAt: "desc" },
-      include: { unit: { select: { name: true } }, messages: true },
+      include: {
+        unit: { select: { name: true } },
+        messages: { where: { isInternalNote: false }, orderBy: { createdAt: "asc" } },
+      },
     });
   }
 
@@ -167,7 +170,16 @@ export class MaintenanceService {
    * 4. GET MESSAGE HISTORY
    * Fetches the conversation for the chat UI.
    */
-  public async getTicketMessages(ticketId: string) {
+  public async getTicketMessages(ticketId: string, tenantId: string) {
+    const ticket = await prisma.maintenanceRequest.findUnique({
+      where: { id: ticketId },
+      select: { tenantId: true },
+    });
+    if (!ticket) throw new NotFoundError("Maintenance request not found");
+    if (ticket.tenantId !== tenantId) {
+      throw new ForbiddenError("You can only view messages on your own requests.");
+    }
+
     return prisma.maintenanceMessage.findMany({
       where: { ticketId, isInternalNote: false },
       orderBy: { createdAt: "asc" },

@@ -10,7 +10,7 @@ export interface TicketListResponseDto {
   assignedTo: { id: string; name: string | null } | null;
   facilityManager: { id: string; name: string | null } | null;
   unit: { id: string; name: string } | null;
-  property: { id: string; name: string | null } | null;
+  property: { id: string; name: string | null; address: string | null; propertyImageUrl: string | null } | null;
 
   // Budget & approval
   budget: number | null;
@@ -34,7 +34,7 @@ export interface TicketDetailResponseDto {
   images: string[];
 
   unit: { id: string; name: string } | null;
-  property: { id: string; name: string | null } | null;
+  property: { id: string; name: string | null; address: string | null; propertyImageUrl: string | null } | null;
   tenant: { name: string | null; phone: string | null } | null;
 
   // Activity & Comments
@@ -63,6 +63,12 @@ export interface TicketDetailResponseDto {
   quotedCost: number | null;
   approvalStatus: MaintenanceApprovalStatus | null;
   rebuttalNote: string | null;
+
+  // Budget metrics — assignedBudget mirrors `budget`; totalExpenses/remainingBudget
+  // are computed from LOGGED/FLAGGED expenses (same counted statuses as the FM side)
+  assignedBudget: number | null;
+  totalExpenses: number;
+  remainingBudget: number | null;
 
   // FM-logged expenses on this ticket
   expenses: {

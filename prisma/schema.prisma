@@ -724,6 +724,7 @@ model AgentLead {
   unit      unit?                @relation(fields: [unitId],     references: [id])
   fee       AgentFee?
   documents AgentLeadDocument[]
+  referees  AgentLeadReferee[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -732,6 +733,23 @@ model AgentLead {
   @@index([propertyId])
   @@index([status])
   @@map("agent_leads")
+}
+
+model AgentLeadReferee {
+  id     String @id @default(uuid())
+  leadId String
+
+  name         String
+  phone        String
+  email        String?
+  relationship String?
+
+  lead AgentLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@map("agent_lead_referees")
 }
 
 enum AgentLeadDocumentCategory {

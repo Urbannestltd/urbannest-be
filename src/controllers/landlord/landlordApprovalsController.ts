@@ -1,4 +1,15 @@
-import { Body, Get, Post, Path, Query, Route, Controller, Tags, Security, Request } from "tsoa";
+import {
+  Body,
+  Get,
+  Post,
+  Path,
+  Query,
+  Route,
+  Controller,
+  Tags,
+  Security,
+  Request,
+} from "tsoa";
 import { LandlordApprovalsService } from "../../services/landlord/landlordApprovalsService";
 import {
   ApprovalsListQuerySchema,
@@ -23,6 +34,7 @@ export class LandlordApprovalsController extends Controller {
    * Status filter: FORWARDED_TO_LANDLORD only.
    *
    * Filters:
+   * \
    *  - propertyId: scope to a specific property
    *  - agentId: scope to a specific forwarding agent
    *  - dateFrom / dateTo: filter by date forwarded (ISO 8601)
@@ -35,7 +47,12 @@ export class LandlordApprovalsController extends Controller {
     @Query() dateFrom?: string,
     @Query() dateTo?: string,
   ): Promise<{ success: boolean; data: ApprovalListItem[] }> {
-    const query = validate(ApprovalsListQuerySchema, { propertyId, agentId, dateFrom, dateTo });
+    const query = validate(ApprovalsListQuerySchema, {
+      propertyId,
+      agentId,
+      dateFrom,
+      dateTo,
+    });
     const data = await this.service.listPending(req.user.userId, query);
     return { success: true, data };
   }
@@ -54,7 +71,12 @@ export class LandlordApprovalsController extends Controller {
     @Query() dateFrom?: string,
     @Query() dateTo?: string,
   ): Promise<{ success: boolean; data: ApprovalHistoryItem[] }> {
-    const query = validate(ApprovalsListQuerySchema, { propertyId, agentId, dateFrom, dateTo });
+    const query = validate(ApprovalsListQuerySchema, {
+      propertyId,
+      agentId,
+      dateFrom,
+      dateTo,
+    });
     const data = await this.service.listHistory(req.user.userId, query);
     return { success: true, data };
   }

@@ -5,6 +5,7 @@ jest.mock("../../config/prisma", () => ({
     agentLead: { findMany: jest.fn(), findUnique: jest.fn(), delete: jest.fn(), update: jest.fn(), create: jest.fn() },
     agentFee: { findUnique: jest.fn() },
     agentLeadDocument: { create: jest.fn(), delete: jest.fn() },
+    agentLeadReferee: { create: jest.fn(), delete: jest.fn() },
     property: { findFirst: jest.fn() },
     unit: { findFirst: jest.fn() },
     user: { findUnique: jest.fn() },
@@ -38,6 +39,7 @@ const mockedPrisma = prisma as unknown as {
   };
   agentFee: { findUnique: jest.Mock };
   agentLeadDocument: { create: jest.Mock; delete: jest.Mock };
+  agentLeadReferee: { create: jest.Mock; delete: jest.Mock };
   property: { findFirst: jest.Mock };
   unit: { findFirst: jest.Mock };
   user: { findUnique: jest.Mock };
@@ -322,6 +324,7 @@ describe("AgentLeadsService", () => {
     employmentDuration: null,
     annualIncome: null,
     documents: [rawDoc()],
+    referees: [],
     status: "PENDING",
     rejectionReason: null,
     decidedAt: null,
@@ -367,6 +370,86 @@ describe("AgentLeadsService", () => {
       mockedPrisma.agentLead.findUnique.mockResolvedValue(null);
 
       await expect(service.getLeadDetail(agentId, "lead-1")).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it("includes structured referees", async () => {
+      const referee = {
+        id: "ref-1",
+        name: "Ada Obi",
+        phone: "08011112222",
+        email: "ada@example.com",
+        relationship: "Employer",
+        createdAt: new Date(2026, 5, 3),
+      };
+      mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead({ referees: [referee] }));
+
+      const result = await service.getLeadDetail(agentId, "lead-1");
+
+      expect(result.referees).toEqual([referee]);
+    });
+  });
+
+  describe("addReferee", () => {
+    it("adds a referee to a draft lead", async () => {
+      mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead());
+      const created = {
+        id: "ref-1",
+        leadId: "lead-1",
+        name: "Ada Obi",
+        phone: "08011112222",
+        email: null,
+        relationship: null,
+        createdAt: new Date(2026, 5, 3),
+      };
+      mockedPrisma.agentLeadReferee.create.mockResolvedValue(created);
+
+      const result = await service.addReferee(agentId, "lead-1", { name: "Ada Obi", phone: "08011112222" });
+
+      expect(mockedPrisma.agentLeadReferee.create).toHaveBeenCalledWith({
+        data: { leadId: "lead-1", name: "Ada Obi", phone: "08011112222", email: null, relationship: null },
+      });
+      expect(result).toEqual({
+        id: "ref-1",
+        name: "Ada Obi",
+        phone: "08011112222",
+        email: null,
+        relationship: null,
+        createdAt: created.createdAt,
+      });
+    });
+
+    it("throws ConflictError (409) when the lead is not a draft", async () => {
+      mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead({ status: "FORWARDED_TO_LANDLORD" }));
+
+      await expect(
+        service.addReferee(agentId, "lead-1", { name: "Ada Obi", phone: "08011112222" }),
+      ).rejects.toMatchObject({ statusCode: 409 });
+      expect(mockedPrisma.agentLeadReferee.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteReferee", () => {
+    it("deletes a referee from a draft lead", async () => {
+      const referee = {
+        id: "ref-1",
+        name: "Ada Obi",
+        phone: "08011112222",
+        email: null,
+        relationship: null,
+        createdAt: new Date(2026, 5, 3),
+      };
+      mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead({ referees: [referee] }));
+
+      await service.deleteReferee(agentId, "lead-1", "ref-1");
+
+      expect(mockedPrisma.agentLeadReferee.delete).toHaveBeenCalledWith({ where: { id: "ref-1" } });
+    });
+
+    it("throws NotFoundError (404) when the referee does not belong to this lead", async () => {
+      mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead({ referees: [] }));
+
+      await expect(service.deleteReferee(agentId, "lead-1", "ref-1")).rejects.toMatchObject({ statusCode: 404 });
+      expect(mockedPrisma.agentLeadReferee.delete).not.toHaveBeenCalled();
     });
   });
 

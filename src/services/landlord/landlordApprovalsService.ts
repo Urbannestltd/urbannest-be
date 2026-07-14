@@ -24,6 +24,7 @@ const LEAD_INCLUDE = {
   property: { select: { id: true, name: true, landlordId: true } },
   unit: { select: { id: true, name: true, baseRent: true } },
   documents: true,
+  referees: true,
 } as const;
 
 export class LandlordApprovalsService {
@@ -165,6 +166,14 @@ export class LandlordApprovalsService {
         fileName: d.fileName,
         fileSizeBytes: d.fileSizeBytes,
         createdAt: d.createdAt,
+      })),
+      referees: lead.referees.map((r) => ({
+        id: r.id,
+        name: r.name,
+        phone: r.phone,
+        email: r.email,
+        relationship: r.relationship,
+        createdAt: r.createdAt,
       })),
       proposedRent: lead.proposedRent,
       notes: lead.notes,

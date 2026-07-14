@@ -18,9 +18,11 @@ import {
   SubmitLeadSchema,
   GetLeadsQuerySchema,
   UpdateLeadSchema,
+  AddRefereeSchema,
   type SubmitLeadRequest,
   type AgentLeadResponse,
   type UpdateLeadRequest,
+  type AddRefereeRequest,
 } from "../../dtos/agent/agent.leads.dto";
 import {
   UploadDocumentSchema,
@@ -175,5 +177,37 @@ export class AgentLeadsController extends Controller {
   ) {
     await this.service.deleteDocument(req.user.userId, leadId, documentId);
     return { success: true, message: "Document deleted" };
+  }
+
+  /**
+   * Adds a referee (name, phone, optional email/relationship) to a Draft lead.
+   * Only valid while the lead is in Draft status (409 otherwise).
+   */
+  @SuccessResponse(201, "Referee added")
+  @Post("{leadId}/referees")
+  public async addReferee(
+    @Path() leadId: string,
+    @Request() req: any,
+    @Body() body: AddRefereeRequest,
+  ) {
+    const data = validate(AddRefereeSchema, body);
+    const result = await this.service.addReferee(req.user.userId, leadId, data);
+    this.setStatus(201);
+    return { success: true, message: "Referee added", data: result };
+  }
+
+  /**
+   * Removes a referee from a Draft lead.
+   * Only valid while the lead is in Draft status — rejected with 409 for
+   * Forwarded, Approved, Rejected, or Converted leads.
+   */
+  @Delete("{leadId}/referees/{refereeId}")
+  public async deleteReferee(
+    @Path() leadId: string,
+    @Path() refereeId: string,
+    @Request() req: any,
+  ) {
+    await this.service.deleteReferee(req.user.userId, leadId, refereeId);
+    return { success: true, message: "Referee removed" };
   }
 }
