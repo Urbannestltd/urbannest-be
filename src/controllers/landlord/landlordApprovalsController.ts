@@ -21,6 +21,7 @@ import {
   type RejectApplicationBody,
   type ApproveApplicationBody,
 } from "../../dtos/landlord/landlord.approvals.dto";
+
 import { validate } from "../../utils/validate";
 
 @Route("landlord/approvals")

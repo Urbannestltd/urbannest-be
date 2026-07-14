@@ -145,10 +145,12 @@ export class AdminTicketService {
         select: { status: true },
       }),
 
-      // 3. Sum of expenses logged for non-cancelled tickets
+      // 3. Sum of expenses logged for non-cancelled tickets. This is an overall
+      // spend metric (matches landlordMaintenanceService's "not REJECTED" scope),
+      // not a per-ticket budget check — so PENDING_APPROVAL/REBUTTED still count.
       prisma.expense.aggregate({
         where: {
-          status: { in: COUNTED_EXPENSE_STATUSES },
+          status: { not: "REJECTED" },
           maintenanceRequest: {
             status: { notIn: ["CANCELLED"] },
           },
