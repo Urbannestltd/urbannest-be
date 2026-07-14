@@ -38,16 +38,6 @@ export class LandlordPropertiesService {
       throw new ForbiddenError("You do not own this property");
   }
 
-  private monthsOverlap(start: Date, end: Date, yearStart: Date, yearEnd: Date): number {
-    const overlapStart = start > yearStart ? start : yearStart;
-    const overlapEnd = end < yearEnd ? end : yearEnd;
-    if (overlapStart >= overlapEnd) return 0;
-    const months =
-      (overlapEnd.getFullYear() - overlapStart.getFullYear()) * 12 +
-      (overlapEnd.getMonth() - overlapStart.getMonth()) +
-      (overlapEnd.getDate() - overlapStart.getDate()) / 30;
-    return Math.max(0, months);
-  }
 
   public async getPropertyDetail(
     landlordId: string,
@@ -130,13 +120,13 @@ export class LandlordPropertiesService {
       const occupancyRate =
         totalUnits === 0 ? 0 : Math.round((occupiedUnits / totalUnits) * 100);
 
-      // Calculate expected rent for this property
+      // Calculate expected rent for this property. rentAmount is the total rent owed for
+      // the lease term, paid as a lump sum rather than accrued monthly, so any lease
+      // overlapping the period counts its full amount.
       let expectedRent = 0;
       for (const unit of prop.units) {
         for (const lease of unit.leases) {
-          const months = this.monthsOverlap(lease.startDate, lease.endDate, yearStart, yearEnd);
-          // rentAmount is the total annual rent for the lease; prorate by the fraction of the year covered
-          expectedRent += lease.rentAmount * (months / 12);
+          expectedRent += lease.rentAmount;
         }
       }
 

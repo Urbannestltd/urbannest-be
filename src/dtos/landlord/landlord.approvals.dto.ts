@@ -47,6 +47,15 @@ export interface ApplicantDossierDocument {
   createdAt: Date;
 }
 
+export interface ApplicantDossierReferee {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  relationship: string | null;
+  createdAt: Date;
+}
+
 export interface ApplicantDossier {
   leadId: string;
   applicantName: string;
@@ -59,6 +68,7 @@ export interface ApplicantDossier {
   employerAddress: string | null;
   employmentDuration: string | null;
   documents: ApplicantDossierDocument[];
+  referees: ApplicantDossierReferee[];
   proposedRent: number | null;
   notes: string | null;
   propertyId: string;

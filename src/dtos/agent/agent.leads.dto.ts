@@ -82,6 +82,15 @@ export interface AgentLeadDocumentItem {
   createdAt: Date;
 }
 
+export interface AgentLeadRefereeItem {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  relationship: string | null;
+  createdAt: Date;
+}
+
 export interface AgentLeadDetail {
   id: string;
   propertyId: string;
@@ -99,11 +108,22 @@ export interface AgentLeadDetail {
   employmentDuration: string | null;
   annualIncome: number | null;
   documents: AgentLeadDocumentItem[];
+  referees: AgentLeadRefereeItem[];
   status: string;
   rejectionReason: string | null;
   decidedAt: Date | null;
   createdAt: Date;
 }
+
+// ── Referees ──────────────────────────────────────────────────────────────────
+
+export const AddRefereeSchema = z.object({
+  name: z.string().min(2, "Referee name is required").max(100),
+  phone: z.string().min(7, "Invalid phone number").max(20),
+  email: z.string().email("Invalid email").optional(),
+  relationship: z.string().max(100).optional(),
+});
+export type AddRefereeRequest = z.infer<typeof AddRefereeSchema>;
 
 // ── Forward / Resubmit ───────────────────────────────────────────────────────
 

@@ -15,6 +15,8 @@ import type {
   ResubmitLeadResponse,
   UpdateLeadRequest,
   AgentLeadDocumentItem,
+  AgentLeadRefereeItem,
+  AddRefereeRequest,
 } from "../../dtos/agent/agent.leads.dto";
 import type { UploadDocumentRequest } from "../../dtos/agent/agent.lead-documents.dto";
 
@@ -160,6 +162,7 @@ export class AgentLeadsService {
         property: { select: { name: true, landlordId: true, landlord: { select: { userFullName: true, userEmail: true } } } },
         unit: { select: { name: true } },
         documents: { orderBy: { createdAt: "desc" } },
+        referees: { orderBy: { createdAt: "desc" } },
       },
     });
     if (!lead) throw new NotFoundError("Lead not found");
@@ -203,6 +206,14 @@ export class AgentLeadsService {
         fileName: d.fileName,
         fileSizeBytes: d.fileSizeBytes,
         createdAt: d.createdAt,
+      })),
+      referees: lead.referees.map((r) => ({
+        id: r.id,
+        name: r.name,
+        phone: r.phone,
+        email: r.email,
+        relationship: r.relationship,
+        createdAt: r.createdAt,
       })),
       status: lead.status,
       rejectionReason: lead.rejectionReason,
@@ -380,6 +391,58 @@ export class AgentLeadsService {
       action: "AGENT_LEAD_DOCUMENT_DELETED",
       description: `Deleted document for lead ${leadId}`,
       metadata: { leadId, documentId },
+    });
+  }
+
+  public async addReferee(
+    agentId: string,
+    leadId: string,
+    data: AddRefereeRequest,
+  ): Promise<AgentLeadRefereeItem> {
+    const lead = await this.fetchOwnedLead(agentId, leadId);
+    this.assertLeadIsDraft(lead.status);
+
+    const referee = await prisma.agentLeadReferee.create({
+      data: {
+        leadId,
+        name: data.name,
+        phone: data.phone,
+        email: data.email ?? null,
+        relationship: data.relationship ?? null,
+      },
+    });
+
+    void logActivity({
+      userId: agentId,
+      action: "AGENT_LEAD_REFEREE_ADDED",
+      description: `Added referee ${data.name} for lead ${leadId}`,
+      metadata: { leadId, refereeId: referee.id },
+    });
+
+    return {
+      id: referee.id,
+      name: referee.name,
+      phone: referee.phone,
+      email: referee.email,
+      relationship: referee.relationship,
+      createdAt: referee.createdAt,
+    };
+  }
+
+  public async deleteReferee(agentId: string, leadId: string, refereeId: string): Promise<void> {
+    const lead = await this.fetchOwnedLead(agentId, leadId);
+    this.assertLeadIsDraft(lead.status);
+
+    const referee = lead.referees.find((r) => r.id === refereeId);
+    if (!referee) throw new NotFoundError("Referee not found");
+
+    await prisma.agentLeadReferee.delete({ where: { id: refereeId } });
+
+    void logActivity({
+      userId: agentId,
+      action: "AGENT_LEAD_REFEREE_DELETED",
+      description: `Deleted referee for lead ${leadId}`,
+      metadata: { leadId, refereeId },
     });
   }
 }

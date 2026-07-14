@@ -1,4 +1,4 @@
-import { PrismaClient, MaintenanceStatus, PropertyType } from "@prisma/client";
+import { PrismaClient, MaintenanceStatus, PropertyType, ExpenseStatus } from "@prisma/client";
 import {
   AddCommentDto,
   MaintenanceMetricsDto,
@@ -18,6 +18,9 @@ import {
 } from "../../config/emailTemplates";
 
 const prisma = new PrismaClient();
+
+// Statuses that count toward total expenses (excludes PENDING_APPROVAL/REJECTED/REBUTTED)
+const COUNTED_EXPENSE_STATUSES: ExpenseStatus[] = [ExpenseStatus.LOGGED, ExpenseStatus.FLAGGED];
 
 export class AdminTicketService {
   private emailService = new ZeptoMailService();
@@ -67,7 +70,12 @@ export class AdminTicketService {
         : null,
       unit: ticket.unit ? { id: ticket.unit.id, name: ticket.unit.name } : null,
       property: ticket.unit?.property
-        ? { id: ticket.unit.property.id, name: ticket.unit.property.name }
+        ? {
+            id: ticket.unit.property.id,
+            name: ticket.unit.property.name,
+            address: ticket.unit.property.address ?? null,
+            propertyImageUrl: ticket.unit.property.images?.[0] ?? null,
+          }
         : null,
       responseTimeMinutes,
       projectedFixDeadline,
@@ -90,6 +98,8 @@ export class AdminTicketService {
             select: {
               id: true,
               name: true,
+              address: true,
+              images: true,
               facilityManager: { select: { userId: true, userFullName: true } },
             },
           },
@@ -138,6 +148,7 @@ export class AdminTicketService {
       // 3. Sum of expenses logged for non-cancelled tickets
       prisma.expense.aggregate({
         where: {
+          status: { in: COUNTED_EXPENSE_STATUSES },
           maintenanceRequest: {
             status: { notIn: ["CANCELLED"] },
           },
@@ -340,7 +351,7 @@ export class AdminTicketService {
           select: {
             id: true,
             name: true,
-            property: { select: { id: true, name: true } },
+            property: { select: { id: true, name: true, address: true, images: true } },
           },
         },
         messages: {
@@ -404,6 +415,13 @@ export class AdminTicketService {
         )
       : null;
 
+    const countedExpenses = (ticket as any).expenses.filter((e: any) =>
+      (COUNTED_EXPENSE_STATUSES as string[]).includes(e.status),
+    );
+    const totalExpenses = countedExpenses.reduce((sum: number, e: any) => sum + e.amount, 0);
+    const assignedBudget = ticket.budget ?? null;
+    const remainingBudget = assignedBudget !== null ? assignedBudget - totalExpenses : null;
+
     return {
       id: ticket.id,
       subject: ticket.subject || "No Subject provided",
@@ -415,7 +433,12 @@ export class AdminTicketService {
 
       unit: ticket.unit ? { id: ticket.unit.id, name: ticket.unit.name } : null,
       property: ticket.unit?.property
-        ? { id: ticket.unit.property.id, name: ticket.unit.property.name }
+        ? {
+            id: ticket.unit.property.id,
+            name: ticket.unit.property.name,
+            address: ticket.unit.property.address ?? null,
+            propertyImageUrl: ticket.unit.property.images?.[0] ?? null,
+          }
         : null,
       tenant: ticket.tenant
         ? { name: ticket.tenant.userFullName, phone: ticket.tenant.userPhone }
@@ -440,6 +463,10 @@ export class AdminTicketService {
       quotedCost: ticket.quotedCost ?? null,
       approvalStatus: ticket.approvalStatus ?? null,
       rebuttalNote: ticket.rebuttalNote ?? null,
+
+      assignedBudget,
+      totalExpenses,
+      remainingBudget,
 
       expenses: (ticket as any).expenses.map((e: any) => ({
         id: e.id,
