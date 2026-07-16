@@ -72,9 +72,12 @@ export class AdminAgentLeadsService {
       data: { status: "OCCUPIED" },
     });
 
+    // Conversion is the moment the commission is both confirmed and paid out —
+    // jump straight to PAID rather than leaving it in the intermediate CONFIRMED state.
+    const paidAt = new Date();
     await prisma.agentFee.updateMany({
       where: { leadId, status: "PENDING_ADMIN_CONFIRMATION" },
-      data: { status: "CONFIRMED", confirmedAt: new Date() },
+      data: { status: "PAID", confirmedAt: paidAt, paidAt },
     });
 
     await prisma.agentLead.update({

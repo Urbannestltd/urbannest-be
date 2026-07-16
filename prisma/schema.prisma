@@ -290,6 +290,7 @@ model user {
   agentVisits          AgentVisit[]       @relation("agentVisits")
   proposedReschedules  AgentVisit[]       @relation("proposedReschedules")
   agentLeads           AgentLead[]        @relation("agentLeads")
+  agentLeadDocuments   AgentLeadDocument[] @relation("agentLeadDocuments")
   agentFees            AgentFee[]         @relation("agentFees")
   loggedExpenses       Expense[]          @relation("loggedExpenses")
   budgetAdjustments    BudgetAdjustment[] @relation("budgetAdjustments")
@@ -775,8 +776,9 @@ enum AgentLeadDocumentType {
 }
 
 model AgentLeadDocument {
-  id     String @id @default(uuid())
-  leadId String
+  id      String  @id @default(uuid())
+  leadId  String?
+  agentId String
 
   category AgentLeadDocumentCategory
   type     AgentLeadDocumentType
@@ -784,11 +786,13 @@ model AgentLeadDocument {
   fileName String
   fileSizeBytes Int
 
-  lead AgentLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead  AgentLead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent user       @relation("agentLeadDocuments", fields: [agentId], references: [userId])
 
   createdAt DateTime @default(now())
 
   @@index([leadId])
+  @@index([agentId])
   @@map("agent_lead_documents")
 }
 

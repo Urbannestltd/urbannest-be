@@ -4,7 +4,14 @@ jest.mock("../../config/prisma", () => ({
   prisma: {
     agentLead: { findMany: jest.fn(), findUnique: jest.fn(), delete: jest.fn(), update: jest.fn(), create: jest.fn() },
     agentFee: { findUnique: jest.fn() },
-    agentLeadDocument: { create: jest.fn(), delete: jest.fn() },
+    agentLeadDocument: {
+      create: jest.fn(),
+      createManyAndReturn: jest.fn(),
+      delete: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      updateMany: jest.fn(),
+    },
     agentLeadReferee: { create: jest.fn(), delete: jest.fn() },
     property: { findFirst: jest.fn() },
     unit: { findFirst: jest.fn() },
@@ -38,7 +45,14 @@ const mockedPrisma = prisma as unknown as {
     create: jest.Mock;
   };
   agentFee: { findUnique: jest.Mock };
-  agentLeadDocument: { create: jest.Mock; delete: jest.Mock };
+  agentLeadDocument: {
+    create: jest.Mock;
+    createManyAndReturn: jest.Mock;
+    delete: jest.Mock;
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    updateMany: jest.Mock;
+  };
   agentLeadReferee: { create: jest.Mock; delete: jest.Mock };
   property: { findFirst: jest.Mock };
   unit: { findFirst: jest.Mock };
@@ -651,7 +665,7 @@ describe("AgentLeadsService", () => {
     });
   });
 
-  describe("uploadDocument", () => {
+  describe("uploadDocuments", () => {
     const uploadRequest = {
       url: "https://storage.example.com/props/passport.pdf",
       fileName: "passport.pdf",
@@ -659,33 +673,38 @@ describe("AgentLeadsService", () => {
       type: "PASSPORT" as const,
     };
 
-    it("uploads a valid document to a Draft lead, reading file size via HEAD request", async () => {
+    it("uploads valid documents to a Draft lead, reading file size via HEAD request", async () => {
       mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead());
       mockedAxios.head.mockResolvedValue({ headers: { "content-length": "2048" } } as any);
-      mockedPrisma.agentLeadDocument.create.mockResolvedValue(rawDoc({ fileSizeBytes: 2048 }));
+      mockedPrisma.agentLeadDocument.createManyAndReturn.mockResolvedValue([
+        rawDoc({ fileSizeBytes: 2048 }),
+      ]);
 
-      const result = await service.uploadDocument(agentId, "lead-1", uploadRequest);
+      const result = await service.uploadDocuments(agentId, "lead-1", [uploadRequest]);
 
-      expect(mockedPrisma.agentLeadDocument.create).toHaveBeenCalledWith({
-        data: {
-          leadId: "lead-1",
-          category: "ID",
-          type: "PASSPORT",
-          url: uploadRequest.url,
-          fileName: "passport.pdf",
-          fileSizeBytes: 2048,
-        },
+      expect(mockedPrisma.agentLeadDocument.createManyAndReturn).toHaveBeenCalledWith({
+        data: [
+          {
+            leadId: "lead-1",
+            agentId,
+            category: "ID",
+            type: "PASSPORT",
+            url: uploadRequest.url,
+            fileName: "passport.pdf",
+            fileSizeBytes: 2048,
+          },
+        ],
       });
-      expect(result.fileSizeBytes).toBe(2048);
+      expect(result[0]!.fileSizeBytes).toBe(2048);
     });
 
     it("throws BadRequestError (400) for an unsupported file format", async () => {
       mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead());
 
       await expect(
-        service.uploadDocument(agentId, "lead-1", { ...uploadRequest, fileName: "passport.exe" }),
+        service.uploadDocuments(agentId, "lead-1", [{ ...uploadRequest, fileName: "passport.exe" }]),
       ).rejects.toMatchObject({ statusCode: 400 });
-      expect(mockedPrisma.agentLeadDocument.create).not.toHaveBeenCalled();
+      expect(mockedPrisma.agentLeadDocument.createManyAndReturn).not.toHaveBeenCalled();
     });
 
     it("throws BadRequestError (400) when the file exceeds the maximum size", async () => {
@@ -693,9 +712,9 @@ describe("AgentLeadsService", () => {
       mockedAxios.head.mockResolvedValue({ headers: { "content-length": String(11 * 1024 * 1024) } } as any);
 
       await expect(
-        service.uploadDocument(agentId, "lead-1", uploadRequest),
+        service.uploadDocuments(agentId, "lead-1", [uploadRequest]),
       ).rejects.toMatchObject({ statusCode: 400 });
-      expect(mockedPrisma.agentLeadDocument.create).not.toHaveBeenCalled();
+      expect(mockedPrisma.agentLeadDocument.createManyAndReturn).not.toHaveBeenCalled();
     });
 
     it("throws BadRequestError (400) when the file cannot be verified (HEAD request fails)", async () => {
@@ -703,26 +722,108 @@ describe("AgentLeadsService", () => {
       mockedAxios.head.mockRejectedValue(new Error("network error"));
 
       await expect(
-        service.uploadDocument(agentId, "lead-1", uploadRequest),
+        service.uploadDocuments(agentId, "lead-1", [uploadRequest]),
       ).rejects.toMatchObject({ statusCode: 400 });
-      expect(mockedPrisma.agentLeadDocument.create).not.toHaveBeenCalled();
+      expect(mockedPrisma.agentLeadDocument.createManyAndReturn).not.toHaveBeenCalled();
     });
 
     it("throws ConflictError (409) when the lead is not Draft", async () => {
       mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead({ status: "FORWARDED_TO_LANDLORD" }));
 
       await expect(
-        service.uploadDocument(agentId, "lead-1", uploadRequest),
+        service.uploadDocuments(agentId, "lead-1", [uploadRequest]),
       ).rejects.toMatchObject({ statusCode: 409 });
-      expect(mockedPrisma.agentLeadDocument.create).not.toHaveBeenCalled();
+      expect(mockedPrisma.agentLeadDocument.createManyAndReturn).not.toHaveBeenCalled();
     });
 
     it("throws ForbiddenError (403) when the lead belongs to another agent", async () => {
       mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead({ agentId: "someone-else" }));
 
       await expect(
-        service.uploadDocument(agentId, "lead-1", uploadRequest),
+        service.uploadDocuments(agentId, "lead-1", [uploadRequest]),
       ).rejects.toMatchObject({ statusCode: 403 });
+    });
+  });
+
+  describe("uploadUnattachedDocuments", () => {
+    const uploadRequest = {
+      url: "https://storage.example.com/props/passport.pdf",
+      fileName: "passport.pdf",
+      category: "ID" as const,
+      type: "PASSPORT" as const,
+    };
+
+    it("stages documents with no leadId", async () => {
+      mockedAxios.head.mockResolvedValue({ headers: { "content-length": "2048" } } as any);
+      mockedPrisma.agentLeadDocument.createManyAndReturn.mockResolvedValue([
+        rawDoc({ fileSizeBytes: 2048, leadId: null }),
+      ]);
+
+      const result = await service.uploadUnattachedDocuments(agentId, [uploadRequest]);
+
+      expect(mockedPrisma.agentLeadDocument.createManyAndReturn).toHaveBeenCalledWith({
+        data: [
+          {
+            leadId: null,
+            agentId,
+            category: "ID",
+            type: "PASSPORT",
+            url: uploadRequest.url,
+            fileName: "passport.pdf",
+            fileSizeBytes: 2048,
+          },
+        ],
+      });
+      expect(result[0]!.leadId).toBeNull();
+    });
+  });
+
+  describe("attachDocuments", () => {
+    it("attaches staged documents owned by the agent to a draft lead", async () => {
+      mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead());
+      mockedPrisma.agentLeadDocument.findMany.mockResolvedValue([rawDoc({ id: "doc-1", leadId: null })]);
+
+      const result = await service.attachDocuments(agentId, "lead-1", ["doc-1"]);
+
+      expect(mockedPrisma.agentLeadDocument.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["doc-1"] } },
+        data: { leadId: "lead-1" },
+      });
+      expect(result[0]!.id).toBe("doc-1");
+    });
+
+    it("throws NotFoundError (404) when a document doesn't belong to the agent or is already attached", async () => {
+      mockedPrisma.agentLead.findUnique.mockResolvedValue(rawOwnedLead());
+      mockedPrisma.agentLeadDocument.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.attachDocuments(agentId, "lead-1", ["doc-1"]),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      expect(mockedPrisma.agentLeadDocument.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteUnattachedDocument", () => {
+    it("deletes a staged document owned by the agent", async () => {
+      mockedPrisma.agentLeadDocument.findUnique.mockResolvedValue(rawDoc({ id: "doc-1", agentId, leadId: null }));
+
+      await service.deleteUnattachedDocument(agentId, "doc-1");
+
+      expect(mockedPrisma.agentLeadDocument.delete).toHaveBeenCalledWith({ where: { id: "doc-1" } });
+    });
+
+    it("throws NotFoundError (404) when the document doesn't belong to the agent", async () => {
+      mockedPrisma.agentLeadDocument.findUnique.mockResolvedValue(rawDoc({ id: "doc-1", agentId: "someone-else", leadId: null }));
+
+      await expect(service.deleteUnattachedDocument(agentId, "doc-1")).rejects.toMatchObject({ statusCode: 404 });
+      expect(mockedPrisma.agentLeadDocument.delete).not.toHaveBeenCalled();
+    });
+
+    it("throws ConflictError (409) when the document is already attached to a lead", async () => {
+      mockedPrisma.agentLeadDocument.findUnique.mockResolvedValue(rawDoc({ id: "doc-1", agentId, leadId: "lead-1" }));
+
+      await expect(service.deleteUnattachedDocument(agentId, "doc-1")).rejects.toMatchObject({ statusCode: 409 });
+      expect(mockedPrisma.agentLeadDocument.delete).not.toHaveBeenCalled();
     });
   });
 
