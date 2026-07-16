@@ -31,9 +31,8 @@ export class AdminAgentLeadsController extends Controller {
   /**
    * Converts an Approved (Awaiting Payment) lead into an active tenant:
    * marks the unit Occupied, creates the tenant account + lease + onboarding
-   * invite, and moves the agent's commission from PENDING_ADMIN_CONFIRMATION to
-   * CONFIRMED. The agent still sees this as "Pending" — only a separate, explicit
-   * admin action (mark-paid) flips it to PAID once the commission is actually sent.
+   * invite, and marks the agent's commission PAID — conversion is treated as
+   * the moment the commission is confirmed and sent, both at once.
    * Permanently locks the lead — no further workflow actions are possible
    * once it reaches CONVERTED_TO_TENANT.
    */

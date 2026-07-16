@@ -15,6 +15,7 @@ import type {
   ResubmitLeadResponse,
   UpdateLeadRequest,
   AgentLeadDocumentItem,
+  AgentLeadStagedDocumentItem,
   AgentLeadRefereeItem,
   AddRefereeRequest,
 } from "../../dtos/agent/agent.leads.dto";
@@ -318,18 +319,12 @@ export class AgentLeadsService {
     return match ? match[0] : "";
   }
 
-  public async uploadDocument(
-    agentId: string,
-    leadId: string,
-    data: UploadDocumentRequest,
-  ): Promise<AgentLeadDocumentItem> {
-    const lead = await this.fetchOwnedLead(agentId, leadId);
-    this.assertLeadIsDraft(lead.status);
-
+  /** Validates format/size for one staged document and returns its verified fileSizeBytes. */
+  private async verifyDocument(data: UploadDocumentRequest): Promise<number> {
     const extension = this.extractExtension(data.fileName);
     if (!ALLOWED_EXTENSIONS.includes(extension)) {
       throw new BadRequestError(
-        `Unsupported file format. Allowed formats: ${ALLOWED_EXTENSIONS.join(", ")}`,
+        `Unsupported file format (${data.fileName}). Allowed formats: ${ALLOWED_EXTENSIONS.join(", ")}`,
       );
     }
 
@@ -339,42 +334,129 @@ export class AgentLeadsService {
       const contentLength = head.headers["content-length"];
       fileSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
     } catch {
-      throw new BadRequestError("Unable to verify the uploaded file. Please try again.");
+      throw new BadRequestError(`Unable to verify the uploaded file: ${data.fileName}. Please try again.`);
     }
 
     if (fileSizeBytes > MAX_FILE_SIZE_BYTES) {
       throw new BadRequestError(
-        `File exceeds the maximum allowed size of ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`,
+        `${data.fileName} exceeds the maximum allowed size of ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`,
       );
     }
 
-    const document = await prisma.agentLeadDocument.create({
-      data: {
+    return fileSizeBytes;
+  }
+
+  private toDocumentItem(d: {
+    id: string; category: string; type: string; url: string; fileName: string;
+    fileSizeBytes: number; createdAt: Date;
+  }): AgentLeadDocumentItem {
+    return {
+      id: d.id,
+      category: d.category,
+      type: d.type,
+      url: d.url,
+      fileName: d.fileName,
+      fileSizeBytes: d.fileSizeBytes,
+      createdAt: d.createdAt,
+    };
+  }
+
+  /** Uploads one or more documents directly attached to an existing draft lead. */
+  public async uploadDocuments(
+    agentId: string,
+    leadId: string,
+    documents: UploadDocumentRequest[],
+  ): Promise<AgentLeadDocumentItem[]> {
+    const lead = await this.fetchOwnedLead(agentId, leadId);
+    this.assertLeadIsDraft(lead.status);
+
+    const sizes = await Promise.all(documents.map((d) => this.verifyDocument(d)));
+
+    const created = await prisma.agentLeadDocument.createManyAndReturn({
+      data: documents.map((d, i) => ({
         leadId,
-        category: data.category,
-        type: data.type,
-        url: data.url,
-        fileName: data.fileName,
-        fileSizeBytes,
-      },
+        agentId,
+        category: d.category,
+        type: d.type,
+        url: d.url,
+        fileName: d.fileName,
+        fileSizeBytes: sizes[i]!,
+      })),
     });
 
     void logActivity({
       userId: agentId,
       action: "AGENT_LEAD_DOCUMENT_UPLOADED",
-      description: `Uploaded ${data.type} document for lead ${leadId}`,
-      metadata: { leadId, documentId: document.id, category: data.category, type: data.type },
+      description: `Uploaded ${created.length} document(s) for lead ${leadId}`,
+      metadata: { leadId, documentIds: created.map((d) => d.id) },
     });
 
-    return {
-      id: document.id,
-      category: document.category,
-      type: document.type,
-      url: document.url,
-      fileName: document.fileName,
-      fileSizeBytes: document.fileSizeBytes,
-      createdAt: document.createdAt,
-    };
+    return created.map((d) => this.toDocumentItem(d));
+  }
+
+  /**
+   * Uploads one or more documents with no lead attached yet (staged). Useful
+   * when an agent collects documents before creating/finishing a lead — use
+   * attachDocuments() later to link them, or deleteUnattachedDocument() to
+   * discard ones that never got used.
+   */
+  public async uploadUnattachedDocuments(
+    agentId: string,
+    documents: UploadDocumentRequest[],
+  ): Promise<AgentLeadStagedDocumentItem[]> {
+    const sizes = await Promise.all(documents.map((d) => this.verifyDocument(d)));
+
+    const created = await prisma.agentLeadDocument.createManyAndReturn({
+      data: documents.map((d, i) => ({
+        leadId: null,
+        agentId,
+        category: d.category,
+        type: d.type,
+        url: d.url,
+        fileName: d.fileName,
+        fileSizeBytes: sizes[i]!,
+      })),
+    });
+
+    void logActivity({
+      userId: agentId,
+      action: "AGENT_LEAD_DOCUMENT_STAGED",
+      description: `Staged ${created.length} unattached document(s)`,
+      metadata: { documentIds: created.map((d) => d.id) },
+    });
+
+    return created.map((d) => ({ ...this.toDocumentItem(d), leadId: d.leadId }));
+  }
+
+  /** Attaches previously-staged (unattached) documents owned by this agent to a draft lead. */
+  public async attachDocuments(
+    agentId: string,
+    leadId: string,
+    documentIds: string[],
+  ): Promise<AgentLeadDocumentItem[]> {
+    const lead = await this.fetchOwnedLead(agentId, leadId);
+    this.assertLeadIsDraft(lead.status);
+
+    const staged = await prisma.agentLeadDocument.findMany({
+      where: { id: { in: documentIds }, agentId, leadId: null },
+    });
+    if (staged.length !== documentIds.length) {
+      throw new NotFoundError("One or more documents were not found, already attached, or don't belong to you");
+    }
+
+    await prisma.agentLeadDocument.updateMany({
+      where: { id: { in: documentIds } },
+      data: { leadId },
+    });
+
+    void logActivity({
+      userId: agentId,
+      action: "AGENT_LEAD_DOCUMENT_ATTACHED",
+      description: `Attached ${staged.length} staged document(s) to lead ${leadId}`,
+      metadata: { leadId, documentIds },
+    });
+
+    return staged.map((d) => this.toDocumentItem(d));
   }
 
   public async deleteDocument(agentId: string, leadId: string, documentId: string): Promise<void> {
@@ -391,6 +473,33 @@ export class AgentLeadsService {
       action: "AGENT_LEAD_DOCUMENT_DELETED",
       description: `Deleted document for lead ${leadId}`,
       metadata: { leadId, documentId },
+    });
+  }
+
+  /** Lists this agent's staged (unattached) documents — not yet linked to any lead. */
+  public async getUnattachedDocuments(agentId: string): Promise<AgentLeadStagedDocumentItem[]> {
+    const documents = await prisma.agentLeadDocument.findMany({
+      where: { agentId, leadId: null },
+      orderBy: { createdAt: "desc" },
+    });
+    return documents.map((d) => ({ ...this.toDocumentItem(d), leadId: d.leadId }));
+  }
+
+  /** Deletes one of this agent's staged (unattached) documents. */
+  public async deleteUnattachedDocument(agentId: string, documentId: string): Promise<void> {
+    const document = await prisma.agentLeadDocument.findUnique({ where: { id: documentId } });
+    if (!document || document.agentId !== agentId) throw new NotFoundError("Document not found");
+    if (document.leadId !== null) {
+      throw new ConflictError("This document is attached to a lead — delete it from that lead instead");
+    }
+
+    await prisma.agentLeadDocument.delete({ where: { id: documentId } });
+
+    void logActivity({
+      userId: agentId,
+      action: "AGENT_LEAD_DOCUMENT_DELETED",
+      description: `Deleted staged document ${documentId}`,
+      metadata: { documentId },
     });
   }
 

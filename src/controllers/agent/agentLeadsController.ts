@@ -25,8 +25,10 @@ import {
   type AddRefereeRequest,
 } from "../../dtos/agent/agent.leads.dto";
 import {
-  UploadDocumentSchema,
-  type UploadDocumentRequest,
+  UploadDocumentsSchema,
+  AttachDocumentsSchema,
+  type UploadDocumentsRequest,
+  type AttachDocumentsRequest,
 } from "../../dtos/agent/agent.lead-documents.dto";
 import { validate } from "../../utils/validate";
 
@@ -146,22 +148,39 @@ export class AgentLeadsController extends Controller {
   }
 
   /**
-   * Uploads a document (ID, Proof of Income, or Proof of Address) to a Draft lead.
-   * The file itself must already be uploaded to storage (via POST /storage/sign-url);
-   * this endpoint records its metadata after validating format/size/category.
+   * Uploads one or more documents (ID, Proof of Income, or Proof of Address)
+   * directly attached to a Draft lead. The files themselves must already be
+   * uploaded to storage (via POST /storage/sign-url); this endpoint records
+   * their metadata after validating format/size/category for each one.
    * Only valid while the lead is in Draft status (409 otherwise).
    */
-  @SuccessResponse(201, "Document uploaded")
+  @SuccessResponse(201, "Documents uploaded")
   @Post("{leadId}/documents")
-  public async uploadDocument(
+  public async uploadDocuments(
     @Path() leadId: string,
     @Request() req: any,
-    @Body() body: UploadDocumentRequest,
+    @Body() body: UploadDocumentsRequest,
   ) {
-    const data = validate(UploadDocumentSchema, body);
-    const result = await this.service.uploadDocument(req.user.userId, leadId, data);
+    const { documents } = validate(UploadDocumentsSchema, body);
+    const result = await this.service.uploadDocuments(req.user.userId, leadId, documents);
     this.setStatus(201);
-    return { success: true, message: "Document uploaded", data: result };
+    return { success: true, message: "Documents uploaded", data: result };
+  }
+
+  /**
+   * Attaches previously staged (unattached) documents — uploaded via
+   * POST agent/lead-documents — to this Draft lead. Only documents owned by
+   * this agent and not already attached elsewhere can be attached.
+   */
+  @Patch("{leadId}/documents/attach")
+  public async attachDocuments(
+    @Path() leadId: string,
+    @Request() req: any,
+    @Body() body: AttachDocumentsRequest,
+  ) {
+    const { documentIds } = validate(AttachDocumentsSchema, body);
+    const result = await this.service.attachDocuments(req.user.userId, leadId, documentIds);
+    return { success: true, message: "Documents attached", data: result };
   }
 
   /**

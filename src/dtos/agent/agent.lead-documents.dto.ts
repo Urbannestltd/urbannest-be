@@ -32,3 +32,13 @@ export const UploadDocumentSchema = z
     path: ["type"],
   });
 export type UploadDocumentRequest = z.infer<typeof UploadDocumentSchema>;
+
+export const UploadDocumentsSchema = z.object({
+  documents: z.array(UploadDocumentSchema).min(1, "At least one document is required"),
+});
+export type UploadDocumentsRequest = z.infer<typeof UploadDocumentsSchema>;
+
+export const AttachDocumentsSchema = z.object({
+  documentIds: z.array(z.string().uuid("Invalid document ID")).min(1, "At least one document ID is required"),
+});
+export type AttachDocumentsRequest = z.infer<typeof AttachDocumentsSchema>;

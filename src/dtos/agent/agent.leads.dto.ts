@@ -82,6 +82,11 @@ export interface AgentLeadDocumentItem {
   createdAt: Date;
 }
 
+// Same shape, plus leadId so the agent can tell staged (null) apart from attached documents.
+export interface AgentLeadStagedDocumentItem extends AgentLeadDocumentItem {
+  leadId: string | null;
+}
+
 export interface AgentLeadRefereeItem {
   id: string;
   name: string;
@@ -120,7 +125,11 @@ export interface AgentLeadDetail {
 export const AddRefereeSchema = z.object({
   name: z.string().min(2, "Referee name is required").max(100),
   phone: z.string().min(7, "Invalid phone number").max(20),
-  email: z.string().email("Invalid email").optional(),
+  // Accepts "" (empty from a blank form field) as "no email provided", not a validation error.
+  email: z
+    .union([z.string().email("Invalid email"), z.literal("")])
+    .optional()
+    .transform((v) => (v ? v : undefined)),
   relationship: z.string().max(100).optional(),
 });
 export type AddRefereeRequest = z.infer<typeof AddRefereeSchema>;

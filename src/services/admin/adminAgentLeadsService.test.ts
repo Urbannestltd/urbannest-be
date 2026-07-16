@@ -51,7 +51,7 @@ describe("AdminAgentLeadsService.convertToTenant", () => {
     service = new AdminAgentLeadsService();
   });
 
-  it("creates the tenant, marks the unit Occupied, moves the fee to Earned (CONFIRMED), and locks the lead", async () => {
+  it("creates the tenant, marks the unit Occupied, marks the fee PAID, and locks the lead", async () => {
     mockedPrisma.agentLead.findUnique.mockResolvedValue(rawLead());
 
     const result = await service.convertToTenant(adminId, "lead-1");
@@ -68,7 +68,7 @@ describe("AdminAgentLeadsService.convertToTenant", () => {
     });
     expect(mockedPrisma.agentFee.updateMany).toHaveBeenCalledWith({
       where: { leadId: "lead-1", status: "PENDING_ADMIN_CONFIRMATION" },
-      data: { status: "CONFIRMED", confirmedAt: expect.any(Date) },
+      data: { status: "PAID", confirmedAt: expect.any(Date), paidAt: expect.any(Date) },
     });
     expect(mockedPrisma.agentLead.update).toHaveBeenCalledWith({
       where: { id: "lead-1" },
