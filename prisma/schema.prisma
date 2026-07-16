@@ -111,6 +111,7 @@ enum AgentVisitStatus {
   REJECTED
   RESCHEDULED_PENDING_AGENT
   CANCELLED
+  CHECKED_IN
 }
 
 enum AgentLeadStatus {
@@ -677,6 +678,9 @@ model AgentVisit {
   proposedById String?
 
   rejectionReason String?
+
+  accessCode  String?   @unique
+  checkedInAt DateTime?
 
   agent      user     @relation("agentVisits", fields: [agentId], references: [userId])
   property   property @relation(fields: [propertyId], references: [id])

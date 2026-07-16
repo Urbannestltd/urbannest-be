@@ -2,6 +2,7 @@ import {
   Body,
   Get,
   Patch,
+  Post,
   Path,
   Query,
   Route,
@@ -15,8 +16,10 @@ import {
   GetAgentVisitsQuerySchema,
   RejectVisitSchema,
   RescheduleVisitSchema,
+  VerifyAgentVisitCodeSchema,
   type RejectVisitRequest,
   type RescheduleVisitRequest,
+  type VerifyAgentVisitCodeRequest,
 } from "../../dtos/facility-manager/fm.agent-visits.dto";
 import { validate } from "../../utils/validate";
 
@@ -100,5 +103,20 @@ export class FmAgentVisitsController extends Controller {
     const { proposedDate } = validate(RescheduleVisitSchema, body);
     await this.service.rescheduleVisit(req.user.userId, visitId, proposedDate);
     return { success: true, message: "Reschedule proposal sent to agent" };
+  }
+
+  /**
+   * Verifies an agent's visit access code at the gate and checks them in.
+   * Only valid for APPROVED visits on properties this FM manages, and only on
+   * the scheduled visit day. Single-use — the code cannot be reused afterward.
+   */
+  @Post("check-in")
+  public async checkIn(
+    @Request() req: any,
+    @Body() body: VerifyAgentVisitCodeRequest,
+  ) {
+    const { accessCode } = validate(VerifyAgentVisitCodeSchema, body);
+    const data = await this.service.checkInAgentVisit(req.user.userId, accessCode);
+    return { success: true, message: "Agent checked in", data };
   }
 }

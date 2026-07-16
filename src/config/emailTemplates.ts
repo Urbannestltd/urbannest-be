@@ -994,6 +994,8 @@ export function agentVisitApprovedEmail(
   agentName: string,
   propertyName: string,
   visitDate: string,
+  accessCode: string,
+  codeValidUntil: string,
 ) {
   return {
     subject: `Your visit request has been approved — ${propertyName}`,
@@ -1006,7 +1008,14 @@ export function agentVisitApprovedEmail(
         ["Visit date", visitDate],
         ["Status", "Approved"],
       ])}
-      ${para("You are confirmed to visit on the scheduled date. Please arrive on time.")}
+      ${para("Use the access code below to check in at the property.")}
+      <div style="text-align:center;margin:28px 0;">
+        <span style="display:inline-block;background:#18181b;color:#d4a853;
+                     font-size:32px;font-weight:700;letter-spacing:8px;
+                     padding:16px 32px;border-radius:10px;">${accessCode}</span>
+      </div>
+      ${metaTable([["Code valid until", codeValidUntil]])}
+      ${alertBox("Show this code to the facility manager on arrival. Do not share it with others.", "info")}
     `),
   };
 }

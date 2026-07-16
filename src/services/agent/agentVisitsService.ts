@@ -19,7 +19,11 @@ import type {
 } from "../../dtos/agent/agent.visits.dto";
 
 const ACTIVE_STATUSES = ["PENDING", "APPROVED", "RESCHEDULED_PENDING_AGENT"] as const;
-const RESOLVED_STATUSES = ["CANCELLED", "REJECTED"] as const;
+// "Resolved" for list-grouping purposes (no longer actionable by the agent) —
+// broader than CANCELLED_REJECTED_STATUSES below, which is specifically for the
+// cancelled/rejected summary count and must NOT include a successful CHECKED_IN.
+const RESOLVED_STATUSES = ["CANCELLED", "REJECTED", "CHECKED_IN"] as const;
+const CANCELLED_REJECTED_STATUSES = ["CANCELLED", "REJECTED"] as const;
 
 export class AgentVisitsService {
   private emailService = new ZeptoMailService();
@@ -164,6 +168,7 @@ export class AgentVisitsService {
       status: v.status,
       proposedDate: v.proposedDate,
       rejectionReason: v.rejectionReason,
+      accessCode: v.accessCode,
       createdAt: v.createdAt,
     }));
   }
@@ -181,7 +186,7 @@ export class AgentVisitsService {
         where: { agentId, status: "PENDING" },
       }),
       prisma.agentVisit.count({
-        where: { agentId, status: { in: [...RESOLVED_STATUSES] } },
+        where: { agentId, status: { in: [...CANCELLED_REJECTED_STATUSES] } },
       }),
     ]);
 
@@ -207,6 +212,7 @@ export class AgentVisitsService {
       status: v.status,
       proposedDate: v.proposedDate,
       rejectionReason: v.rejectionReason,
+      accessCode: v.accessCode,
       createdAt: v.createdAt,
     };
   }

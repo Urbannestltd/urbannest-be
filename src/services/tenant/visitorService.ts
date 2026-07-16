@@ -17,15 +17,10 @@ import {
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
 import { InviteFrequency, InviteStatus, VisitorType } from "@prisma/client";
 import { resolveDateRangePreset } from "../../utils/dateRangePreset";
+import { generateNumericCode } from "../../utils/generateNumericCode";
 
 export class VisitorService {
   private emailService = new ZeptoMailService();
-  /**
-   * Helper: Generate a random 6-digit code
-   */
-  private generateCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
 
   /**
    * 1. CREATE INVITE
@@ -43,11 +38,11 @@ export class VisitorService {
     }
 
     // Uniqueness check loop
-    let code = this.generateCode();
+    let code = generateNumericCode();
     while (
       await prisma.visitorInvite.findUnique({ where: { accessCode: code } })
     ) {
-      code = this.generateCode();
+      code = generateNumericCode();
     }
 
     const invite = await prisma.visitorInvite.create({
@@ -133,9 +128,9 @@ export class VisitorService {
 
     // 2. Generate Invites linked to this Group
     for (const visitor of params.visitors) {
-      let code = this.generateCode();
+      let code = generateNumericCode();
       while (await prisma.visitorInvite.findUnique({ where: { accessCode: code } })) {
-        code = this.generateCode();
+        code = generateNumericCode();
       }
 
       invitesData.push({

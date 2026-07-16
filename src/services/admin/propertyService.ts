@@ -363,6 +363,19 @@ export class AdminPropertyService {
       return { role: "FACILITY_MANAGER", userId: data.userId, propertyId };
     }
 
+    if (data.role === "AGENT") {
+      if (userRole !== "AGENT") {
+        throw new BadRequestError(
+          `Cannot assign as AGENT — user's role is ${userRole}`,
+        );
+      }
+      await prisma.property.update({
+        where: { id: propertyId },
+        data: { agentId: data.userId },
+      });
+      return { role: "AGENT", userId: data.userId, propertyId };
+    }
+
     if (data.role === "TENANT") {
       if (!data.unitId)
         throw new BadRequestError("unitId is required to assign a tenant.");
@@ -399,7 +412,7 @@ export class AdminPropertyService {
       return { role: "TENANT", userId: data.userId, propertyId, leaseId: lease.id };
     }
 
-    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, or TENANT.");
+    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, AGENT, or TENANT.");
   }
 
   // --- REMOVE MEMBER ---
@@ -416,6 +429,14 @@ export class AdminPropertyService {
       await prisma.property.update({
         where: { id: propertyId },
         data: { facilityManagerId: null },
+      });
+      return;
+    }
+
+    if (data.role === "AGENT") {
+      await prisma.property.update({
+        where: { id: propertyId },
+        data: { agentId: null },
       });
       return;
     }
@@ -438,7 +459,7 @@ export class AdminPropertyService {
       return;
     }
 
-    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, or TENANT.");
+    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, AGENT, or TENANT.");
   }
 
   // --- UPDATE PROPERTY ---
