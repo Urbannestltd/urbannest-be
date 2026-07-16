@@ -1,6 +1,7 @@
 import { UnitStatus } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { BadRequestError, NotFoundError } from "../../utils/apiError";
+import { logActivity } from "../../utils/activityLogger";
 
 // Normalises raw floor strings to a canonical "Floor N" form so that
 // "7", "Floor 7", "Seventh Floor" etc. all map to the same bucket.
@@ -323,7 +324,7 @@ export class AdminPropertyService {
     };
   }
 
-  public async assignMember(propertyId: string, data: ManageMemberDto) {
+  public async assignMember(propertyId: string, data: ManageMemberDto, adminId: string) {
     const [user, property] = await Promise.all([
       prisma.user.findUnique({
         where: { userId: data.userId, isDeleted: false },
@@ -347,6 +348,12 @@ export class AdminPropertyService {
         where: { id: propertyId },
         data: { landlordId: data.userId },
       });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_ASSIGNED_PROPERTY_MEMBER",
+        description: `Assigned user ${data.userId} as LANDLORD on property ${propertyId}`,
+        metadata: { propertyId, role: "LANDLORD", assignedUserId: data.userId },
+      });
       return { role: "LANDLORD", userId: data.userId, propertyId };
     }
 
@@ -360,6 +367,12 @@ export class AdminPropertyService {
         where: { id: propertyId },
         data: { facilityManagerId: data.userId },
       });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_ASSIGNED_PROPERTY_MEMBER",
+        description: `Assigned user ${data.userId} as FACILITY_MANAGER on property ${propertyId}`,
+        metadata: { propertyId, role: "FACILITY_MANAGER", assignedUserId: data.userId },
+      });
       return { role: "FACILITY_MANAGER", userId: data.userId, propertyId };
     }
 
@@ -372,6 +385,12 @@ export class AdminPropertyService {
       await prisma.property.update({
         where: { id: propertyId },
         data: { agentId: data.userId },
+      });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_ASSIGNED_PROPERTY_MEMBER",
+        description: `Assigned user ${data.userId} as AGENT on property ${propertyId}`,
+        metadata: { propertyId, role: "AGENT", assignedUserId: data.userId },
       });
       return { role: "AGENT", userId: data.userId, propertyId };
     }
@@ -409,6 +428,12 @@ export class AdminPropertyService {
           status: "ACTIVE",
         },
       });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_ASSIGNED_PROPERTY_MEMBER",
+        description: `Assigned user ${data.userId} as TENANT on unit ${data.unitId} (property ${propertyId})`,
+        metadata: { propertyId, role: "TENANT", assignedUserId: data.userId, unitId: data.unitId, leaseId: lease.id },
+      });
       return { role: "TENANT", userId: data.userId, propertyId, leaseId: lease.id };
     }
 
@@ -416,11 +441,17 @@ export class AdminPropertyService {
   }
 
   // --- REMOVE MEMBER ---
-  public async removeMember(propertyId: string, data: ManageMemberDto) {
+  public async removeMember(propertyId: string, data: ManageMemberDto, adminId: string) {
     if (data.role === "LANDLORD") {
       await prisma.property.update({
         where: { id: propertyId },
         data: { landlordId: null },
+      });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_REMOVED_PROPERTY_MEMBER",
+        description: `Removed LANDLORD (user ${data.userId}) from property ${propertyId}`,
+        metadata: { propertyId, role: "LANDLORD", removedUserId: data.userId },
       });
       return;
     }
@@ -430,6 +461,12 @@ export class AdminPropertyService {
         where: { id: propertyId },
         data: { facilityManagerId: null },
       });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_REMOVED_PROPERTY_MEMBER",
+        description: `Removed FACILITY_MANAGER (user ${data.userId}) from property ${propertyId}`,
+        metadata: { propertyId, role: "FACILITY_MANAGER", removedUserId: data.userId },
+      });
       return;
     }
 
@@ -437,6 +474,12 @@ export class AdminPropertyService {
       await prisma.property.update({
         where: { id: propertyId },
         data: { agentId: null },
+      });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_REMOVED_PROPERTY_MEMBER",
+        description: `Removed AGENT (user ${data.userId}) from property ${propertyId}`,
+        metadata: { propertyId, role: "AGENT", removedUserId: data.userId },
       });
       return;
     }
@@ -455,6 +498,12 @@ export class AdminPropertyService {
       await prisma.lease.update({
         where: { id: activeLease.id },
         data: { status: "TERMINATED" },
+      });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_REMOVED_PROPERTY_MEMBER",
+        description: `Removed TENANT (user ${data.userId}) from unit ${data.unitId} (property ${propertyId})`,
+        metadata: { propertyId, role: "TENANT", removedUserId: data.userId, unitId: data.unitId, leaseId: activeLease.id },
       });
       return;
     }
