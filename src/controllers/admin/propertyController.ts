@@ -1,4 +1,4 @@
-import { Body, Delete, Get, Middlewares, Path, Post, Put, Route, Security, Tags } from "tsoa";
+import { Body, Delete, Get, Middlewares, Path, Post, Put, Request, Route, Security, Tags } from "tsoa";
 import { AdminPropertyService } from "../../services/admin/propertyService";
 import {
   CreatePropertyAdminDto,
@@ -50,8 +50,9 @@ export class AdminPropertyController {
   public async assignMember(
     @Path() propertyId: string,
     @Body() body: ManageMemberDto,
+    @Request() req: any,
   ) {
-    await this.propertyService.assignMember(propertyId, body);
+    await this.propertyService.assignMember(propertyId, body, req.user.userId);
     return {
       success: true,
       message: `${body.role} assigned successfully`,
@@ -62,8 +63,9 @@ export class AdminPropertyController {
   public async removeMember(
     @Path() propertyId: string,
     @Body() body: ManageMemberDto,
+    @Request() req: any,
   ) {
-    await this.propertyService.removeMember(propertyId, body);
+    await this.propertyService.removeMember(propertyId, body, req.user.userId);
     return {
       success: true,
       message: `${body.role} removed successfully`,
