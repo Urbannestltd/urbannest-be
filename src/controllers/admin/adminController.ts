@@ -33,11 +33,12 @@ export class AdminController extends Controller {
   @SuccessResponse("201", "User Created")
   public async createUser(
     @Body() body: AdminCreateUserRequest,
+    @Request() req: any,
   ): Promise<ApiResponse<any>> {
     const validation = await validate(AdminCreateUserSchema, body);
 
     this.setStatus(201);
-    return this.adminService.createUser(validation);
+    return this.adminService.createUser(validation, req.user.userId);
   }
 
   @Get("users/metrics")
