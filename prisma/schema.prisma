@@ -748,6 +748,7 @@ model AgentLeadReferee {
   phone        String
   email        String?
   relationship String?
+  description  String?
 
   lead AgentLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 

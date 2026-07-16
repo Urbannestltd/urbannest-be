@@ -53,6 +53,7 @@ export interface ApplicantDossierReferee {
   phone: string;
   email: string | null;
   relationship: string | null;
+  description: string | null;
   createdAt: Date;
 }
 
