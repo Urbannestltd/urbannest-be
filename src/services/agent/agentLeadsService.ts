@@ -214,6 +214,7 @@ export class AgentLeadsService {
         phone: r.phone,
         email: r.email,
         relationship: r.relationship,
+        description: r.description,
         createdAt: r.createdAt,
       })),
       status: lead.status,
@@ -518,6 +519,7 @@ export class AgentLeadsService {
         phone: data.phone,
         email: data.email ?? null,
         relationship: data.relationship ?? null,
+        description: data.description ?? null,
       },
     });
 
@@ -534,6 +536,7 @@ export class AgentLeadsService {
       phone: referee.phone,
       email: referee.email,
       relationship: referee.relationship,
+      description: referee.description,
       createdAt: referee.createdAt,
     };
   }

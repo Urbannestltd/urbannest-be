@@ -173,6 +173,7 @@ export class LandlordApprovalsService {
         phone: r.phone,
         email: r.email,
         relationship: r.relationship,
+        description: r.description,
         createdAt: r.createdAt,
       })),
       proposedRent: lead.proposedRent,

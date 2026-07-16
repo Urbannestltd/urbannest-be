@@ -413,6 +413,7 @@ describe("AgentLeadsService", () => {
         phone: "08011112222",
         email: null,
         relationship: null,
+        description: null,
         createdAt: new Date(2026, 5, 3),
       };
       mockedPrisma.agentLeadReferee.create.mockResolvedValue(created);
@@ -420,7 +421,7 @@ describe("AgentLeadsService", () => {
       const result = await service.addReferee(agentId, "lead-1", { name: "Ada Obi", phone: "08011112222" });
 
       expect(mockedPrisma.agentLeadReferee.create).toHaveBeenCalledWith({
-        data: { leadId: "lead-1", name: "Ada Obi", phone: "08011112222", email: null, relationship: null },
+        data: { leadId: "lead-1", name: "Ada Obi", phone: "08011112222", email: null, relationship: null, description: null },
       });
       expect(result).toEqual({
         id: "ref-1",
@@ -428,6 +429,7 @@ describe("AgentLeadsService", () => {
         phone: "08011112222",
         email: null,
         relationship: null,
+        description: null,
         createdAt: created.createdAt,
       });
     });

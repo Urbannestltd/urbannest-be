@@ -93,6 +93,7 @@ export interface AgentLeadRefereeItem {
   phone: string;
   email: string | null;
   relationship: string | null;
+  description: string | null;
   createdAt: Date;
 }
 
@@ -131,6 +132,7 @@ export const AddRefereeSchema = z.object({
     .optional()
     .transform((v) => (v ? v : undefined)),
   relationship: z.string().max(100).optional(),
+  description: z.string().max(500).optional(),
 });
 export type AddRefereeRequest = z.infer<typeof AddRefereeSchema>;
 
