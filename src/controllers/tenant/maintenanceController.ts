@@ -11,6 +11,7 @@ import {
   Path,
   Patch,
   Delete,
+  Query,
 } from "tsoa";
 import { MaintenanceService } from "../../services/tenant/maintenanceService";
 import {
@@ -86,12 +87,17 @@ export class MaintenanceController extends Controller {
   }
 
   /**
-   * Get Chat History for a Ticket
+   * Get Chat History for a Ticket.
+   * Pass ?since=<ISO timestamp> to fetch only messages newer than that time (for polling).
    */
   @Get("{ticketId}/messages")
   @Security("jwt")
-  public async getMessages(@Request() req: any, @Path() ticketId: string) {
-    const result = await this.maintenanceService.getTicketMessages(ticketId, req.user.userId);
+  public async getMessages(
+    @Request() req: any,
+    @Path() ticketId: string,
+    @Query() since?: string,
+  ) {
+    const result = await this.maintenanceService.getTicketMessages(ticketId, req.user.userId, since);
     return successResponse(result, "Messages retrieved");
   }
 

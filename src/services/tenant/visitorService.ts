@@ -7,7 +7,13 @@ import {
 } from "../../dtos/tenant/visitor.dto";
 import { NotFoundError, BadRequestError } from "../../utils/apiError";
 import { ZeptoMailService } from "./../external/zeptoMailService";
-import { adminVisitorCheckInEmail, visitorCheckInEmail, visitorAccessCodeEmail } from "../../config/emailTemplates";
+import {
+  adminVisitorCheckInEmail,
+  visitorCheckInEmail,
+  visitorAccessCodeEmail,
+  tenantVisitorCodeEmail,
+  tenantBulkVisitorCodesEmail,
+} from "../../config/emailTemplates";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
 import { InviteFrequency, InviteStatus, VisitorType } from "@prisma/client";
 import { resolveDateRangePreset } from "../../utils/dateRangePreset";
@@ -58,7 +64,7 @@ export class VisitorService {
         validUntil: new Date(params.endDate),
         status: InviteStatus.UPCOMING,
       },
-      include: { tenant: { select: { userFullName: true } } },
+      include: { tenant: { select: { userFullName: true, userEmail: true } } },
     });
 
     // Send code directly to visitor if their email was provided
@@ -78,6 +84,22 @@ export class VisitorService {
         )
         .catch(() => {});
     }
+
+    // Also send a copy of the code to the tenant who generated it
+    const tenantTpl = tenantVisitorCodeEmail(
+      invite.tenant.userFullName ?? "there",
+      invite.visitorName,
+      code,
+      invite.validFrom,
+      invite.validUntil,
+    );
+    this.emailService
+      .sendEmail(
+        { email: invite.tenant.userEmail, name: invite.tenant.userFullName ?? undefined },
+        tenantTpl.subject,
+        tenantTpl.html,
+      )
+      .catch(() => {});
 
     return {
       code,
@@ -112,7 +134,9 @@ export class VisitorService {
     // 2. Generate Invites linked to this Group
     for (const visitor of params.visitors) {
       let code = this.generateCode();
-      // ... uniqueness check ...
+      while (await prisma.visitorInvite.findUnique({ where: { accessCode: code } })) {
+        code = this.generateCode();
+      }
 
       invitesData.push({
         tenantId,
@@ -130,7 +154,31 @@ export class VisitorService {
 
     await prisma.visitorInvite.createMany({ data: invitesData });
 
-    return { groupName: newGroup.name, count: invitesData.length };
+    const codes = invitesData.map((i) => ({ name: i.visitorName, code: i.accessCode }));
+
+    // Send the tenant a copy of every code generated for this event
+    const tenant = await prisma.user.findUnique({
+      where: { userId: tenantId },
+      select: { userFullName: true, userEmail: true },
+    });
+    if (tenant) {
+      const tenantTpl = tenantBulkVisitorCodesEmail(
+        tenant.userFullName ?? "there",
+        newGroup.name,
+        codes,
+        newGroup.validFrom,
+        newGroup.validUntil,
+      );
+      this.emailService
+        .sendEmail(
+          { email: tenant.userEmail, name: tenant.userFullName ?? undefined },
+          tenantTpl.subject,
+          tenantTpl.html,
+        )
+        .catch(() => {});
+    }
+
+    return { groupName: newGroup.name, count: invitesData.length, codes };
   }
 
   /**
@@ -151,7 +199,10 @@ export class VisitorService {
     // VALIDATION CHECKS
     const now = new Date();
 
-    if (invite.status !== "ACTIVE") {
+    // Invites are created as UPCOMING (nothing transitions them to ACTIVE ahead
+    // of time) — both are valid statuses to check in on; the validFrom/validUntil
+    // window below is what actually gates entry.
+    if (invite.status !== "ACTIVE" && invite.status !== "UPCOMING") {
       throw new BadRequestError(`Code is ${invite.status} (Used or Revoked)`);
     }
 

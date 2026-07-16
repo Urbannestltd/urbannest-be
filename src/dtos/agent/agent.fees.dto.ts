@@ -3,16 +3,17 @@ import { z } from "zod";
 // ── Requests ──────────────────────────────────────────────────────────────────
 
 export const GetFeesQuerySchema = z.object({
-  status: z.enum(["PENDING", "APPROVED", "PAID"]).optional(),
+  status: z.enum(["PENDING", "PAID"]).optional(),
   propertyId: z.string().uuid("Invalid property ID").optional(),
 });
 export type GetFeesQuery = z.infer<typeof GetFeesQuerySchema>;
 
 // ── Responses ─────────────────────────────────────────────────────────────────
 
+// A fee is PENDING from landlord approval until the admin marks it PAID once
+// the commission is actually sent — there is no agent-visible "Approved" state.
 export interface AgentFeeSummary {
   totalPending: number;
-  totalApproved: number;
   totalPaid: number;
 }
 

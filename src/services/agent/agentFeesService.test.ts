@@ -46,7 +46,7 @@ describe("AgentFeesService", () => {
       );
     });
 
-    it("maps grouped sums into totalPending/totalApproved/totalPaid", async () => {
+    it("merges PENDING_ADMIN_CONFIRMATION and CONFIRMED into totalPending", async () => {
       mockedPrisma.agentFee.groupBy.mockResolvedValue([
         { status: "PENDING_ADMIN_CONFIRMATION", _sum: { amount: 60000 } },
         { status: "CONFIRMED", _sum: { amount: 45000 } },
@@ -56,13 +56,12 @@ describe("AgentFeesService", () => {
       const result = await service.getSummary(agentId);
 
       expect(result).toEqual({
-        totalPending: 60000,
-        totalApproved: 45000,
+        totalPending: 105000,
         totalPaid: 30000,
       });
     });
 
-    it("excludes REJECTED fees from all three totals", async () => {
+    it("excludes REJECTED fees from both totals", async () => {
       mockedPrisma.agentFee.groupBy.mockResolvedValue([
         { status: "PENDING_ADMIN_CONFIRMATION", _sum: { amount: 60000 } },
         { status: "REJECTED", _sum: { amount: 15000 } },
@@ -71,7 +70,6 @@ describe("AgentFeesService", () => {
       const result = await service.getSummary(agentId);
 
       expect(result.totalPending).toBe(60000);
-      expect(result.totalApproved).toBe(0);
       expect(result.totalPaid).toBe(0);
     });
 
@@ -82,7 +80,6 @@ describe("AgentFeesService", () => {
 
       expect(result).toEqual({
         totalPending: 0,
-        totalApproved: 0,
         totalPaid: 0,
       });
     });
@@ -102,7 +99,7 @@ describe("AgentFeesService", () => {
       );
     });
 
-    it("maps DB fields to the list item shape", async () => {
+    it("maps DB fields to the list item shape, displaying CONFIRMED/PENDING_ADMIN_CONFIRMATION as PENDING", async () => {
       mockedPrisma.agentFee.findMany.mockResolvedValue([rawFee()]);
 
       const result = await service.getFees(agentId, {});
@@ -114,10 +111,26 @@ describe("AgentFeesService", () => {
           unitNumber: "Unit 4B",
           tenantName: "Chidi Okafor",
           amount: 60000,
-          status: "PENDING_ADMIN_CONFIRMATION",
+          status: "PENDING",
           generationDate: rawFee().createdAt,
         },
       ]);
+    });
+
+    it("displays a CONFIRMED fee as PENDING (no agent-visible Approved state)", async () => {
+      mockedPrisma.agentFee.findMany.mockResolvedValue([rawFee({ status: "CONFIRMED" })]);
+
+      const result = await service.getFees(agentId, {});
+
+      expect(result.fees[0]!.status).toBe("PENDING");
+    });
+
+    it("displays a REJECTED fee as REJECTED (unaffected by the pending/paid merge)", async () => {
+      mockedPrisma.agentFee.findMany.mockResolvedValue([rawFee({ status: "REJECTED" })]);
+
+      const result = await service.getFees(agentId, {});
+
+      expect(result.fees[0]!.status).toBe("REJECTED");
     });
 
     it("returns null unitNumber when the lead has no unit", async () => {
@@ -130,24 +143,31 @@ describe("AgentFeesService", () => {
       expect(result.fees[0]!.unitNumber).toBeNull();
     });
 
-    it.each([
-      ["PENDING", "PENDING_ADMIN_CONFIRMATION"],
-      ["APPROVED", "CONFIRMED"],
-      ["PAID", "PAID"],
-    ])(
-      "maps status filter %s to internal status %s",
-      async (filterStatus, internalStatus) => {
-        mockedPrisma.agentFee.findMany.mockResolvedValue([]);
+    it("maps status filter PENDING to both PENDING_ADMIN_CONFIRMATION and CONFIRMED", async () => {
+      mockedPrisma.agentFee.findMany.mockResolvedValue([]);
 
-        await service.getFees(agentId, { status: filterStatus as any });
+      await service.getFees(agentId, { status: "PENDING" });
 
-        expect(mockedPrisma.agentFee.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({ status: internalStatus }),
+      expect(mockedPrisma.agentFee.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: { in: ["PENDING_ADMIN_CONFIRMATION", "CONFIRMED"] },
           }),
-        );
-      },
-    );
+        }),
+      );
+    });
+
+    it("maps status filter PAID to internal status PAID", async () => {
+      mockedPrisma.agentFee.findMany.mockResolvedValue([]);
+
+      await service.getFees(agentId, { status: "PAID" });
+
+      expect(mockedPrisma.agentFee.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: "PAID" }),
+        }),
+      );
+    });
 
     it("does not filter by status when status is omitted", async () => {
       mockedPrisma.agentFee.findMany.mockResolvedValue([]);
@@ -174,7 +194,7 @@ describe("AgentFeesService", () => {
       mockedPrisma.agentFee.findMany.mockResolvedValue([]);
 
       await service.getFees(agentId, {
-        status: "APPROVED",
+        status: "PENDING",
         propertyId: "prop-1",
       });
 
@@ -182,7 +202,7 @@ describe("AgentFeesService", () => {
         expect.objectContaining({
           where: expect.objectContaining({
             agentId,
-            status: "CONFIRMED",
+            status: { in: ["PENDING_ADMIN_CONFIRMATION", "CONFIRMED"] },
             propertyId: "prop-1",
           }),
         }),

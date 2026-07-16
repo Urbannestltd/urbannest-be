@@ -170,7 +170,7 @@ export class MaintenanceService {
    * 4. GET MESSAGE HISTORY
    * Fetches the conversation for the chat UI.
    */
-  public async getTicketMessages(ticketId: string, tenantId: string) {
+  public async getTicketMessages(ticketId: string, tenantId: string, since?: string) {
     const ticket = await prisma.maintenanceRequest.findUnique({
       where: { id: ticketId },
       select: { tenantId: true },
@@ -181,7 +181,11 @@ export class MaintenanceService {
     }
 
     return prisma.maintenanceMessage.findMany({
-      where: { ticketId, isInternalNote: false },
+      where: {
+        ticketId,
+        isInternalNote: false,
+        ...(since ? { createdAt: { gt: new Date(since) } } : {}),
+      },
       orderBy: { createdAt: "asc" },
       include: {
         sender: {

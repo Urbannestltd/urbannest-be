@@ -2,10 +2,47 @@ import { prisma } from "../../config/prisma";
 import { BadRequestError, ConflictError, NotFoundError } from "../../utils/apiError";
 import { logActivity } from "../../utils/activityLogger";
 import { AdminService } from "./adminService";
-import type { ConvertToTenantResponse } from "../../dtos/admin/admin.agent-leads.dto";
+import type {
+  AdminAgentLeadListItem,
+  AdminAgentLeadsQuery,
+  ConvertToTenantResponse,
+} from "../../dtos/admin/admin.agent-leads.dto";
 
 export class AdminAgentLeadsService {
   private adminService = new AdminService();
+
+  public async listLeads(query: AdminAgentLeadsQuery): Promise<AdminAgentLeadListItem[]> {
+    const leads = await prisma.agentLead.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.propertyId ? { propertyId: query.propertyId } : {}),
+        ...(query.agentId ? { agentId: query.agentId } : {}),
+      },
+      include: {
+        agent: { select: { userId: true, userFullName: true } },
+        property: { select: { id: true, name: true } },
+        unit: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return leads.map((l) => ({
+      leadId: l.id,
+      prospectName: l.prospectName,
+      prospectEmail: l.prospectEmail,
+      prospectPhone: l.prospectPhone,
+      propertyId: l.property.id,
+      propertyName: l.property.name,
+      unitId: l.unit?.id ?? null,
+      unitName: l.unit?.name ?? null,
+      proposedRent: l.proposedRent,
+      agentId: l.agent.userId,
+      agentName: l.agent.userFullName,
+      status: l.status,
+      dateForwarded: l.createdAt,
+      decidedAt: l.decidedAt,
+    }));
+  }
 
   public async convertToTenant(adminId: string, leadId: string): Promise<ConvertToTenantResponse> {
     const lead = await prisma.agentLead.findUnique({ where: { id: leadId } });

@@ -339,6 +339,32 @@ export class AdminTicketService {
     return tickets.map((t) => this.mapTicket(t, now));
   }
 
+  // --- 1b. GET CHAT MESSAGES (lightweight, for polling) ---
+  public async getMessages(ticketId: string, since?: string) {
+    const ticket = await prisma.maintenanceRequest.findUnique({ where: { id: ticketId } });
+    if (!ticket) throw new Error("Ticket not found");
+
+    const messages = await prisma.maintenanceMessage.findMany({
+      where: {
+        ticketId,
+        ...(since ? { createdAt: { gt: new Date(since) } } : {}),
+      },
+      include: { sender: { select: { userId: true, userFullName: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return messages.map((m) => ({
+      id: m.id,
+      senderId: m.sender.userId,
+      senderName: m.sender.userFullName ?? "Unknown",
+      message: m.message,
+      timestamp: m.createdAt,
+      readAt: m.readAt,
+      isSystemMessage: m.message.startsWith("System:"),
+      isInternalNote: m.isInternalNote,
+    }));
+  }
+
   // --- 2. GET SINGLE TICKET DETAILS (FOR THE MODAL) ---
   public async getTicketDetails(
     ticketId: string,

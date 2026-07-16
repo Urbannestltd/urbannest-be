@@ -10,8 +10,8 @@ export class AgentFeesController extends Controller {
   private service = new AgentFeesService();
 
   /**
-   * Returns the agent's aggregate commission totals: pending admin confirmation,
-   * confirmed/awaiting disbursement, and historically paid.
+   * Returns the agent's aggregate commission totals: pending (covers both
+   * awaiting admin confirmation and confirmed-but-not-yet-disbursed) and paid.
    */
   @Get("summary")
   public async getSummary(@Request() req: any) {
@@ -23,7 +23,7 @@ export class AgentFeesController extends Controller {
    * Returns the agent's own commission ledger, sorted newest first.
    * Read-only historical audit view — no mutation actions.
    * Optional filters:
-   *  - status: PENDING | APPROVED | PAID
+   *  - status: PENDING | PAID
    *  - propertyId: scope to a specific assigned property
    */
   @Get()
