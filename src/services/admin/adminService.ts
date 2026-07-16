@@ -11,6 +11,7 @@ import { ZeptoMailService } from "../external/zeptoMailService";
 import { registrationInviteEmail } from "../../config/emailTemplates";
 import { Permission } from "@prisma/client";
 import { date } from "zod";
+import { logActivity } from "../../utils/activityLogger";
 
 export class AdminService {
   private zeptoMailService = new ZeptoMailService();
@@ -85,6 +86,7 @@ export class AdminService {
   }
   public async createUser(
     params: AdminCreateUserRequest,
+    adminId?: string,
   ): Promise<ApiResponse<any>> {
     // check if user exists (including PENDING users so we can track isNewUser)
     const existingUser = await prisma.user.findUnique({
@@ -220,7 +222,32 @@ export class AdminService {
         where: { id: params.propertyId },
         select: { name: true },
       });
-      propertyName = property?.name ?? undefined;
+      if (!property) throw new BadRequestError("Specified property does not exist");
+      propertyName = property.name ?? undefined;
+
+      // A propertyId + one of these roles means "assign this new/invited user to
+      // this property" — not just a label for the invite email. Without this,
+      // the property field is accepted by the API but silently has no effect.
+      const propertyAssignmentField = {
+        LANDLORD: "landlordId",
+        FACILITY_MANAGER: "facilityManagerId",
+        AGENT: "agentId",
+      }[params.userRole as string];
+
+      if (propertyAssignmentField) {
+        await prisma.property.update({
+          where: { id: params.propertyId },
+          data: { [propertyAssignmentField]: newUser.userId },
+        });
+        if (adminId) {
+          void logActivity({
+            userId: adminId,
+            action: "ADMIN_ASSIGNED_PROPERTY_MEMBER",
+            description: `Assigned user ${newUser.userId} as ${params.userRole} on property ${params.propertyId} at creation`,
+            metadata: { propertyId: params.propertyId, role: params.userRole, assignedUserId: newUser.userId },
+          });
+        }
+      }
     }
 
     if (params.unitId) {
