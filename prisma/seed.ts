@@ -306,6 +306,166 @@ async function main() {
   }
 
   // ==================================================
+  // 7. SECOND COHORT — a fully separate admin/landlord/FM/agent/tenant,
+  //    with their own property + units, isolated from the first cohort above.
+  // ==================================================
+  console.log("...creating second cohort (admin2/landlord2/fm2/agent2/tenant2)");
+
+  const admin2 = await prisma.user.upsert({
+    where: { userEmail: "admin2@urbannest.com" },
+    update: {},
+    create: {
+      userEmail: "admin2@urbannest.com",
+      userFullName: "Ijeoma Balogun",
+      userPhone: "08056781234",
+      userStatus: UserStatus.ACTIVE,
+      userPassword: defaultPassword,
+      userRole: { connect: { roleName: "ADMIN" } },
+    },
+  });
+
+  const facilityManager2 = await prisma.user.upsert({
+    where: { userEmail: "fm2@urbannest.com" },
+    update: {},
+    create: {
+      userEmail: "fm2@urbannest.com",
+      userFullName: "Tunji Bakare",
+      userPhone: "08067892345",
+      userStatus: UserStatus.ACTIVE,
+      userPassword: defaultPassword,
+      userRole: { connect: { roleName: "FACILITY_MANAGER" } },
+    },
+  });
+
+  const landlord2 = await prisma.user.upsert({
+    where: { userEmail: "landlord2@properties.ng" },
+    update: {},
+    create: {
+      userEmail: "landlord2@properties.ng",
+      userFullName: "Chidinma Eze",
+      userPhone: "08078903456",
+      userStatus: UserStatus.ACTIVE,
+      userPassword: defaultPassword,
+      userRole: { connect: { roleName: "LANDLORD" } },
+    },
+  });
+
+  const agent2 = await prisma.user.upsert({
+    where: { userEmail: "agent2@urbannest.com" },
+    update: {},
+    create: {
+      userEmail: "agent2@urbannest.com",
+      userFullName: "Segun Adeyemi",
+      userPhone: "08089014567",
+      userStatus: UserStatus.ACTIVE,
+      userPassword: defaultPassword,
+      userRole: { connect: { roleName: "AGENT" } },
+    },
+  });
+
+  const tenant2 = await prisma.user.upsert({
+    where: { userEmail: "tenant2@gmail.com" },
+    update: {},
+    create: {
+      userEmail: "tenant2@gmail.com",
+      userFullName: "Blessing Nwachukwu",
+      userPhone: "08090125678",
+      userStatus: UserStatus.ACTIVE,
+      userPassword: defaultPassword,
+      userRole: { connect: { roleName: "TENANT" } },
+    },
+  });
+
+  let property2 = await prisma.property.findFirst({
+    where: { name: "Palmview Residences" },
+  });
+
+  if (property2) {
+    property2 = await prisma.property.update({
+      where: { id: property2.id },
+      data: {
+        facilityManagerId: facilityManager2.userId,
+        agentId: agent2.userId,
+        landlordId: landlord2.userId,
+        price: property2.price ?? 3200000,
+        amenities: property2.amenities.length
+          ? property2.amenities
+          : ["Backup Generator", "CCTV", "Borehole Water"],
+      },
+    });
+  } else {
+    property2 = await prisma.property.create({
+      data: {
+        name: "Palmview Residences",
+        address: "12 Admiralty Way",
+        city: "Lekki Phase 1",
+        state: "Lagos",
+        zip: "106104",
+        landlordId: landlord2.userId,
+        type: PropertyType.MULTI_UNIT,
+        facilityManagerId: facilityManager2.userId,
+        agentId: agent2.userId,
+        price: 3200000,
+        amenities: ["Backup Generator", "CCTV", "Borehole Water"],
+        units: {
+          create: [
+            {
+              name: "Block A, Flat 1",
+              bedrooms: 2,
+              bathrooms: 2,
+              status: UnitStatus.OCCUPIED,
+            },
+            {
+              name: "Block A, Flat 2",
+              bedrooms: 2,
+              bathrooms: 2,
+              status: UnitStatus.AVAILABLE,
+            },
+            {
+              name: "Block A, Flat 3",
+              bedrooms: 3,
+              bathrooms: 2.5,
+              status: UnitStatus.AVAILABLE,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  const units2 = await prisma.unit.findMany({
+    where: { propertyId: property2.id },
+  });
+  const occupiedUnit2 = units2.find((u) => u.name === "Block A, Flat 1");
+
+  if (!occupiedUnit2) throw new Error("Second cohort unit creation failed or missing");
+
+  console.log("...creating second cohort lease");
+
+  const existingLease2 = await prisma.lease.findFirst({
+    where: { tenantId: tenant2.userId, unitId: occupiedUnit2.id },
+  });
+
+  if (!existingLease2) {
+    const startDate2 = new Date();
+    startDate2.setMonth(startDate2.getMonth() - 1);
+
+    const endDate2 = new Date(startDate2);
+    endDate2.setFullYear(endDate2.getFullYear() + 1);
+
+    await prisma.lease.create({
+      data: {
+        tenantId: tenant2.userId,
+        unitId: occupiedUnit2.id,
+        startDate: startDate2,
+        endDate: endDate2,
+        rentAmount: 3200000,
+        status: LeaseStatus.ACTIVE,
+      },
+    });
+  }
+
+  // ==================================================
   // FINISH
   // ==================================================
   console.log("==================================================");
@@ -315,6 +475,13 @@ async function main() {
   console.log(`🔑 Landlord Email: obi@properties.ng | Pass: Password1$`);
   console.log(`🔑 Tenant Email: tunde@gmail.com | Pass: Password1$`);
   console.log(`🔑 Agent Email: amaka@urbannest.com | Pass: Password1$`);
+  console.log("--------------------------------------------------");
+  console.log(`🏢 Created Property: ${property2.name} in ${property2.city}`);
+  console.log(`🔑 Admin 2 Email: admin2@urbannest.com | Pass: Password1$`);
+  console.log(`🔑 Landlord 2 Email: landlord2@properties.ng | Pass: Password1$`);
+  console.log(`🔑 Facility Manager 2 Email: fm2@urbannest.com | Pass: Password1$`);
+  console.log(`🔑 Agent 2 Email: agent2@urbannest.com | Pass: Password1$`);
+  console.log(`🔑 Tenant 2 Email: tenant2@gmail.com | Pass: Password1$`);
   console.log("==================================================");
 }
 

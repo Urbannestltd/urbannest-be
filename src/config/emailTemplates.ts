@@ -1366,6 +1366,79 @@ export function visitorAccessCodeEmail(
 }
 
 // ---------------------------------------------------------------------------
+// 34b. Tenant — copy of the visitor pass code they just generated
+// ---------------------------------------------------------------------------
+export function tenantVisitorCodeEmail(
+  tenantName: string,
+  visitorName: string,
+  accessCode: string,
+  validFrom: Date,
+  validUntil: Date,
+) {
+  const fmt = (d: Date) =>
+    d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  return {
+    subject: `Visitor pass created for ${visitorName} — ${accessCode}`,
+    html: base(`
+      ${heading("Visitor pass created")}
+      ${subheading(`Hi ${tenantName}`)}
+      ${para(`You generated a visitor pass for <strong>${visitorName}</strong>. Here's a copy of the code for your records — share it with your visitor if you haven't already.`)}
+      <div style="text-align:center;margin:28px 0;">
+        <span style="display:inline-block;background:#18181b;color:#d4a853;
+                     font-size:32px;font-weight:700;letter-spacing:8px;
+                     padding:16px 32px;border-radius:10px;">${accessCode}</span>
+      </div>
+      ${metaTable([
+        ["Visitor", visitorName],
+        ["Valid from", fmt(validFrom)],
+        ["Valid until", fmt(validUntil)],
+      ])}
+      ${alertBox("This code stops working after the valid-until time above.", "info")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 34c. Tenant — copy of a bulk/event visitor pass batch they just generated
+// ---------------------------------------------------------------------------
+export function tenantBulkVisitorCodesEmail(
+  tenantName: string,
+  groupName: string,
+  codes: { name: string; code: string }[],
+  validFrom: Date,
+  validUntil: Date,
+) {
+  const fmt = (d: Date) =>
+    d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  return {
+    subject: `Visitor passes created for "${groupName}"`,
+    html: base(`
+      ${heading("Visitor passes created")}
+      ${subheading(`Hi ${tenantName}`)}
+      ${para(`You generated ${codes.length} visitor pass${codes.length === 1 ? "" : "es"} for <strong>${groupName}</strong>. Here's a copy for your records.`)}
+      ${metaTable(codes.map((c) => [c.name, c.code]))}
+      ${metaTable([
+        ["Valid from", fmt(validFrom)],
+        ["Valid until", fmt(validUntil)],
+      ])}
+      ${alertBox("These codes stop working after the valid-until time above.", "info")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 35. Agent — their lead was approved by landlord
 // ---------------------------------------------------------------------------
 export function landlordLeadApprovedAgentEmail(

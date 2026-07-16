@@ -102,6 +102,17 @@ export class AdminTicketController {
     };
   }
 
+  // Lightweight chat messages, for polling. Pass ?since=<ISO timestamp> to
+  // fetch only messages newer than that time instead of the full history.
+  @Get("tickets/{ticketId}/messages")
+  public async getMessages(
+    @Path() ticketId: string,
+    @Query() since?: string,
+  ) {
+    const data = await this.ticketService.getMessages(ticketId, since);
+    return { success: true, message: "Messages retrieved", data };
+  }
+
   // Add a comment to the ticket
   @Post("tickets/{ticketId}/comments")
   @Middlewares(requirePermission(Permission.MANAGE_TICKETS))
