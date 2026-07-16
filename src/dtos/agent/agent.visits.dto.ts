@@ -13,7 +13,7 @@ export type ScheduleVisitRequest = z.infer<typeof ScheduleVisitSchema>;
 
 export const GetVisitsQuerySchema = z.object({
   status: z
-    .enum(["PENDING", "APPROVED", "REJECTED", "RESCHEDULED_PENDING_AGENT", "CANCELLED"])
+    .enum(["PENDING", "APPROVED", "REJECTED", "RESCHEDULED_PENDING_AGENT", "CANCELLED", "CHECKED_IN"])
     .optional(),
 });
 export type GetVisitsQuery = z.infer<typeof GetVisitsQuerySchema>;
@@ -38,6 +38,8 @@ export interface AgentVisitListItem {
   status: string;
   proposedDate: Date | null;
   rejectionReason: string | null;
+  // Set once the visit is APPROVED — check your email, this code is also sent there.
+  accessCode: string | null;
   createdAt: Date;
 }
 

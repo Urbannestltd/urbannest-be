@@ -22,7 +22,7 @@ export interface CreatePropertyAdminDto {
   noOfUnitsPerFloor?: number;
 }
 
-export type PropertyRole = "LANDLORD" | "FACILITY_MANAGER" | "TENANT";
+export type PropertyRole = "LANDLORD" | "FACILITY_MANAGER" | "AGENT" | "TENANT";
 
 export interface CreateUnitAdminDto {
   name: string; // e.g., "Unit 1"

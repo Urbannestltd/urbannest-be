@@ -6,6 +6,7 @@ const AGENT_VISIT_STATUSES = [
   "REJECTED",
   "RESCHEDULED_PENDING_AGENT",
   "CANCELLED",
+  "CHECKED_IN",
 ] as const;
 
 // ── Requests ──────────────────────────────────────────────────────────────────
@@ -30,6 +31,11 @@ export const RescheduleVisitSchema = z.object({
 });
 export type RescheduleVisitRequest = z.infer<typeof RescheduleVisitSchema>;
 
+export const VerifyAgentVisitCodeSchema = z.object({
+  accessCode: z.string().min(1, "Access code is required"),
+});
+export type VerifyAgentVisitCodeRequest = z.infer<typeof VerifyAgentVisitCodeSchema>;
+
 // ── Responses ─────────────────────────────────────────────────────────────────
 
 export interface FmAgentVisitListItem {
@@ -45,6 +51,8 @@ export interface FmAgentVisitListItem {
   visitDate: Date;
   purpose: string | null;
   status: string;
+  // REQUEST until the FM approves it, then INSPECTION from approval onward.
+  accessType: "REQUEST" | "INSPECTION";
   proposedDate: Date | null;
   createdAt: Date;
 }
@@ -52,4 +60,11 @@ export interface FmAgentVisitListItem {
 export interface FmAgentVisitDetail extends FmAgentVisitListItem {
   notes: string | null;
   rejectionReason: string | null;
+  accessCode: string | null;
+}
+
+export interface VerifyAgentVisitCodeResponse {
+  valid: boolean;
+  agentName: string | null;
+  propertyName: string | null;
 }

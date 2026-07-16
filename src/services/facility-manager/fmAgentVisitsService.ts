@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { ForbiddenError, NotFoundError, BadRequestError } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { logActivity } from "../../utils/activityLogger";
+import { generateNumericCode } from "../../utils/generateNumericCode";
 import {
   agentVisitApprovedEmail,
   agentVisitRejectedEmail,
@@ -11,7 +12,22 @@ import type {
   GetAgentVisitsQuery,
   FmAgentVisitListItem,
   FmAgentVisitDetail,
+  VerifyAgentVisitCodeResponse,
 } from "../../dtos/facility-manager/fm.agent-visits.dto";
+
+/** Access code is valid until the end of the scheduled visit's calendar day. */
+function endOfDay(date: Date): Date {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+// A visit is just a "request" until the FM approves it; from approval onward
+// (including after the agent has checked in) it's a confirmed "inspection".
+const APPROVED_STATUSES = ["APPROVED", "CHECKED_IN"];
+function accessTypeFor(status: string): "REQUEST" | "INSPECTION" {
+  return APPROVED_STATUSES.includes(status) ? "INSPECTION" : "REQUEST";
+}
 
 export class FmAgentVisitsService {
   private emailService = new ZeptoMailService();
@@ -78,6 +94,7 @@ export class FmAgentVisitsService {
       visitDate: v.visitDate,
       purpose: v.purpose,
       status: v.status,
+      accessType: accessTypeFor(v.status),
       proposedDate: v.proposedDate,
       createdAt: v.createdAt,
     }));
@@ -99,8 +116,10 @@ export class FmAgentVisitsService {
       purpose: v.purpose,
       notes: v.notes,
       status: v.status,
+      accessType: accessTypeFor(v.status),
       proposedDate: v.proposedDate,
       rejectionReason: v.rejectionReason,
+      accessCode: v.accessCode,
       createdAt: v.createdAt,
     };
   }
@@ -119,10 +138,16 @@ export class FmAgentVisitsService {
     const hasAgentCounterProposal = Boolean(visit.proposedDate && visit.proposedById);
     const effectiveVisitDate = hasAgentCounterProposal ? visit.proposedDate! : visit.visitDate;
 
+    let accessCode = generateNumericCode();
+    while (await prisma.agentVisit.findUnique({ where: { accessCode } })) {
+      accessCode = generateNumericCode();
+    }
+
     await prisma.agentVisit.update({
       where: { id: visitId },
       data: {
         status: "APPROVED",
+        accessCode,
         ...(hasAgentCounterProposal
           ? { visitDate: effectiveVisitDate, proposedDate: null, proposedById: null }
           : {}),
@@ -135,10 +160,19 @@ export class FmAgentVisitsService {
       month: "long",
       year: "numeric",
     });
+    const codeValidUntilStr = endOfDay(effectiveVisitDate).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     const email = agentVisitApprovedEmail(
       visit.agent.userFullName ?? "Agent",
       visit.property.name ?? visit.property.address,
       visitDateStr,
+      accessCode,
+      codeValidUntilStr,
     );
     await this.emailService.sendEmail(
       { email: visit.agent.userEmail, name: visit.agent.userFullName ?? undefined },
@@ -255,5 +289,48 @@ export class FmAgentVisitsService {
       description: `Proposed reschedule for agent visit ${visitId}`,
       metadata: { visitId, agentId: visit.agentId, proposedDate },
     });
+  }
+
+  /**
+   * Verifies an agent's visit access code at the gate — scoped to properties
+   * this FM manages. Marks the visit CHECKED_IN on success (single-use).
+   */
+  public async checkInAgentVisit(fmId: string, accessCode: string): Promise<VerifyAgentVisitCodeResponse> {
+    const visit = await prisma.agentVisit.findUnique({
+      where: { accessCode },
+      include: {
+        agent: { select: { userFullName: true } },
+        property: { select: { facilityManagerId: true, name: true } },
+      },
+    });
+
+    if (!visit) throw new NotFoundError("Invalid access code");
+    if (visit.property.facilityManagerId !== fmId) {
+      throw new ForbiddenError("You do not manage the property for this visit");
+    }
+    if (visit.status !== "APPROVED") {
+      throw new BadRequestError(`Code is ${visit.status} (already used or not yet approved)`);
+    }
+    if (new Date() > endOfDay(visit.visitDate)) {
+      throw new BadRequestError("Code is expired — it was only valid on the scheduled visit day");
+    }
+
+    await prisma.agentVisit.update({
+      where: { id: visit.id },
+      data: { status: "CHECKED_IN", checkedInAt: new Date() },
+    });
+
+    await logActivity({
+      userId: fmId,
+      action: "AGENT_VISIT_CHECKED_IN",
+      description: `Checked in agent visit ${visit.id} for property ${visit.propertyId}`,
+      metadata: { visitId: visit.id, agentId: visit.agentId },
+    });
+
+    return {
+      valid: true,
+      agentName: visit.agent.userFullName,
+      propertyName: visit.property.name,
+    };
   }
 }
