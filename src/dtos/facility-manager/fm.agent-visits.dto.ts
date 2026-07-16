@@ -49,10 +49,10 @@ export interface FmAgentVisitListItem {
   unitId: string | null;
   unitName: string | null;
   visitDate: Date;
-  purpose: string | null;
   status: string;
   // REQUEST until the FM approves it, then INSPECTION from approval onward.
   accessType: "REQUEST" | "INSPECTION";
+  frequency: "INSPECTION";
   proposedDate: Date | null;
   createdAt: Date;
 }
