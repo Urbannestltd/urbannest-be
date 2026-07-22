@@ -824,22 +824,26 @@ model AgentFee {
 // ==========================================
 
 model SupportTicket {
-  id       String @id @default(uuid())
-  tenantId String
+  id     String @id @default(uuid())
+  userId String
 
   category SupportCategory
   subject  String
   status   SupportStatus   @default(OPEN)
   priority SupportPriority @default(LOW)
 
+  resolutionToken     String?   @unique
+  resolutionExpiresAt DateTime?
+  resolvedAt          DateTime?
+
   messages SupportMessage[]
 
-  tenant user @relation(fields: [tenantId], references: [userId])
+  submitter user @relation(fields: [userId], references: [userId])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([tenantId])
+  @@index([userId])
 }
 
 model SupportMessage {
