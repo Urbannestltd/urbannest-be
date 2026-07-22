@@ -1,39 +1,30 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Middlewares,
-  Route,
-  Tags,
-  Security,
-  Request,
-  Path,
-} from "tsoa";
-import { SupportService } from "../../services/tenant/supportService";
+import { Controller, Post, Get, Body, Route, Tags, Security, Request, Path } from "tsoa";
+import { SupportService } from "../services/supportService";
 import {
   CreateSupportSchema,
   AddSupportMessageSchema,
   CreateSupportRequest,
   AddSupportMessageRequest,
-} from "../../dtos/tenant/support.dto";
-import { successResponse } from "../../utils/responseHelper";
-import { validate } from "../../utils/validate";
-import { Permission } from "@prisma/client";
-import { requirePermission } from "../../middlewares/permissionMiddleware";
+} from "../dtos/support.dto";
+import { successResponse } from "../utils/responseHelper";
+import { validate } from "../utils/validate";
 
-@Route("tenant/support")
-@Tags("Tenant - Support Tickets")
-@Middlewares(requirePermission(Permission.ACCESS_TENANT_PORTAL))
+@Route("support")
+@Tags("Support Tickets")
 export class SupportController extends Controller {
   private supportService = new SupportService();
 
+  /**
+   * Open a support ticket. Available to any authenticated user, regardless of role.
+   * The submitter's identity and role are taken from the JWT, never from the request body.
+   */
   @Post("create")
   @Security("jwt")
   public async create(@Request() req: any, @Body() body: CreateSupportRequest) {
     validate(CreateSupportSchema, body);
     const result = await this.supportService.createTicket(
       req.user.userId,
+      req.user.role,
       body,
     );
     return successResponse(result, "Support ticket created");

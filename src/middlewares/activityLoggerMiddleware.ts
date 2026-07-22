@@ -191,12 +191,12 @@ const ROUTE_LABELS: Record<string, { action: string; description: string }> = {
     description: "Sent a message on a maintenance ticket",
   },
 
-  // ── Tenant: Support ───────────────────────────────────────────────────────
-  "POST /tenant/support": {
+  // ── Support ───────────────────────────────────────────────────────────────
+  "POST /support/create": {
     action: "Opened Support Ticket",
     description: "Opened a new support ticket",
   },
-  "POST /tenant/support/messages": {
+  "POST /support/:id/reply": {
     action: "Replied to Support Ticket",
     description: "Sent a reply on a support ticket",
   },

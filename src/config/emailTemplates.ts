@@ -265,30 +265,145 @@ export function twoFaSetupEmail(name: string, code: string) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. New support ticket (to support team)
+// 6. New support ticket (to support staff)
 // ---------------------------------------------------------------------------
-export function supportNewTicketEmail(
-  ticketId: string,
-  subject: string,
-  userId: string,
-) {
+const SUPPORT_CATEGORY_LABELS: Record<string, string> = {
+  BILLING: "Billing & Fees",
+  ACCOUNT_ISSUE: "Account Issue",
+  APP_BUG: "App Bug",
+  DISPUTE: "Dispute",
+  OTHER: "Other",
+};
+
+export function supportRoleLabel(role?: string | null): string {
+  switch (role) {
+    case "LANDLORD":
+      return "Landlord";
+    case "FACILITY_MANAGER":
+      return "Facility Manager";
+    case "AGENT":
+      return "Agent";
+    case "TENANT":
+      return "Tenant";
+    case "ADMIN":
+      return "Admin";
+    case "VENDOR":
+      return "Vendor";
+    default:
+      return role ?? "Unknown";
+  }
+}
+
+export interface SupportNewTicketEmailParams {
+  ticketId: string;
+  ticketShortCode: string;
+  userFullName: string;
+  userRole: string;
+  userEmail: string;
+  userPhone?: string | null;
+  category: string;
+  relatedProperty?: string | null;
+  submittedAt: Date;
+  subject: string;
+  message: string;
+  attachments?: string[];
+  resolveUrl: string;
+}
+
+export function supportNewTicketEmail(params: SupportNewTicketEmailParams) {
+  const {
+    ticketShortCode,
+    userFullName,
+    userRole,
+    userEmail,
+    userPhone,
+    category,
+    relatedProperty,
+    submittedAt,
+    subject,
+    message,
+    attachments,
+    resolveUrl,
+  } = params;
+
+  const submittedAtLabel = submittedAt.toLocaleString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Africa/Lagos",
+  });
+
+  const userRows: [string, string][] = [
+    ["Name", userFullName],
+    ["User Role", supportRoleLabel(userRole)],
+    ["Email / Phone", `${userEmail}${userPhone ? ` | ${userPhone}` : ""}`],
+  ];
+
+  const contextRows: [string, string][] = [
+    ["Category", SUPPORT_CATEGORY_LABELS[category] ?? category],
+  ];
+  if (relatedProperty) contextRows.push(["Related Property", relatedProperty]);
+  contextRows.push(["Submitted At", submittedAtLabel]);
+
+  const attachmentsBlock =
+    attachments && attachments.length > 0
+      ? `
+      ${subheading("📎 Attachments")}
+      <ul style="margin:0 0 20px;padding-left:20px;color:${BRAND.text};font-size:14px;line-height:1.9;">
+        ${attachments
+          .map(
+            (url) =>
+              `<li><a href="${url}" style="color:${BRAND.dark};text-decoration:underline;">Download attachment</a></li>`,
+          )
+          .join("")}
+      </ul>`
+      : "";
+
   return {
-    subject: `New support ticket — ${ticketId.substring(0, 8).toUpperCase()}`,
+    subject: `🚨 New support ticket [#${ticketShortCode}]`,
     html: base(`
-      ${heading("New support ticket received")}
-      ${subheading("A tenant has submitted a new support request")}
-      ${metaTable([
-        ["Ticket ID", ticketId.substring(0, 8).toUpperCase()],
-        ["Subject", subject],
-        ["Submitted by", userId],
-      ])}
-      ${para("Log in to the admin dashboard to view and respond to this ticket.")}
+      ${heading(`New support ticket [#${ticketShortCode}]`)}
+      ${subheading("A new support request has been submitted")}
+
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:${BRAND.dark};
+                text-transform:uppercase;letter-spacing:0.4px;">👤 User Details</p>
+      ${metaTable(userRows)}
+
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:${BRAND.dark};
+                text-transform:uppercase;letter-spacing:0.4px;">📌 Ticket Context</p>
+      ${metaTable(contextRows)}
+
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:${BRAND.dark};
+                text-transform:uppercase;letter-spacing:0.4px;">📝 Issue Summary</p>
+      ${para(`<strong>Subject:</strong> ${subject}`)}
+      <div style="background:${BRAND.softBg};border:1px solid ${BRAND.border};
+                  border-radius:8px;padding:20px;margin:0 0 24px;">
+        <p style="margin:0;font-size:14px;color:${BRAND.text};line-height:1.7;
+                  white-space:pre-wrap;">${message}</p>
+      </div>
+
+      ${attachmentsBlock}
+      ${divider()}
+
+      <table cellpadding="0" cellspacing="0" role="presentation" style="margin:28px 0 0;">
+        <tr>
+          <td style="background:#16a34a;border-radius:8px;">
+            <a href="${resolveUrl}"
+               style="display:inline-block;padding:14px 32px;color:#ffffff;
+                      font-size:14px;font-weight:600;text-decoration:none;
+                      letter-spacing:0.2px;">🟢 Mark as Resolved</a>
+          </td>
+        </tr>
+      </table>
     `),
   };
 }
 
 // ---------------------------------------------------------------------------
-// 7. Support reply received (to tenant)
+// 7. Support reply received (to ticket submitter)
 // ---------------------------------------------------------------------------
 export function supportReplyEmail(
   name: string,
