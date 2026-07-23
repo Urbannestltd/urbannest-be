@@ -128,7 +128,24 @@ export class SupportService {
   }
 
   /**
-   * 3. GET HISTORY
+   * 3. LIST MY TICKETS
+   * All tickets submitted by the calling user, most recent first.
+   */
+  public async listMyTickets(userId: string) {
+    return prisma.supportTicket.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+  }
+
+  /**
+   * 4. GET HISTORY
    */
   public async getTicketDetails(ticketId: string) {
     return prisma.supportTicket.findUnique({

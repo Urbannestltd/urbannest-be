@@ -70,3 +70,25 @@ export function requireAnyPermission(...required: Permission[]) {
     next();
   };
 }
+
+/**
+ * Require the caller to be logged in with the ADMIN role.
+ */
+export function requireAdmin() {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userId: string = (req as any).user?.userId;
+    if (!userId) return next(new ForbiddenError("Unauthorized"));
+
+    const user = await prisma.user.findUnique({
+      where: { userId },
+      select: { userRole: { select: { roleName: true } } },
+    });
+
+    if (!user) return next(new ForbiddenError("User not found"));
+    if (user.userRole.roleName !== "ADMIN") {
+      return next(new ForbiddenError("Admin access required"));
+    }
+
+    next();
+  };
+}
