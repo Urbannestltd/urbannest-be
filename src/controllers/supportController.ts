@@ -46,6 +46,16 @@ export class SupportController extends Controller {
     return successResponse(result, "Reply sent");
   }
 
+  /**
+   * List all support tickets submitted by the calling user.
+   */
+  @Get()
+  @Security("jwt")
+  public async list(@Request() req: any) {
+    const result = await this.supportService.listMyTickets(req.user.userId);
+    return successResponse(result, "Support tickets retrieved");
+  }
+
   @Get("{id}")
   @Security("jwt")
   public async getDetails(@Path() id: string) {
