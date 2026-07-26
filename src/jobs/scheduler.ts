@@ -10,8 +10,8 @@ const noShowWorker = new NoShowWorker();
 export const initCronJobs = () => {
   console.log("⏰ Initializing Cron Jobs...");
 
-  // Schedule: Run once per day at midnight (0 0 * * *)
-  cron.schedule("0 0 * * *", async () => {
+  // Schedule: Run every minute (* * * * *)
+  cron.schedule("* * * * *", async () => {
     try {
       await reminderWorker.processDueReminders();
     } catch (error) {
@@ -19,16 +19,15 @@ export const initCronJobs = () => {
     }
   });
 
-  // once per day
-  cron.schedule("0 0 * * *", async () => {
+  cron.schedule("* * * * *", async () => {
     try {
       await walkInTimeoutWorker.processExpiredWalkIns();
     } catch (error) {
       console.error("🔥 Error in Walk-In Timeout Cron:", error);
     }
   });
-  // once per day
-  cron.schedule("0 0 * * *", async () => {
+
+  cron.schedule("* * * * *", async () => {
     try {
       await noShowWorker.processNoShows();
     } catch (error) {
