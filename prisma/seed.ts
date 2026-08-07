@@ -73,6 +73,7 @@ async function main() {
     { name: "VENDOR", desc: "Service Provider / Maintenance Worker" },
     { name: "FACILITY_MANAGER", desc: "Manages property facilities and operations" },
     { name: "AGENT", desc: "Field agent who markets properties and manages leads" },
+    { name: "FRONT_DESK", desc: "Approves and checks in tenant visitors at the front desk" },
   ];
 
   // We no longer need the createdRoles dictionary!
@@ -164,6 +165,20 @@ async function main() {
     },
   });
 
+  // Front Desk: Chidinma Eze
+  const frontDesk = await prisma.user.upsert({
+    where: { userEmail: "chidinma@urbannest.com" },
+    update: {},
+    create: {
+      userEmail: "chidinma@urbannest.com",
+      userFullName: "Chidinma Eze",
+      userPhone: "08034567890",
+      userStatus: UserStatus.ACTIVE,
+      userPassword: defaultPassword,
+      userRole: { connect: { roleName: "FRONT_DESK" } },
+    },
+  });
+
   // ==================================================
   // 4. CREATE PROPERTY & UNITS (Lagos Context)
   // ==================================================
@@ -179,6 +194,7 @@ async function main() {
       data: {
         facilityManagerId: facilityManager.userId,
         agentId: agent.userId,
+        frontDeskId: frontDesk.userId,
         price: property.price ?? 4500000,
         amenities: property.amenities.length
           ? property.amenities
@@ -197,6 +213,7 @@ async function main() {
         type: PropertyType.MULTI_UNIT, // Fix: Use Enum instead of raw string
         facilityManagerId: facilityManager.userId,
         agentId: agent.userId,
+        frontDeskId: frontDesk.userId,
         price: 4500000,
         amenities: ["24/7 Power", "Swimming Pool", "Gym", "Secure Parking"],
         units: {
@@ -475,6 +492,7 @@ async function main() {
   console.log(`🔑 Landlord Email: obi@properties.ng | Pass: Password1$`);
   console.log(`🔑 Tenant Email: tunde@gmail.com | Pass: Password1$`);
   console.log(`🔑 Agent Email: amaka@urbannest.com | Pass: Password1$`);
+  console.log(`🔑 Front Desk Email: chidinma@urbannest.com | Pass: Password1$`);
   console.log("--------------------------------------------------");
   console.log(`🏢 Created Property: ${property2.name} in ${property2.city}`);
   console.log(`🔑 Admin 2 Email: admin2@urbannest.com | Pass: Password1$`);

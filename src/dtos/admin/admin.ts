@@ -3,7 +3,7 @@ import { z } from "zod";
 export const AdminCreateUserSchema = z.object({
   userEmail: z.email(),
   userRole: z
-    .enum(["TENANT", "LANDLORD", "ADMIN", "FACILITY_MANAGER", "AGENT"])
+    .enum(["TENANT", "LANDLORD", "ADMIN", "FACILITY_MANAGER", "AGENT", "FRONT_DESK"])
     .optional(),
   unitId: z.string().uuid().optional(),
   propertyId: z.string().uuid().optional(),
@@ -13,7 +13,7 @@ export interface AdminCreateUserRequest {
   userEmail: string;
   unitId?: string;
   propertyId?: string;
-  userRole?: "TENANT" | "LANDLORD" | "ADMIN" | "FACILITY_MANAGER" | "AGENT";
+  userRole?: "TENANT" | "LANDLORD" | "ADMIN" | "FACILITY_MANAGER" | "AGENT" | "FRONT_DESK";
 }
 
 export const AdminGetUsersSchema = z.object({

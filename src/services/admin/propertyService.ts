@@ -395,6 +395,25 @@ export class AdminPropertyService {
       return { role: "AGENT", userId: data.userId, propertyId };
     }
 
+    if (data.role === "FRONT_DESK") {
+      if (userRole !== "FRONT_DESK") {
+        throw new BadRequestError(
+          `Cannot assign as FRONT_DESK — user's role is ${userRole}`,
+        );
+      }
+      await prisma.property.update({
+        where: { id: propertyId },
+        data: { frontDeskId: data.userId },
+      });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_ASSIGNED_PROPERTY_MEMBER",
+        description: `Assigned user ${data.userId} as FRONT_DESK on property ${propertyId}`,
+        metadata: { propertyId, role: "FRONT_DESK", assignedUserId: data.userId },
+      });
+      return { role: "FRONT_DESK", userId: data.userId, propertyId };
+    }
+
     if (data.role === "TENANT") {
       if (!data.unitId)
         throw new BadRequestError("unitId is required to assign a tenant.");
@@ -437,7 +456,7 @@ export class AdminPropertyService {
       return { role: "TENANT", userId: data.userId, propertyId, leaseId: lease.id };
     }
 
-    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, AGENT, or TENANT.");
+    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, AGENT, FRONT_DESK, or TENANT.");
   }
 
   // --- REMOVE MEMBER ---
@@ -484,6 +503,20 @@ export class AdminPropertyService {
       return;
     }
 
+    if (data.role === "FRONT_DESK") {
+      await prisma.property.update({
+        where: { id: propertyId },
+        data: { frontDeskId: null },
+      });
+      void logActivity({
+        userId: adminId,
+        action: "ADMIN_REMOVED_PROPERTY_MEMBER",
+        description: `Removed FRONT_DESK (user ${data.userId}) from property ${propertyId}`,
+        metadata: { propertyId, role: "FRONT_DESK", removedUserId: data.userId },
+      });
+      return;
+    }
+
     if (data.role === "TENANT") {
       if (!data.unitId)
         throw new BadRequestError("unitId is required to remove a tenant.");
@@ -508,7 +541,7 @@ export class AdminPropertyService {
       return;
     }
 
-    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, AGENT, or TENANT.");
+    throw new BadRequestError("Invalid role specified. Must be LANDLORD, FACILITY_MANAGER, AGENT, FRONT_DESK, or TENANT.");
   }
 
   // --- UPDATE PROPERTY ---

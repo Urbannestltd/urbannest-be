@@ -261,6 +261,7 @@ export class AdminService {
         LANDLORD: "landlordId",
         FACILITY_MANAGER: "facilityManagerId",
         AGENT: "agentId",
+        FRONT_DESK: "frontDeskId",
       }[params.userRole as string];
 
       if (propertyAssignmentField) {
