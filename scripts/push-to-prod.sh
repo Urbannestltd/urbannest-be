@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-SOURCE_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+SOURCE_BRANCH="$(git symbolic-ref --short HEAD)"
 DEPLOY_BRANCH="deploy-to-prod"
 VERCEL_JSON="vercel.json"
 KCT_NAME="KCT Consulting"
@@ -26,9 +26,23 @@ echo "==> Checking out $DEPLOY_BRANCH"
 git checkout "$DEPLOY_BRANCH"
 
 echo "==> Merging $SOURCE_BRANCH into $DEPLOY_BRANCH"
-GIT_AUTHOR_NAME="$KCT_NAME" GIT_AUTHOR_EMAIL="$KCT_EMAIL" \
-GIT_COMMITTER_NAME="$KCT_NAME" GIT_COMMITTER_EMAIL="$KCT_EMAIL" \
-  git merge --no-edit "$SOURCE_BRANCH"
+if ! GIT_AUTHOR_NAME="$KCT_NAME" GIT_AUTHOR_EMAIL="$KCT_EMAIL" \
+     GIT_COMMITTER_NAME="$KCT_NAME" GIT_COMMITTER_EMAIL="$KCT_EMAIL" \
+     git merge --no-edit "$SOURCE_BRANCH"; then
+  CONFLICTS="$(git diff --name-only --diff-filter=U)"
+  if [[ "$CONFLICTS" == "$VERCEL_JSON" ]]; then
+    echo "==> Auto-resolving vercel.json conflict (cron schedule gets restored to every-minute next anyway)"
+    git checkout --ours "$VERCEL_JSON"
+    git add "$VERCEL_JSON"
+    GIT_AUTHOR_NAME="$KCT_NAME" GIT_AUTHOR_EMAIL="$KCT_EMAIL" \
+    GIT_COMMITTER_NAME="$KCT_NAME" GIT_COMMITTER_EMAIL="$KCT_EMAIL" \
+      git commit --no-edit
+  else
+    echo "Merge conflict in files other than vercel.json - resolve manually:" >&2
+    echo "$CONFLICTS" >&2
+    exit 1
+  fi
+fi
 
 echo "==> Restoring every-minute cron schedule (Vercel Pro plan)"
 tmp="$(mktemp)"
