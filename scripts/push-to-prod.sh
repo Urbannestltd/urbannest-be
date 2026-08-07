@@ -6,6 +6,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 SOURCE_BRANCH="$(git symbolic-ref --short HEAD)"
+SOURCE_REF="refs/heads/$SOURCE_BRANCH"
 DEPLOY_BRANCH="deploy-to-prod"
 VERCEL_JSON="vercel.json"
 KCT_NAME="KCT Consulting"
@@ -28,7 +29,7 @@ git checkout "$DEPLOY_BRANCH"
 echo "==> Merging $SOURCE_BRANCH into $DEPLOY_BRANCH"
 if ! GIT_AUTHOR_NAME="$KCT_NAME" GIT_AUTHOR_EMAIL="$KCT_EMAIL" \
      GIT_COMMITTER_NAME="$KCT_NAME" GIT_COMMITTER_EMAIL="$KCT_EMAIL" \
-     git merge --no-edit "$SOURCE_BRANCH"; then
+     git merge --no-edit "$SOURCE_REF"; then
   CONFLICTS="$(git diff --name-only --diff-filter=U)"
   if [[ "$CONFLICTS" == "$VERCEL_JSON" ]]; then
     echo "==> Auto-resolving vercel.json conflict (cron schedule gets restored to every-minute next anyway)"
@@ -71,6 +72,6 @@ echo "==> Force-pushing $DEPLOY_BRANCH to prod/main"
 git push prod "$DEPLOY_BRANCH":main --force
 
 echo "==> Switching back to $SOURCE_BRANCH"
-git checkout "$SOURCE_BRANCH"
+git checkout -
 
 echo "Done. Deployed to kctconsultingltd/urbannest-be (Vercel Pro)."
