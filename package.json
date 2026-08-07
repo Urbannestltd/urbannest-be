@@ -9,7 +9,9 @@
     "dev": "nodemon",
     "tsoa": "tsoa spec-and-routes",
     "build": "npm run tsoa && tsc",
-    "test": "jest"
+    "test": "jest",
+    "push:dev": "bash scripts/push-to-dev.sh",
+    "push:prod": "bash scripts/push-to-prod.sh"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
