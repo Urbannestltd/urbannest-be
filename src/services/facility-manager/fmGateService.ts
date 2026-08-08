@@ -6,6 +6,7 @@ import { logActivity } from "../../utils/activityLogger";
 import {
   tenantVisitorArrivalEmail,
   tenantDepartureVerificationEmail,
+  staffDepartureConfirmedEmail,
 } from "../../config/emailTemplates";
 import type { GateVisitorProfile, PinLookupResult } from "../../dtos/facility-manager/fm.gate.dto";
 
@@ -277,13 +278,32 @@ export class FmGateService {
 // ---------------------------------------------------------------------------
 // Shared departure confirmation — used by both public token and authenticated app paths
 // ---------------------------------------------------------------------------
+const departureEmailService = new ZeptoMailService();
+
 export async function confirmVisitorDeparture(
   inviteId: string,
   tenantId: string,
 ): Promise<void> {
   const invite = await prisma.visitorInvite.findUnique({
     where: { id: inviteId },
-    select: { id: true, status: true, visitorName: true, tenantId: true },
+    select: {
+      id: true,
+      status: true,
+      visitorName: true,
+      tenantId: true,
+      tenant: { select: { userFullName: true } },
+      unit: {
+        select: {
+          name: true,
+          property: {
+            select: {
+              facilityManager: { select: { userFullName: true, userEmail: true } },
+              frontDesk: { select: { userFullName: true, userEmail: true } },
+            },
+          },
+        },
+      },
+    },
   });
   if (!invite) throw new NotFoundError("Visit record not found");
   if (invite.tenantId !== tenantId) throw new ForbiddenError("This visit does not belong to you");
@@ -306,4 +326,21 @@ export async function confirmVisitorDeparture(
     description: `Departure confirmed for visitor ${invite.visitorName}`,
     metadata: { inviteId },
   });
+
+  // Close the loop with whoever's watching the gate — the FM and/or FD who
+  // requested departure verification never otherwise learn the tenant responded.
+  const staff = [invite.unit.property.facilityManager, invite.unit.property.frontDesk].filter(
+    (s): s is { userFullName: string | null; userEmail: string } => !!s,
+  );
+  for (const s of staff) {
+    const emailTemplate = staffDepartureConfirmedEmail(
+      s.userFullName ?? "Team",
+      invite.visitorName,
+      invite.tenant.userFullName ?? "The tenant",
+      invite.unit.name,
+    );
+    void departureEmailService
+      .sendEmail({ email: s.userEmail, name: s.userFullName ?? undefined }, emailTemplate.subject, emailTemplate.html)
+      .catch(() => {});
+  }
 }

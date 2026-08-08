@@ -31,7 +31,7 @@ export interface LeaseDetailDto {
   endDate: Date;
   moveOutNotice: string | null;
   documentUrl: string | null;
-  tenant: { id: string; name: string | null; phone: string | null } | null;
+  tenant: { id: string; name: string | null; phone: string | null; isPending: boolean } | null;
   unit: { id: string; name: string } | null;
   property: { id: string; name: string | null } | null;
 }

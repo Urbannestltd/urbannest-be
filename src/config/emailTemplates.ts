@@ -173,6 +173,7 @@ export function registrationInviteEmail(
     role === "LANDLORD" ? "a landlord"
     : role === "FACILITY_MANAGER" ? "a facility manager"
     : role === "AGENT" ? "an agent"
+    : role === "FRONT_DESK" ? "a front desk officer"
     : "a tenant";
 
   const contextLines: [string, string][] = [];
@@ -1447,6 +1448,32 @@ export function tenantDepartureVerificationEmail(
       ${para("If your visitor has already departed, please click the button below to log their checkout.")}
       ${ctaButton("Confirm Departure", confirmUrl)}
       ${alertBox("Only click this button if your visitor has left. This will update the visitor log and close their entry record.", "warning")}
+    `),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 32b. FM/FD — Tenant confirmed visitor departure
+// ---------------------------------------------------------------------------
+export function staffDepartureConfirmedEmail(
+  staffName: string,
+  visitorName: string,
+  tenantName: string,
+  unitName: string,
+) {
+  const now = new Date();
+  const departureTime = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return {
+    subject: `${visitorName} has been checked out`,
+    html: base(`
+      ${heading("Visitor checked out")}
+      ${subheading(`Hi ${staffName}`)}
+      ${para(`${tenantName} confirmed that <strong>${visitorName}</strong> has left the premises. The visitor log has been updated.`)}
+      ${metaTable([
+        ["Visitor", visitorName],
+        ["Unit", unitName],
+        ["Checked out at", departureTime],
+      ])}
     `),
   };
 }

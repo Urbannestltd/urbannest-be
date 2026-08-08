@@ -10,6 +10,7 @@ import { logActivity } from "../../utils/activityLogger";
 import {
   tenantWalkInApprovalEmail,
 } from "../../config/emailTemplates";
+import { resolveExpiredWalkIn } from "../facility-manager/fmWalkInsService";
 import type {
   RegisterWalkInRequest,
   WalkInListQuery,
@@ -57,6 +58,21 @@ export class FdWalkInsService {
     if (visit.unit.property.frontDeskId !== fdId) {
       throw new ForbiddenError("You do not manage the property for this visit");
     }
+
+    // Self-heal: don't leave a stale "PENDING" past its approval deadline
+    // sitting there until the next cron sweep — resolve it right now.
+    if (
+      visit.status === "PENDING" &&
+      visit.approvalExpiresAt &&
+      visit.approvalExpiresAt <= new Date()
+    ) {
+      const newStatus = await resolveExpiredWalkIn(visit.id);
+      if (newStatus) {
+        (visit as any).status = newStatus;
+        if (newStatus === "CHECKED_IN") visit.checkedInAt = new Date();
+      }
+    }
+
     return visit;
   }
 
@@ -162,7 +178,14 @@ export class FdWalkInsService {
           metadata: { visitId: visit.id },
         }),
       )
-      .catch(() => {});
+      .catch((err: any) =>
+        logActivity({
+          userId: fdId,
+          action: "WALK_IN_APPROVAL_SEND_FAILED",
+          description: `Approval email to tenant failed for walk-in visitor ${data.visitorName}: ${err?.message ?? "unknown error"}`,
+          metadata: { visitId: visit.id },
+        }),
+      );
 
     void logActivity({
       userId: fdId,
@@ -268,6 +291,16 @@ export class FdWalkInsService {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    for (const v of visits) {
+      if (v.status === "PENDING" && v.approvalExpiresAt && v.approvalExpiresAt <= new Date()) {
+        const newStatus = await resolveExpiredWalkIn(v.id);
+        if (newStatus) {
+          (v as any).status = newStatus;
+          if (newStatus === "CHECKED_IN") v.checkedInAt = new Date();
+        }
+      }
+    }
 
     return visits.map((v) => this.mapVisit(v));
   }

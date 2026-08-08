@@ -59,6 +59,21 @@ export class FmWalkInsService {
     if (visit.unit.property.facilityManagerId !== fmId) {
       throw new ForbiddenError("You do not manage the property for this visit");
     }
+
+    // Self-heal: don't leave a stale "PENDING" past its approval deadline
+    // sitting there until the next cron sweep — resolve it right now.
+    if (
+      visit.status === "PENDING" &&
+      visit.approvalExpiresAt &&
+      visit.approvalExpiresAt <= new Date()
+    ) {
+      const newStatus = await resolveExpiredWalkIn(visit.id);
+      if (newStatus) {
+        (visit as any).status = newStatus;
+        if (newStatus === "CHECKED_IN") visit.checkedInAt = new Date();
+      }
+    }
+
     return visit;
   }
 
@@ -164,7 +179,14 @@ export class FmWalkInsService {
           metadata: { visitId: visit.id },
         }),
       )
-      .catch(() => {});
+      .catch((err: any) =>
+        logActivity({
+          userId: fmId,
+          action: "WALK_IN_APPROVAL_SEND_FAILED",
+          description: `Approval email to tenant failed for walk-in visitor ${data.visitorName}: ${err?.message ?? "unknown error"}`,
+          metadata: { visitId: visit.id },
+        }),
+      );
 
     void logActivity({
       userId: fmId,
@@ -270,6 +292,16 @@ export class FmWalkInsService {
       },
       orderBy: { createdAt: "desc" },
     });
+
+    for (const v of visits) {
+      if (v.status === "PENDING" && v.approvalExpiresAt && v.approvalExpiresAt <= new Date()) {
+        const newStatus = await resolveExpiredWalkIn(v.id);
+        if (newStatus) {
+          (v as any).status = newStatus;
+          if (newStatus === "CHECKED_IN") v.checkedInAt = new Date();
+        }
+      }
+    }
 
     return visits.map((v) => this.mapVisit(v));
   }
@@ -399,4 +431,92 @@ export async function resolveWalkInApproval(
     description: `Walk-in visitor ${visit.visitorName} ${action === "approve" ? "approved" : "rejected"} by tenant`,
     metadata: { visitId },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Timeout resolution — shared by the cron sweep (walkInTimeoutWorker) AND by
+// lazy resolution on read (FD/FM getWalkInStatus, listWalkIns), so a walk-in
+// past its approval deadline resolves immediately the next time anyone looks
+// at it, instead of waiting for the next cron run (which on Vercel's Hobby
+// plan for dev only fires once daily — see vercel.json).
+// ---------------------------------------------------------------------------
+
+const timeoutEmailService = new ZeptoMailService();
+
+type WalkInForTimeout = {
+  id: string;
+  visitorName: string;
+  fallbackRule: string | null;
+  tenantId: string;
+  unit: { name: string; property: { type: string | null } };
+  tenant: { userFullName: string | null };
+  registeredByFm: { userId: string; userFullName: string | null; userEmail: string } | null;
+  registeredByFd: { userId: string; userFullName: string | null; userEmail: string } | null;
+};
+
+async function applyWalkInTimeout(
+  visit: WalkInForTimeout,
+): Promise<"CHECKED_IN" | "REJECTED"> {
+  const isCommercial = visit.unit.property.type === "COMMERCIAL";
+  const newStatus: "CHECKED_IN" | "REJECTED" =
+    isCommercial && visit.fallbackRule === "SEND_UP" ? "CHECKED_IN" : "REJECTED";
+
+  await prisma.visitorInvite.update({
+    where: { id: visit.id },
+    data: {
+      status: newStatus as any,
+      checkedInAt: newStatus === "CHECKED_IN" ? new Date() : undefined,
+      approvalToken: null,
+    },
+  });
+
+  const registrant = visit.registeredByFm ?? visit.registeredByFd;
+  void logActivity({
+    userId: registrant?.userId ?? visit.tenantId,
+    action: "WALK_IN_TIMEOUT_APPLIED",
+    description: `Walk-in for ${visit.visitorName} auto-resolved to ${newStatus} after approval timeout`,
+    metadata: { visitId: visit.id, appliedRule: newStatus },
+  });
+
+  if (registrant?.userEmail) {
+    const emailTemplate = fmWalkInTimedOutEmail(
+      registrant.userFullName ?? "Facility Manager",
+      visit.visitorName,
+      visit.tenant.userFullName ?? "Tenant",
+      visit.unit.name,
+      newStatus,
+    );
+    await timeoutEmailService
+      .sendEmail(
+        { email: registrant.userEmail, name: registrant.userFullName ?? undefined },
+        emailTemplate.subject,
+        emailTemplate.html,
+      )
+      .catch(() => {});
+  }
+
+  return newStatus;
+}
+
+/**
+ * If the given walk-in is still PENDING and past its approval deadline,
+ * resolves it (commercial send-up rule or reject) and returns the new
+ * status. Returns null if there was nothing to resolve.
+ */
+export async function resolveExpiredWalkIn(
+  visitId: string,
+): Promise<"CHECKED_IN" | "REJECTED" | null> {
+  const visit = await prisma.visitorInvite.findUnique({
+    where: { id: visitId },
+    include: {
+      unit: { select: { name: true, property: { select: { type: true } } } },
+      tenant: { select: { userFullName: true } },
+      registeredByFm: { select: { userId: true, userFullName: true, userEmail: true } },
+      registeredByFd: { select: { userId: true, userFullName: true, userEmail: true } },
+    },
+  });
+  if (!visit || visit.status !== "PENDING") return null;
+  if (!visit.approvalExpiresAt || visit.approvalExpiresAt > new Date()) return null;
+
+  return applyWalkInTimeout(visit);
 }

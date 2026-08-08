@@ -39,7 +39,15 @@ export class AdminPaymentService {
         },
         orderBy: { createdAt: "desc" },
         include: {
-          user: { select: { userId: true, userFullName: true, userEmail: true, isDeleted: true } },
+          user: {
+            select: {
+              userId: true,
+              userFullName: true,
+              userEmail: true,
+              isDeleted: true,
+              userRole: { select: { roleName: true } },
+            },
+          },
           lease: {
             include: {
               unit: { include: { property: { select: { id: true, name: true } } } },
@@ -66,6 +74,7 @@ export class AdminPaymentService {
                 email: p.user.isDeleted ? null : p.user.userEmail,
               }
             : null,
+          role: p.user?.userRole?.roleName ?? null,
           unit: p.lease?.unit ? { id: p.lease.unit.id, name: p.lease.unit.name } : null,
           property: p.lease?.unit?.property
             ? { id: p.lease.unit.property.id, name: p.lease.unit.property.name }
@@ -93,6 +102,14 @@ export class AdminPaymentService {
         include: {
           property: { select: { id: true, name: true } },
           unit:     { select: { id: true, name: true } },
+          loggedBy: {
+            select: {
+              userId: true,
+              userFullName: true,
+              userEmail: true,
+              userRole: { select: { roleName: true } },
+            },
+          },
         },
       });
 
@@ -107,7 +124,14 @@ export class AdminPaymentService {
           paymentType: null,
           dueDate: null,
           paidDate: null,
-          tenant: null,
+          tenant: e.loggedBy
+            ? {
+                id: e.loggedBy.userId,
+                name: e.loggedBy.userFullName ?? "Unknown",
+                email: e.loggedBy.userEmail,
+              }
+            : null,
+          role: e.loggedBy?.userRole?.roleName ?? null,
           unit: e.unit
             ? { id: e.unit.id, name: e.unit.name }
             : { id: null, name: "All units" },
@@ -223,6 +247,7 @@ export class AdminPaymentService {
       "description",
       "tenantName",
       "tenantEmail",
+      "role",
       "propertyName",
       "unitName",
     ].join(",");
@@ -242,6 +267,7 @@ export class AdminPaymentService {
         escape(item.description),
         escape(item.tenant?.name ?? null),
         escape(item.tenant?.email ?? null),
+        escape(item.role),
         escape(item.property?.name ?? null),
         escape(item.unit?.name ?? null),
       ].join(","),

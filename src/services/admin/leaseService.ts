@@ -89,7 +89,7 @@ export class AdminLeaseService {
       where: { id: leaseId },
       include: {
         tenant: {
-          select: { userId: true, userFullName: true, userPhone: true },
+          select: { userId: true, userFullName: true, userPhone: true, userStatus: true },
         },
         unit: {
           select: {
@@ -117,7 +117,12 @@ export class AdminLeaseService {
       moveOutNotice: lease.moveOutNotice ?? null,
       documentUrl: lease.documentUrl ?? null,
       tenant: lease.tenant
-        ? { id: lease.tenant.userId, name: lease.tenant.userFullName, phone: lease.tenant.userPhone }
+        ? {
+            id: lease.tenant.userId,
+            name: lease.tenant.userFullName,
+            phone: lease.tenant.userPhone,
+            isPending: lease.tenant.userStatus === "PENDING",
+          }
         : null,
       unit: lease.unit ? { id: lease.unit.id, name: lease.unit.name } : null,
       property: lease.unit?.property
@@ -132,7 +137,7 @@ export class AdminLeaseService {
       orderBy: { createdAt: "desc" },
       include: {
         tenant: {
-          select: { userId: true, userFullName: true, userPhone: true },
+          select: { userId: true, userFullName: true, userPhone: true, userStatus: true },
         },
         unit: {
           select: {
@@ -148,11 +153,19 @@ export class AdminLeaseService {
 
   // --- EDIT ACTIVE LEASE ---
   public async updateLease(leaseId: string, data: UpdateLeaseDto) {
-    const lease = await prisma.lease.findUnique({ where: { id: leaseId } });
+    const lease = await prisma.lease.findUnique({
+      where: { id: leaseId },
+      include: { tenant: { select: { userStatus: true } } },
+    });
     if (!lease) throw new BadRequestError("Lease not found.");
     if (lease.status !== LeaseStatus.ACTIVE) {
       throw new BadRequestError(
         "Only active leases can be edited. Use renew to create a new lease.",
+      );
+    }
+    if (lease.tenant?.userStatus === "PENDING") {
+      throw new BadRequestError(
+        "This lease cannot be edited until the tenant has signed in.",
       );
     }
 

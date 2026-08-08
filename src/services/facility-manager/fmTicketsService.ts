@@ -398,6 +398,7 @@ export class FmTicketsService {
           senderId: userId,
           message: `System: Status changed from ${ticket.status} to ${newStatus}`,
           attachments: [],
+          isInternalNote: true,
         },
       }),
     ]);

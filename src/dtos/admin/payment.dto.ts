@@ -13,6 +13,8 @@ export interface CombinedLedgerItemDto {
   dueDate: Date | null;
   paidDate: Date | null;
   tenant: { id: string; name: string; email: string | null } | null;
+  /** Role of the person tied to this record, e.g. "TENANT", "FACILITY_MANAGER", "AGENT", "ADMIN" */
+  role: string | null;
   unit: { id: string | null; name: string } | null;
 
   // Expense-only (null for payments)

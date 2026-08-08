@@ -547,6 +547,7 @@ export class AdminTicketService {
         senderId: data.adminId,
         message: `System: Status updated to ${data.status}`,
         attachments: [],
+        isInternalNote: true,
       },
     });
 
@@ -594,6 +595,7 @@ export class AdminTicketService {
         senderId: adminId,
         message: `System: Request approved${ticket.budget != null ? ` with a budget of ₦${ticket.budget.toLocaleString()}` : ""}`,
         attachments: [],
+        isInternalNote: true,
       },
     });
 
@@ -638,6 +640,7 @@ export class AdminTicketService {
         senderId: adminId,
         message: `System: Request rejected — ${data.reason}`,
         attachments: [],
+        isInternalNote: true,
       },
     });
 
@@ -685,6 +688,7 @@ export class AdminTicketService {
         senderId: adminId,
         message: `System: Rebuttal sent — ${data.message}${data.suggestedAmount != null ? ` (suggested: ₦${data.suggestedAmount.toLocaleString()})` : ""}`,
         attachments: [],
+        isInternalNote: true,
       },
     });
 

@@ -12,6 +12,10 @@ import {
 } from "../config/emailTemplates";
 import { getAdminRecipients } from "../utils/getAdminRecipients";
 
+// If a claim is older than this, treat it as abandoned (e.g. the process
+// crashed mid-verification) and let a fresh call retry instead of hanging forever.
+const CLAIM_STALE_MS = 60_000;
+
 export class PaymentService {
   private vtpass = new VTPassService();
   private emailService = new ZeptoMailService();
@@ -51,6 +55,52 @@ export class PaymentService {
 
     const meta = payment.metadata as any;
 
+    // ====================================================
+    // CLAIM: prevent the webhook and the frontend's manual /payments/verify
+    // call from both processing this payment at the same time (double vend,
+    // double lease creation, "unit already taken" errors on the loser, etc).
+    // ====================================================
+    const claimedAt = new Date();
+    const staleBefore = new Date(claimedAt.getTime() - CLAIM_STALE_MS);
+
+    const claim = await prisma.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: { not: PaymentStatus.PAID },
+        OR: [{ verifyingAt: null }, { verifyingAt: { lt: staleBefore } }],
+      },
+      data: { verifyingAt: claimedAt },
+    });
+
+    if (claim.count === 0) {
+      const latest = await prisma.payment.findUnique({ where: { id: payment.id } });
+      if (latest?.status === PaymentStatus.PAID) {
+        return {
+          success: true,
+          message: "Transaction already processed.",
+          token: latest.utilityToken || undefined,
+        };
+      }
+      return {
+        success: true,
+        pending: true,
+        message: "Payment is already being verified. Please check back shortly.",
+      };
+    }
+
+    try {
+      return await this.processVerifiedPayment(reference, payment, meta);
+    } catch (err) {
+      // Release the claim so a retry isn't blocked for the full stale window.
+      await prisma.payment.updateMany({
+        where: { id: payment.id, status: { not: PaymentStatus.PAID } },
+        data: { verifyingAt: null },
+      });
+      throw err;
+    }
+  }
+
+  private async processVerifiedPayment(reference: string, payment: any, meta: any) {
     // ====================================================
     // PHASE 2: HANDLE UTILITIES (External API - NO Transaction)
     // ====================================================
