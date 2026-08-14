@@ -109,6 +109,7 @@ export class AgentLeadsService {
       select: {
         id: true,
         prospectName: true,
+        proposedRent: true,
         status: true,
         createdAt: true,
         property: { select: { name: true } },
@@ -122,6 +123,7 @@ export class AgentLeadsService {
       prospectName: l.prospectName,
       propertyName: l.property.name,
       unitNumber: l.unit?.name ?? null,
+      proposedRent: l.proposedRent,
       status: l.status,
       dateAdded: l.createdAt,
     }));

@@ -82,7 +82,11 @@ export class DashboardService {
     const visitors = await prisma.visitorInvite.findMany({
       where: {
         tenantId: userId,
-        validFrom: { gte: todayStart, lte: todayEnd },
+        // Window overlaps today — not just "starts today". A RECURRING or
+        // multi-day WHOLE_DAY pass created on an earlier day but still valid
+        // today must still show up here.
+        validFrom: { lte: todayEnd },
+        validUntil: { gte: todayStart },
       },
       orderBy: { validFrom: "asc" },
       include: { group: true },

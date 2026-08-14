@@ -123,6 +123,9 @@ export interface FmTicketListItem {
   isFixLate: boolean;
   approvalStatus: string | null;
   unreadCount: number;
+  /** Who last changed this ticket to RESOLVED/FIXED/CANCELLED — null if not yet resolved. */
+  resolvedBy: { name: string; role: string } | null;
+  resolvedAt: Date | null;
 }
 
 export interface FmTicketDetail {
@@ -152,6 +155,14 @@ export interface FmTicketDetail {
     timeToFirstResponseMinutes: number | null;
     timeToResolutionMinutes: number | null;
   };
+}
+
+export interface FmActivityItem {
+  id: string;
+  senderId: string;
+  senderName: string;
+  event: string;
+  timestamp: Date;
 }
 
 export interface FmMessageItem {

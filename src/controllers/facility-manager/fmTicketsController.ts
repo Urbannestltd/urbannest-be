@@ -183,6 +183,17 @@ export class FmTicketsController extends Controller {
   }
 
   /**
+   * Returns the activity feed for a ticket (status changes, resolutions,
+   * budget events, etc) — oldest first. Kept separate from /messages so the
+   * chat thread only shows the actual tenant/FM conversation.
+   */
+  @Get("{ticketId}/activity")
+  public async getTicketActivity(@Path() ticketId: string, @Request() req: any) {
+    const data = await this.fmTicketsService.getTicketActivity(req.user.userId, ticketId);
+    return { success: true, message: "Activity retrieved", data };
+  }
+
+  /**
    * Marks all unread messages on this ticket (sent by others) as read.
    * Call when FM opens the chat screen to clear the unread badge.
    */

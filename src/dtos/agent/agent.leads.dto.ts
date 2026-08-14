@@ -43,6 +43,7 @@ export interface AgentLeadListItem {
   prospectName: string;
   propertyName: string | null;
   unitNumber: string | null;
+  proposedRent: number | null;
   status: string;
   dateAdded: Date;
 }

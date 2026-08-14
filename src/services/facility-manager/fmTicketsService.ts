@@ -67,7 +67,12 @@ export class FmTicketsService {
     };
   }
 
-  private mapTicketListItem(ticket: any, now: Date, viewerUserId?: string) {
+  private mapTicketListItem(
+    ticket: any,
+    now: Date,
+    viewerUserId?: string,
+    resolution?: { name: string; role: string; at: Date } | null,
+  ) {
     const sla = this.SLA[ticket.priority as keyof typeof this.SLA] ?? this.SLA.MEDIUM;
 
     const projectedFixDeadline = new Date(
@@ -105,7 +110,49 @@ export class FmTicketsService {
       isFixLate,
       approvalStatus: ticket.approvalStatus ?? null,
       unreadCount: ticket._count?.messages ?? 0,
+      resolvedBy: resolution ? { name: resolution.name, role: resolution.role } : null,
+      resolvedAt: resolution?.at ?? null,
     };
+  }
+
+  /**
+   * For a batch of resolved/fixed/cancelled tickets, finds who last changed
+   * their status and when — from the system messages both updateStatus()
+   * (FM) and admin's ticket service log on every transition. Without this,
+   * the list only shows "Resolved" with no attribution, even though the
+   * ticket detail page derives "Resolved by Admin" from this same data.
+   */
+  private async getResolutionInfoMap(
+    ticketIds: string[],
+  ): Promise<Map<string, { name: string; role: string; at: Date }>> {
+    const map = new Map<string, { name: string; role: string; at: Date }>();
+    if (ticketIds.length === 0) return map;
+
+    const messages = await prisma.maintenanceMessage.findMany({
+      where: {
+        ticketId: { in: ticketIds },
+        isInternalNote: true,
+        OR: [
+          { message: { contains: "RESOLVED" } },
+          { message: { contains: "FIXED" } },
+          { message: { contains: "CANCELLED" } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      include: {
+        sender: { select: { userFullName: true, userRole: { select: { roleName: true } } } },
+      },
+    });
+
+    for (const m of messages) {
+      if (map.has(m.ticketId)) continue; // messages are desc-ordered — first seen per ticket is the most recent
+      map.set(m.ticketId, {
+        name: m.sender.userFullName ?? "Unknown",
+        role: m.sender.userRole?.roleName ?? "UNKNOWN",
+        at: m.createdAt,
+      });
+    }
+    return map;
   }
 
   private listIncludes(viewerUserId: string) {
@@ -225,9 +272,12 @@ export class FmTicketsService {
     });
 
     const now = new Date();
+    const resolutionMap = await this.getResolutionInfoMap(
+      tickets.filter((t) => ["RESOLVED", "FIXED", "CANCELLED"].includes(t.status)).map((t) => t.id),
+    );
     return {
       property,
-      tickets: tickets.map((t) => this.mapTicketListItem(t, now, userId)),
+      tickets: tickets.map((t) => this.mapTicketListItem(t, now, userId, resolutionMap.get(t.id) ?? null)),
     };
   }
 
@@ -239,7 +289,10 @@ export class FmTicketsService {
     });
 
     const now = new Date();
-    return tickets.map((t) => this.mapTicketListItem(t, now, userId));
+    const resolutionMap = await this.getResolutionInfoMap(
+      tickets.filter((t) => ["RESOLVED", "FIXED", "CANCELLED"].includes(t.status)).map((t) => t.id),
+    );
+    return tickets.map((t) => this.mapTicketListItem(t, now, userId, resolutionMap.get(t.id) ?? null));
   }
 
   public async getTicketDetail(userId: string, ticketId: string) {
@@ -330,14 +383,19 @@ export class FmTicketsService {
       quotedCost: ticket.quotedCost ?? null,
       approvalStatus: ticket.approvalStatus ?? null,
       rebuttalNote: ticket.rebuttalNote ?? null,
-      activity: messages.map((m) => ({
-        id: m.id,
-        senderId: m.sender.userId,
-        senderName: m.sender.userFullName ?? "Unknown",
-        message: m.message,
-        timestamp: m.createdAt,
-        isSystemMessage: m.message.startsWith("System:"),
-      })),
+      // Chat — real tenant/FM conversation only (including FM-only internal
+      // notes). System/status-change events live in `timeline` instead, so
+      // they don't clutter the chat thread.
+      activity: messages
+        .filter((m) => !m.message.startsWith("System:"))
+        .map((m) => ({
+          id: m.id,
+          senderId: m.sender.userId,
+          senderName: m.sender.userFullName ?? "Unknown",
+          message: m.message,
+          timestamp: m.createdAt,
+          isSystemMessage: false,
+        })),
       timeline,
       responseMetrics: { timeToFirstResponseMinutes, timeToResolutionMinutes },
     };
@@ -427,6 +485,9 @@ export class FmTicketsService {
     const messages = await prisma.maintenanceMessage.findMany({
       where: {
         ticketId,
+        // Chat only — system/status-change events belong in the activity tab
+        // (see getTicketActivity), not mixed into the conversation thread.
+        NOT: { message: { startsWith: "System:" } },
         ...(since ? { createdAt: { gt: new Date(since) } } : {}),
       },
       include: { sender: { select: { userId: true, userFullName: true } } },
@@ -434,6 +495,28 @@ export class FmTicketsService {
     });
 
     return messages.map((m) => this.mapMessage(m, userId));
+  }
+
+  /**
+   * Activity tab — system events only (status changes, resolutions, etc),
+   * kept separate from the chat thread returned by getMessages/getTicketDetail.
+   */
+  public async getTicketActivity(userId: string, ticketId: string) {
+    await this.assertFmAccess(userId, ticketId);
+
+    const messages = await prisma.maintenanceMessage.findMany({
+      where: { ticketId, message: { startsWith: "System:" } },
+      include: { sender: { select: { userId: true, userFullName: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return messages.map((m) => ({
+      id: m.id,
+      senderId: m.sender.userId,
+      senderName: m.sender.userFullName ?? "Unknown",
+      event: m.message.replace("System: ", ""),
+      timestamp: m.createdAt,
+    }));
   }
 
   public async markMessagesRead(userId: string, ticketId: string) {

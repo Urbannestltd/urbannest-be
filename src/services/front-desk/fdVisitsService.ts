@@ -283,6 +283,8 @@ export class FdVisitsService {
     const now = new Date();
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(now);
+    endOfToday.setHours(23, 59, 59, 999);
 
     const start15 = new Date(now);
     start15.setDate(now.getDate() - 15);
@@ -292,16 +294,20 @@ export class FdVisitsService {
     start30.setDate(now.getDate() - 30);
     start30.setHours(0, 0, 0, 0);
 
+    // Bucket by the visit's actual valid window (overlap), not by createdAt —
+    // a RECURRING pass created weeks ago but still valid today must still
+    // count as "today", not just on the day it was originally created.
     const records = await prisma.visitorInvite.findMany({
       where: {
         unitId: { in: unitIds },
-        createdAt: { gte: start30 },
+        validFrom: { lte: endOfToday },
+        validUntil: { gte: start30 },
       },
-      select: { createdAt: true, isWalkIn: true, status: true },
+      select: { validUntil: true, isWalkIn: true, status: true },
     });
 
     const compute = (from: Date): FmVisitorStatsPeriod => {
-      const slice = records.filter((r) => r.createdAt >= from);
+      const slice = records.filter((r) => r.validUntil >= from);
       return {
         total: slice.length,
         scheduled: slice.filter((r) => !r.isWalkIn).length,

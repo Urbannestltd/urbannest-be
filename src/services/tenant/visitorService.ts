@@ -19,6 +19,37 @@ import { InviteFrequency, InviteStatus, VisitorType } from "@prisma/client";
 import { resolveDateRangePreset } from "../../utils/dateRangePreset";
 import { generateNumericCode } from "../../utils/generateNumericCode";
 
+const RECURRING_VALID_MS = 365 * 24 * 60 * 60 * 1000; // 1 year — "open-ended until revoked"
+
+/**
+ * Derives validFrom/validUntil from the request per frequency:
+ *  - ONE_OFF: exact window the tenant provided.
+ *  - WHOLE_DAY: expands startDate to 00:00–23:59 of that day.
+ *  - RECURRING: starts at startDate, open-ended (capped at 1 year out).
+ */
+function resolveValidityWindow(
+  frequency: "ONE_OFF" | "WHOLE_DAY" | "RECURRING",
+  startDate: string,
+  endDate?: string,
+): { validFrom: Date; validUntil: Date } {
+  const start = new Date(startDate);
+
+  if (frequency === "WHOLE_DAY") {
+    const validFrom = new Date(start);
+    validFrom.setHours(0, 0, 0, 0);
+    const validUntil = new Date(start);
+    validUntil.setHours(23, 59, 59, 999);
+    return { validFrom, validUntil };
+  }
+
+  if (frequency === "RECURRING") {
+    return { validFrom: start, validUntil: new Date(start.getTime() + RECURRING_VALID_MS) };
+  }
+
+  // ONE_OFF — endDate is guaranteed present by CreateInviteSchema's refine
+  return { validFrom: start, validUntil: new Date(endDate as string) };
+}
+
 export class VisitorService {
   private emailService = new ZeptoMailService();
 
@@ -32,8 +63,15 @@ export class VisitorService {
     });
     if (!lease) throw new BadRequestError("Active lease required.");
 
-    // Ensure validFrom < validUntil
-    if (new Date(params.startDate) >= new Date(params.endDate)) {
+    const { validFrom, validUntil } = resolveValidityWindow(
+      params.frequency,
+      params.startDate,
+      params.endDate,
+    );
+
+    // Ensure validFrom < validUntil (only meaningful to check for ONE_OFF —
+    // WHOLE_DAY/RECURRING windows are derived and always valid by construction)
+    if (params.frequency === "ONE_OFF" && validFrom >= validUntil) {
       throw new BadRequestError("End time must be after start time");
     }
 
@@ -55,8 +93,8 @@ export class VisitorService {
         accessCode: code,
         type: params.type as VisitorType,
         frequency: params.frequency as InviteFrequency,
-        validFrom: new Date(params.startDate),
-        validUntil: new Date(params.endDate),
+        validFrom,
+        validUntil,
         status: InviteStatus.UPCOMING,
       },
       include: { tenant: { select: { userFullName: true, userEmail: true } } },

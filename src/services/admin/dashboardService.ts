@@ -205,6 +205,7 @@ export class AdminDashboardService {
       return {
         propertyId: property.id,
         propertyName,
+        address: property.address,
         occupancyPercent,
         propertyImages: property.images,
         dateListed: property.createdAt,

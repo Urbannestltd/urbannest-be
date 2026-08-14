@@ -476,7 +476,10 @@ export class AdminService {
       search?: string;
     },
   ) {
-    const propertySelect = { select: { id: true, name: true } };
+    const propertySelect = {
+      where: { isDeleted: false },
+      select: { id: true, name: true },
+    };
     const q = filters?.search?.trim();
 
     const users = await prisma.user.findMany({
@@ -535,7 +538,10 @@ export class AdminService {
   }
 
   public async getUserById(userId: string) {
-    const propertySelect = { select: { id: true, name: true } };
+    const propertySelect = {
+      where: { isDeleted: false },
+      select: { id: true, name: true },
+    };
 
     const user = await prisma.user.findUnique({
       where: { userId, isDeleted: false },

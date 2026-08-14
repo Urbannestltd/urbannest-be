@@ -39,6 +39,9 @@ export interface PersonSummaryDto {
 export interface PropertyOverviewItemDto {
   propertyId: string;
   propertyName: string;
+  address: string;
+  propertyImages: string[];
+  dateListed: Date;
   occupancyPercent: number;
   tenantSummary: {
     active: number;
