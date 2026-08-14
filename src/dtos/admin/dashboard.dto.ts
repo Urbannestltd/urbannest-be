@@ -7,7 +7,13 @@ export interface DashboardMetricsDto {
     amountCollected: number;
     collectedPercent: number;
   };
-  maintenanceChart: { property: string; count: number }[];
+  maintenanceChart: {
+    propertyId: string;
+    property: string;
+    address: string;
+    propertyImages: string[];
+    count: number;
+  }[];
 }
 
 export interface TenantStatusDto {

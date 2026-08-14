@@ -47,8 +47,10 @@ export class AdminDashboardService {
     const propertiesWithRequests = await prisma.property.findMany({
       where: { isDeleted: false },
       select: {
+        id: true,
         name: true,
         address: true,
+        images: true,
         units: {
           select: {
             _count: { select: { maintenanceRequests: true } },
@@ -59,7 +61,10 @@ export class AdminDashboardService {
 
     const maintenanceChart = propertiesWithRequests
       .map((p) => ({
+        propertyId: p.id,
         property: p.name ?? p.address,
+        address: p.address,
+        propertyImages: p.images,
         count: p.units.reduce((sum, u) => sum + u._count.maintenanceRequests, 0),
       }))
       .sort((a, b) => b.count - a.count)

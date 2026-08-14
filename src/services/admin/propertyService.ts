@@ -297,6 +297,7 @@ export class AdminPropertyService {
       // People
       facilityManager: property.facilityManager
         ? {
+            id: property.facilityManager.userId,
             name: property.facilityManager.userFullName || "Unknown",
             email: property.facilityManager.userEmail,
             photoUrl: property.facilityManager.userProfileUrl,
@@ -305,6 +306,7 @@ export class AdminPropertyService {
 
       landlord: property.landlord
         ? {
+            id: property.landlord.userId,
             name: property.landlord.userFullName || "Unknown",
             email: property.landlord.userEmail,
             photoUrl: property.landlord.userProfileUrl,
@@ -313,6 +315,7 @@ export class AdminPropertyService {
 
       agent: property.agent
         ? {
+            id: property.agent.userId,
             name: property.agent.userFullName || "Unknown",
             email: property.agent.userEmail,
             photoUrl: property.agent.userProfileUrl,
