@@ -304,11 +304,16 @@ export class FmVisitsService {
       select: { validUntil: true, isWalkIn: true, status: true },
     });
 
+    // A rejected/revoked/expired invite was never a real completed visit —
+    // don't count it toward "scheduled". EXPIRED_NO_SHOW is tracked
+    // separately via `noShows` instead of being folded into `scheduled`.
+    const FAILED_STATUSES = new Set(["REJECTED", "REVOKED", "EXPIRED", "EXPIRED_NO_SHOW"]);
+
     const compute = (from: Date): FmVisitorStatsPeriod => {
       const slice = records.filter((r) => r.validUntil >= from);
       return {
         total: slice.length,
-        scheduled: slice.filter((r) => !r.isWalkIn).length,
+        scheduled: slice.filter((r) => !r.isWalkIn && !FAILED_STATUSES.has(r.status)).length,
         walkIns: slice.filter((r) => r.isWalkIn).length,
         noShows: slice.filter(
           (r) => !r.isWalkIn && r.status === "EXPIRED_NO_SHOW",

@@ -360,6 +360,13 @@ export class FmTicketsService {
     const availableActions: string[] =
       isClosed ? [] : (this.ALLOWED_TRANSITIONS[ticket.status] ?? []);
 
+    // Who last changed the status (e.g. "Resolved by Admin") — same lookup
+    // the ticket list uses, so both surfaces agree instead of forcing the
+    // frontend to derive it from the activity/timeline text.
+    const resolution = ["RESOLVED", "FIXED", "CANCELLED"].includes(ticket.status)
+      ? (await this.getResolutionInfoMap([ticketId])).get(ticketId) ?? null
+      : null;
+
     return {
       id: ticket.id,
       subject: ticket.subject ?? "No subject provided",
@@ -367,6 +374,8 @@ export class FmTicketsService {
       category: ticket.category,
       priority: ticket.priority,
       status: ticket.status,
+      resolvedBy: resolution ? { name: resolution.name, role: resolution.role } : null,
+      resolvedAt: resolution?.at ?? null,
       isClosed,
       isChatLocked,
       availableActions,

@@ -135,6 +135,9 @@ export interface FmTicketDetail {
   category: string;
   priority: string;
   status: string;
+  /** Who last changed the status to RESOLVED/FIXED/CANCELLED — null if not yet resolved. */
+  resolvedBy: { name: string; role: string } | null;
+  resolvedAt: Date | null;
   isClosed: boolean;
   isChatLocked: boolean;
   availableActions: string[];

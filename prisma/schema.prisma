@@ -901,6 +901,11 @@ model MaintenanceRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Last time the tenant opened this ticket — drives the "new activity" dot
+  // on the tenant ticket list (status changes, e.g. resolved, plus unread
+  // replies both count, since a chat message doesn't bump `updatedAt`).
+  tenantViewedAt DateTime?
+
   assignedToId String?
   assignedTo   user?   @relation("AssignedTickets", fields: [assignedToId], references: [userId])
 

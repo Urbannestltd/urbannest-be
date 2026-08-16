@@ -87,9 +87,12 @@ export class MaintenanceService {
 
   /**
    * 2. GET MY REQUESTS (History)
+   * Each ticket carries hasNewActivity — true if the status changed (e.g.
+   * resolved) or a new reply arrived since the tenant last opened it — for
+   * the colored-dot indicator on the list.
    */
   public async getMyTickets(tenantId: string) {
-    return prisma.maintenanceRequest.findMany({
+    const tickets = await prisma.maintenanceRequest.findMany({
       where: { tenantId },
       orderBy: { createdAt: "desc" },
       include: {
@@ -97,6 +100,47 @@ export class MaintenanceService {
         messages: { where: { isInternalNote: false }, orderBy: { createdAt: "asc" } },
       },
     });
+
+    return tickets.map((t) => {
+      const viewedAt = t.tenantViewedAt ?? t.createdAt;
+      const statusChangedSinceViewed = t.updatedAt > viewedAt;
+      const hasUnreadReply = t.messages.some(
+        (m) => m.senderId !== tenantId && m.readAt === null,
+      );
+      return { ...t, hasNewActivity: statusChangedSinceViewed || hasUnreadReply };
+    });
+  }
+
+  /**
+   * Marks a ticket as viewed by the tenant — clears the "new activity" dot
+   * (both the status-change signal and any unread replies).
+   */
+  public async markTicketViewed(tenantId: string, ticketId: string): Promise<void> {
+    const ticket = await prisma.maintenanceRequest.findUnique({
+      where: { id: ticketId },
+      select: { tenantId: true },
+    });
+    if (!ticket) throw new NotFoundError("Maintenance request not found");
+    if (ticket.tenantId !== tenantId) {
+      throw new ForbiddenError("You can only view your own requests.");
+    }
+
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.maintenanceRequest.update({
+        where: { id: ticketId },
+        data: { tenantViewedAt: now },
+      }),
+      prisma.maintenanceMessage.updateMany({
+        where: {
+          ticketId,
+          senderId: { not: tenantId },
+          isInternalNote: false,
+          readAt: null,
+        },
+        data: { readAt: now },
+      }),
+    ]);
   }
 
   /**
@@ -229,7 +273,7 @@ export class MaintenanceService {
       where: { id: ticketId },
       data: {
         subject: params.subject || ticket.subject,
-        category: params.category || ticket.category, // Keep old if not provided
+        category: (params.category as MaintenanceCategory) || ticket.category, // Keep old if not provided
         description: params.description || ticket.description,
         priority: params.priority || ticket.priority,
         attachments: params.attachments || ticket.attachments, // Replaces images

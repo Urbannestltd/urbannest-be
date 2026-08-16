@@ -401,20 +401,30 @@ export class VisitorService {
   ): Promise<VisitorStatsResponse> {
     const { start: startDate, end: now } = resolveDateRangePreset(period);
 
+    // Overlap with the period window (not createdAt) — a RECURRING/WHOLE_DAY
+    // pass created before the window but still valid within it must still
+    // count, same fix applied to the FM/FD visitor stats.
     const baseWhere = {
-      createdAt: {
-        gte: startDate,
-        lte: now,
-      },
-      tenantId: tenantId,
+      tenantId,
+      validFrom: { lte: now },
+      validUntil: { gte: startDate },
     };
+
+    // A rejected/revoked/expired invite was never a real completed visit —
+    // don't count it toward "scheduled".
+    const FAILED_STATUSES: InviteStatus[] = [
+      "REJECTED",
+      "REVOKED",
+      "EXPIRED",
+      "EXPIRED_NO_SHOW",
+    ];
 
     const [totalVisitors, totalScheduled, totalWalkIns] =
       await prisma.$transaction([
         prisma.visitorInvite.count({ where: baseWhere }),
 
         prisma.visitorInvite.count({
-          where: { ...baseWhere, isWalkIn: false },
+          where: { ...baseWhere, isWalkIn: false, status: { notIn: FAILED_STATUSES } },
         }),
 
         prisma.visitorInvite.count({

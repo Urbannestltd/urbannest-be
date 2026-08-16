@@ -1,17 +1,24 @@
 import { z } from "zod";
 
+// The DB enum is SAFETY_SECURITY, but clients commonly send the shorter
+// "SECURITY" label — accept it as an alias rather than rejecting the ticket.
+const MAINTENANCE_CATEGORY_VALUES = [
+  "PLUMBING",
+  "ELECTRICAL",
+  "HVAC",
+  "APPLIANCE",
+  "STRUCTURAL",
+  "PEST_CONTROL",
+  "CLEANING",
+  "SAFETY_SECURITY",
+  "OTHER",
+] as const;
+
+const normalizeCategory = (val: unknown) =>
+  typeof val === "string" && val.toUpperCase() === "SECURITY" ? "SAFETY_SECURITY" : val;
+
 export const CreateMaintenanceSchema = z.object({
-  category: z.enum([
-    "PLUMBING",
-    "ELECTRICAL",
-    "HVAC",
-    "APPLIANCE",
-    "STRUCTURAL",
-    "PEST_CONTROL",
-    "CLEANING",
-    "SAFETY_SECURITY",
-    "OTHER",
-  ]),
+  category: z.preprocess(normalizeCategory, z.enum(MAINTENANCE_CATEGORY_VALUES)),
   subject: z.string().min(3, "Subject is required"),
   description: z
     .string()
@@ -30,6 +37,7 @@ export interface CreateMaintenanceRequest {
     | "PEST_CONTROL"
     | "CLEANING"
     | "SAFETY_SECURITY"
+    | "SECURITY"
     | "OTHER";
   subject: string;
   description: string;
@@ -49,17 +57,7 @@ export interface AddMessageRequest {
 
 export const UpdateMaintenanceSchema = z.object({
   category: z
-    .enum([
-      "PLUMBING",
-      "ELECTRICAL",
-      "HVAC",
-      "APPLIANCE",
-      "STRUCTURAL",
-      "PEST_CONTROL",
-      "CLEANING",
-      "SAFETY_SECURITY",
-      "OTHER",
-    ])
+    .preprocess(normalizeCategory, z.enum(MAINTENANCE_CATEGORY_VALUES))
     .optional(),
   subject: z.string().min(3).optional(),
   description: z.string().min(5).optional(),
@@ -79,6 +77,7 @@ export interface UpdateMaintenanceRequest {
     | "PEST_CONTROL"
     | "CLEANING"
     | "SAFETY_SECURITY"
+    | "SECURITY"
     | "OTHER";
   subject?: string;
   description?: string;

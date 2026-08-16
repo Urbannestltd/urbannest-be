@@ -280,6 +280,28 @@ async function main() {
   }
 
   // ==================================================
+  // 5b. CREATE SAMPLE EXPENSE (logged by the facility manager)
+  // ==================================================
+  console.log("...creating sample expense");
+
+  const existingExpense = await prisma.expense.findFirst({
+    where: { propertyId: property.id, loggedById: facilityManager.userId },
+  });
+  if (!existingExpense) {
+    await prisma.expense.create({
+      data: {
+        amount: 45000,
+        category: "SUPPLIES",
+        description: "Replacement bulbs and cleaning supplies for common areas",
+        propertyId: property.id,
+        unitId: occupiedUnit.id,
+        loggedById: facilityManager.userId,
+        status: "LOGGED",
+      },
+    });
+  }
+
+  // ==================================================
   // 6. CREATE AGENT LEADS (Sample Pipeline)
   // ==================================================
   console.log("...creating agent leads");

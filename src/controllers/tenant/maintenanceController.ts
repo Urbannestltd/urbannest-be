@@ -43,10 +43,10 @@ export class MaintenanceController extends Controller {
     @Request() req: any,
     @Body() body: CreateMaintenanceRequest,
   ) {
-    validate(CreateMaintenanceSchema, body);
+    const validated = validate(CreateMaintenanceSchema, body);
     const result = await this.maintenanceService.createTicket(
       req.user.userId,
-      body,
+      validated,
     );
     return successResponse(
       result,
@@ -63,6 +63,18 @@ export class MaintenanceController extends Controller {
     const userId = req.user.userId;
     const history = await this.maintenanceService.getMyTickets(userId);
     return successResponse(history, "Maintenance history retrieved");
+  }
+
+  /**
+   * Marks a ticket as viewed — clears the "new activity" dot on the list
+   * (both a status change like resolved, and any unread replies).
+   * Call when the tenant opens the ticket.
+   */
+  @Post("{ticketId}/viewed")
+  @Security("jwt")
+  public async markViewed(@Request() req: any, @Path() ticketId: string) {
+    await this.maintenanceService.markTicketViewed(req.user.userId, ticketId);
+    return successResponse(null, "Ticket marked as viewed");
   }
 
   /**
@@ -108,12 +120,12 @@ export class MaintenanceController extends Controller {
     @Path() ticketId: string,
     @Body() body: UpdateMaintenanceRequest,
   ) {
-    validate(UpdateMaintenanceSchema, body);
+    const validated = validate(UpdateMaintenanceSchema, body);
 
     const result = await this.maintenanceService.updateRequest(
       ticketId,
       req.user.userId,
-      body,
+      validated,
     );
 
     return successResponse(result, "Maintenance request updated successfully");
