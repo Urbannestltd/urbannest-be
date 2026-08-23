@@ -139,14 +139,6 @@ enum ExpenseStatus {
   REBUTTED
 }
 
-enum SupportCategory {
-  BILLING
-  ACCOUNT_ISSUE
-  APP_BUG
-  DISPUTE
-  OTHER
-}
-
 enum SupportStatus {
   OPEN
   IN_PROGRESS
@@ -840,7 +832,7 @@ model SupportTicket {
   id     String @id @default(uuid())
   userId String
 
-  category SupportCategory
+  category String
   subject  String
   status   SupportStatus   @default(OPEN)
   priority SupportPriority @default(LOW)

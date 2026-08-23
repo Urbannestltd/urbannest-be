@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 // 1. Create Ticket
+// category is open-ended (plain string, not an enum) — the frontend can
+// send any category label without a matching backend value to update.
 export const CreateSupportSchema = z.object({
-  category: z.enum(["BILLING", "ACCOUNT_ISSUE", "APP_BUG", "DISPUTE", "OTHER"]),
+  category: z.string().min(1, "Category is required"),
   subject: z.string().min(5),
   message: z.string().min(10), // Initial message
   priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("LOW"),
@@ -10,7 +12,7 @@ export const CreateSupportSchema = z.object({
 });
 
 export interface CreateSupportRequest {
-  category: "BILLING" | "ACCOUNT_ISSUE" | "APP_BUG" | "DISPUTE" | "OTHER";
+  category: string;
   subject: string;
   message: string;
   priority?: "LOW" | "MEDIUM" | "HIGH";

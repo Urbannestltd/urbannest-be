@@ -4,7 +4,7 @@ import { CreateSupportRequest, AddSupportMessageRequest } from "../dtos/support.
 import { NotFoundError } from "../utils/apiError";
 import { assertOwned } from "../utils/ownership";
 import { logActivity } from "../utils/activityLogger";
-import { SupportCategory, SupportPriority, SupportStatus } from "@prisma/client";
+import { SupportPriority, SupportStatus } from "@prisma/client";
 import { ZeptoMailService } from "./external/zeptoMailService";
 import { supportNewTicketEmail, supportReplyEmail } from "../config/emailTemplates";
 
@@ -36,7 +36,7 @@ export class SupportService {
     const ticket = await prisma.supportTicket.create({
       data: {
         userId,
-        category: params.category as SupportCategory,
+        category: params.category,
         subject: params.subject,
         priority: params.priority as SupportPriority,
         status: SupportStatus.OPEN,

@@ -1,7 +1,10 @@
 jest.mock("../config/prisma", () => ({
   prisma: {
-    supportTicket: { findUnique: jest.fn() },
+    supportTicket: { findUnique: jest.fn(), create: jest.fn() },
     supportMessage: { create: jest.fn() },
+    user: { findUnique: jest.fn() },
+    lease: { findFirst: jest.fn() },
+    property: { findFirst: jest.fn() },
   },
 }));
 
@@ -21,8 +24,11 @@ import { NotFoundError } from "../utils/apiError";
 import { logActivity } from "../utils/activityLogger";
 
 const mockedPrisma = prisma as unknown as {
-  supportTicket: { findUnique: jest.Mock };
+  supportTicket: { findUnique: jest.Mock; create: jest.Mock };
   supportMessage: { create: jest.Mock };
+  user: { findUnique: jest.Mock };
+  lease: { findFirst: jest.Mock };
+  property: { findFirst: jest.Mock };
 };
 
 const TICKET_ID = "ticket-1";
@@ -140,6 +146,39 @@ describe("SupportService — cross-user access (BOLA)", () => {
           userId: ADMIN_ID,
           action: "ADMIN_REPLIED_SUPPORT_TICKET",
           metadata: { ticketId: TICKET_ID, ticketOwnerId: OWNER_ID },
+        }),
+      );
+    });
+  });
+
+  describe("createTicket — category is open-ended", () => {
+    beforeEach(() => {
+      mockedPrisma.user.findUnique.mockResolvedValue({
+        userId: OWNER_ID,
+        userFullName: "Owner",
+        userEmail: "a@example.com",
+        userPhone: "08000000000",
+      });
+      mockedPrisma.lease.findFirst.mockResolvedValue(null);
+      mockedPrisma.property.findFirst.mockResolvedValue(null);
+      mockedPrisma.supportTicket.create.mockResolvedValue({
+        id: TICKET_ID,
+        createdAt: new Date(),
+      });
+    });
+
+    it("accepts a category value that isn't one of the old fixed enum options", async () => {
+      await expect(
+        service.createTicket(OWNER_ID, "TENANT", {
+          category: "Something Custom",
+          subject: "A subject long enough",
+          message: "A message long enough to pass validation",
+        }),
+      ).resolves.toBeDefined();
+
+      expect(mockedPrisma.supportTicket.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ category: "Something Custom" }),
         }),
       );
     });
