@@ -63,9 +63,9 @@ export class AdminLeaseController {
   @Post("{leaseId}/terminate")
   public async terminateLease(
     @Path() leaseId: string,
-    @Body() body: TerminateLeaseDto,
+    @Body() body?: TerminateLeaseDto,
   ) {
-    await this.leaseService.terminateLease(leaseId, body);
+    await this.leaseService.terminateLease(leaseId, body ?? {});
     return { success: true, message: "Lease terminated successfully" };
   }
 }
