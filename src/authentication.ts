@@ -56,11 +56,16 @@ export function expressAuthentication(
             }
           }
 
-          // Check if the user account is still active
+          // Check if the user account is still active, and that the token's
+          // role claim still matches the user's current role in the DB
+          // (a role change must invalidate any previously issued token's claim).
           prisma.user
             .findUnique({
               where: { userId: decoded.userId },
-              select: { userStatus: true },
+              select: {
+                userStatus: true,
+                userRole: { select: { roleName: true } },
+              },
             })
             .then((user) => {
               if (!user || user.userStatus === "BLOCKED") {
@@ -70,6 +75,15 @@ export function expressAuthentication(
                   ),
                 );
               }
+
+              if (decoded.role && decoded.role !== user.userRole?.roleName) {
+                return reject(
+                  new UnauthorizedError(
+                    "Token role does not match current account role",
+                  ),
+                );
+              }
+
               resolve(decoded);
             })
             .catch(() => reject(new UnauthorizedError("Could not verify account status")));

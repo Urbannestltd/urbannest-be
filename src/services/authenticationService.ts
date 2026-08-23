@@ -19,7 +19,12 @@ import * as jwt from "jsonwebtoken";
 import crypto from "crypto";
 import * as bcrypt from "bcrypt";
 import { ApiResponse } from "../dtos/apiResponse";
-import { BASE_URL, GOOGLE_CLIENT_ID, JWT_PRIVATE_KEY, JWTSECRET } from "../config/env";
+import {
+  BASE_URL,
+  GOOGLE_CLIENT_ID,
+  JWT_PRIVATE_KEY,
+  JWT_PUBLIC_KEY,
+} from "../config/env";
 import { OAuth2Client } from "google-auth-library";
 import sendEmail from "../config/resend";
 import { JwtPayload } from "jsonwebtoken";
@@ -30,13 +35,21 @@ const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 export class AuthenticationService {
   private emailService = new ZeptoMailService();
-  private get jwtSecret(): string {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error("FATAL: JWT_SECRET environment variable is not defined.");
+
+  private get jwtPrivateKey(): string {
+    if (!JWT_PRIVATE_KEY) {
+      throw new Error("FATAL: JWT_PRIVATE_KEY environment variable is not defined.");
     }
-    return secret;
+    return Buffer.from(JWT_PRIVATE_KEY, "base64").toString("ascii");
   }
+
+  private get jwtPublicKey(): string {
+    if (!JWT_PUBLIC_KEY) {
+      throw new Error("FATAL: JWT_PUBLIC_KEY environment variable is not defined.");
+    }
+    return Buffer.from(JWT_PUBLIC_KEY, "base64").toString("ascii");
+  }
+
   public async getMe(userId: string) {
     const user = await prisma.user.findUnique({
       where: { userId, isDeleted: false },
@@ -198,101 +211,6 @@ export class AuthenticationService {
     return { success: true, message: "Account verified successfully" };
   }
 
-  // public async login(params: LoginRequest) {
-  //   const user = await prisma.user.findUnique({
-  //     where: { userEmail: params.email },
-  //     include: { userRole: true },
-  //   });
-
-  //   if (
-  //     !user ||
-  //     !(await bcrypt.compare(params.password, user.userPassword ?? ""))
-  //   ) {
-  //     throw new UnauthorizedError("Invalid email or password");
-  //   }
-
-  //   if (user?.userStatus !== "ACTIVE") {
-  //     throw new UnauthorizedError("Account is not active.");
-  //   }
-
-  //   // --- SECURITY ENFORCEMENT ---
-  //   // Extract and validate the RS256 Private Key early so we can use it for both tokens
-  //   if (!JWT_PRIVATE_KEY) {
-  //     throw new Error(
-  //       "FATAL: JWT_PRIVATE_KEY environment variable is not defined.",
-  //     );
-  //   }
-  //   const privateKey = Buffer.from(JWT_PRIVATE_KEY, "base64").toString("ascii");
-
-  //   // === NEW: 2FA CHECK ===
-  //   if (user.isTwoFactorEnabled) {
-  //     // 1. Generate a random 6-digit code
-  //     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  //     const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-
-  //     // 2. Save it to the database
-  //     await prisma.user.update({
-  //       where: { userId: user.userId },
-  //       data: {
-  //         twoFactorSecret: otp,
-  //         twoFactorExpiry: expiry,
-  //       },
-  //     });
-
-  //     // 3. Sign tempToken using RS256 instead of the vulnerable HS256 secret
-  //     const tempToken = jwt.sign(
-  //       { userId: user.userId, scope: "2FA_PENDING" },
-  //       privateKey,
-  //       { algorithm: "RS256", expiresIn: "5m" }, // Short life
-  //     );
-
-  //     // 4. Send the Email
-  //     await this.emailService.sendTemplateEmail(
-  //       { email: user.userEmail, name: user.userFullName ?? "Tenant" },
-  //       "LOGIN_OTP_TEMPLATE",
-  //       { code: otp },
-  //     );
-
-  //     // 5. Return a "Partial Login" response
-  //     return {
-  //       require2fa: true,
-  //       message: "OTP sent to email",
-  //       tempToken,
-  //     };
-  //   }
-
-  //   // 1. Generate 15-minute Access Token
-  //   const token = jwt.sign(
-  //     { userId: user.userId, role: user.userRole.roleName },
-  //     privateKey,
-  //     { algorithm: "RS256", expiresIn: "15m" },
-  //   );
-
-  //   // 2. Generate Cryptographically Secure Refresh Token
-  //   const refreshToken = crypto.randomBytes(64).toString("hex");
-
-  //   // 3. Create Server-Side Session
-  //   await prisma.session.create({
-  //     data: {
-  //       userId: user.userId,
-  //       refreshToken: refreshToken,
-  //     },
-  //   });
-
-  //   // 4. Return FULL payload
-  //   return {
-  //     require2fa: false,
-  //     token,
-  //     refreshToken,
-  //     user: {
-  //       id: user.userId,
-  //       name: user.userFullName,
-  //       role: user.userRole.roleName,
-  //       profilePicUrl: user.userProfileUrl,
-  //     },
-  //   };
-  // }
-
   public async login(params: LoginRequest) {
     const user = await prisma.user.findUnique({
       where: { userEmail: params.email },
@@ -317,15 +235,7 @@ export class AuthenticationService {
     }
 
     // --- SECURITY ENFORCEMENT ---
-    if (!process.env.JWT_PRIVATE_KEY) {
-      throw new Error(
-        "FATAL: JWT_PRIVATE_KEY environment variable is not defined.",
-      );
-    }
-    const privateKey = Buffer.from(
-      process.env.JWT_PRIVATE_KEY,
-      "base64",
-    ).toString("ascii");
+    const privateKey = this.jwtPrivateKey;
 
     // === 2FA CHECK ===
     if (user.isTwoFactorEnabled) {
@@ -409,8 +319,9 @@ export class AuthenticationService {
     let decoded: TempTokenPayload;
 
     try {
-      // Strictly use the getter to avoid fallback to "secret"
-      decoded = jwt.verify(tempToken, this.jwtSecret) as TempTokenPayload;
+      decoded = jwt.verify(tempToken, this.jwtPublicKey, {
+        algorithms: ["RS256"],
+      }) as TempTokenPayload;
     } catch (err) {
       throw new UnauthorizedError("Invalid or expired 2FA session token.");
     }
@@ -457,8 +368,8 @@ export class AuthenticationService {
         email: user.userEmail,
         role: user.userRole.roleName,
       },
-      this.jwtSecret,
-      { expiresIn: "15m" },
+      this.jwtPrivateKey,
+      { algorithm: "RS256", expiresIn: "15m" },
     );
 
     return {
