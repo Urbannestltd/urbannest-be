@@ -41,6 +41,7 @@ export class SupportController extends Controller {
     const result = await this.supportService.replyToTicket(
       id,
       req.user.userId,
+      req.user.role,
       body,
     );
     return successResponse(result, "Reply sent");
@@ -58,8 +59,8 @@ export class SupportController extends Controller {
 
   @Get("{id}")
   @Security("jwt")
-  public async getDetails(@Path() id: string) {
-    const result = await this.supportService.getTicketDetails(id);
+  public async getDetails(@Request() req: any, @Path() id: string) {
+    const result = await this.supportService.getTicketDetails(id, req.user.userId, req.user.role);
     return successResponse(result, "Ticket details retrieved");
   }
 }

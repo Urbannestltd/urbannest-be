@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "../config/prisma";
 import { CreateSupportRequest, AddSupportMessageRequest } from "../dtos/support.dto";
 import { NotFoundError } from "../utils/apiError";
+import { assertOwned } from "../utils/ownership";
 import { SupportCategory, SupportPriority, SupportStatus } from "@prisma/client";
 import { ZeptoMailService } from "./external/zeptoMailService";
 import { supportNewTicketEmail, supportReplyEmail } from "../config/emailTemplates";
@@ -88,6 +89,7 @@ export class SupportService {
   public async replyToTicket(
     ticketId: string,
     senderId: string,
+    senderRole: string,
     params: AddSupportMessageRequest,
   ) {
     const ticket = await prisma.supportTicket.findUnique({
@@ -95,7 +97,13 @@ export class SupportService {
       include: { submitter: true },
     });
 
-    if (!ticket) throw new NotFoundError("Ticket not found");
+    // 404 (not 403) so a guessed ticketId can't be used to confirm another
+    // user's ticket exists. Owner or staff (ADMIN) may reply.
+    assertOwned(
+      ticket,
+      (t) => t.userId === senderId || senderRole === "ADMIN",
+      "Ticket not found",
+    );
 
     const msg = await prisma.supportMessage.create({
       data: {
@@ -145,10 +153,10 @@ export class SupportService {
   }
 
   /**
-   * 4. GET HISTORY
+   * 4. GET HISTORY (ticket owner OR staff)
    */
-  public async getTicketDetails(ticketId: string) {
-    return prisma.supportTicket.findUnique({
+  public async getTicketDetails(ticketId: string, requesterId: string, requesterRole: string) {
+    const ticket = await prisma.supportTicket.findUnique({
       where: { id: ticketId },
       include: {
         messages: {
@@ -161,6 +169,16 @@ export class SupportService {
         },
       },
     });
+
+    // 404 (not 403) so a guessed ticketId can't be used to confirm another
+    // user's ticket exists. Owner or staff (ADMIN) may view it.
+    assertOwned(
+      ticket,
+      (t) => t.userId === requesterId || requesterRole === "ADMIN",
+      "Ticket not found",
+    );
+
+    return ticket;
   }
 
   /**
