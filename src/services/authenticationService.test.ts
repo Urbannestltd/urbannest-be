@@ -81,6 +81,13 @@ describe("AuthenticationService JWT signing", () => {
     const decoded = verifyWithPublicKey(result.token) as jwt.JwtPayload;
     expect(decoded.userId).toBe("u1");
     expect(decoded.role).toBe("TENANT");
+
+    // Regression: this was previously "1d" despite a comment saying
+    // "15-minute Access Token" — a stale/wrong TTL is exactly how a session
+    // ends up outliving its intended idle/absolute policy unnoticed.
+    const ttlSeconds = (decoded.exp as number) - (decoded.iat as number);
+    expect(ttlSeconds).toBeLessThanOrEqual(15 * 60);
+    expect(ttlSeconds).toBeGreaterThan(0);
   });
 
   it("login() (2FA enabled) signs an RS256 temp token that verifies with the public key", async () => {

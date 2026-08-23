@@ -287,7 +287,7 @@ export class AuthenticationService {
     const token = jwt.sign(
       { userId: user.userId, role: user.userRole.roleName },
       privateKey,
-      { algorithm: "RS256", expiresIn: "1d" },
+      { algorithm: "RS256", expiresIn: "15m" },
     );
 
     // 2. Generate Cryptographically Secure Refresh Token

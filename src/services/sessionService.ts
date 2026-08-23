@@ -51,7 +51,7 @@ export class SessionService {
     const newAccessToken = jwt.sign(
       { userId: session.userId, role: session.user.userRole.roleName },
       privateKey,
-      { algorithm: "RS256", expiresIn: "1d" },
+      { algorithm: "RS256", expiresIn: "15m" },
     );
 
     return { accessToken: newAccessToken };

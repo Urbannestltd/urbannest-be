@@ -94,6 +94,18 @@ describe("expressAuthentication", () => {
     );
   });
 
+  it("rejects a token that's genuinely old (5 days past its issued lifetime) — regression for the reported stale-session finding", async () => {
+    const token = signToken(
+      { userId: "u1", role: "TENANT" },
+      { expiresIn: -5 * 24 * 60 * 60 },
+    );
+
+    await expect(expressAuthentication(makeRequest(token), "jwt")).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    expect(mockedPrisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
   it("rejects when the token's role is not among the route's declared scopes", async () => {
     const token = signToken({ userId: "u1", role: "TENANT" });
 
