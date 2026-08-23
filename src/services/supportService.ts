@@ -3,6 +3,7 @@ import { prisma } from "../config/prisma";
 import { CreateSupportRequest, AddSupportMessageRequest } from "../dtos/support.dto";
 import { NotFoundError } from "../utils/apiError";
 import { assertOwned } from "../utils/ownership";
+import { logActivity } from "../utils/activityLogger";
 import { SupportCategory, SupportPriority, SupportStatus } from "@prisma/client";
 import { ZeptoMailService } from "./external/zeptoMailService";
 import { supportNewTicketEmail, supportReplyEmail } from "../config/emailTemplates";
@@ -105,6 +106,15 @@ export class SupportService {
       "Ticket not found",
     );
 
+    if (senderRole === "ADMIN" && ticket.userId !== senderId) {
+      await logActivity({
+        userId: senderId,
+        action: "ADMIN_REPLIED_SUPPORT_TICKET",
+        description: `Admin replied to a support ticket owned by another user.`,
+        metadata: { ticketId, ticketOwnerId: ticket.userId },
+      });
+    }
+
     const msg = await prisma.supportMessage.create({
       data: {
         ticketId,
@@ -177,6 +187,15 @@ export class SupportService {
       (t) => t.userId === requesterId || requesterRole === "ADMIN",
       "Ticket not found",
     );
+
+    if (requesterRole === "ADMIN" && ticket.userId !== requesterId) {
+      await logActivity({
+        userId: requesterId,
+        action: "ADMIN_VIEWED_SUPPORT_TICKET",
+        description: `Admin viewed a support ticket owned by another user.`,
+        metadata: { ticketId, ticketOwnerId: ticket.userId },
+      });
+    }
 
     return ticket;
   }

@@ -9,6 +9,10 @@ export class StorageController extends Controller {
 
   /**
    * Get a Secure Upload Link.
+   * Available to any authenticated user, regardless of role — used across
+   * tenant maintenance photos, agent lead documents, profile pictures, etc.
+   * The upload path is namespaced under the caller's own userId
+   * (`{folder}/{userId}/...`), so no per-role restriction is needed here.
    * Frontend sends: { "filename": "leak.jpg", "folder": "maintenance" }
    */
   @Post("sign-url")

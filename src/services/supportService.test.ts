@@ -11,9 +11,14 @@ jest.mock("./external/zeptoMailService", () => ({
   })),
 }));
 
+jest.mock("../utils/activityLogger", () => ({
+  logActivity: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { SupportService } from "./supportService";
 import { prisma } from "../config/prisma";
 import { NotFoundError } from "../utils/apiError";
+import { logActivity } from "../utils/activityLogger";
 
 const mockedPrisma = prisma as unknown as {
   supportTicket: { findUnique: jest.Mock };
@@ -45,7 +50,7 @@ describe("SupportService — cross-user access (BOLA)", () => {
       ).rejects.toBeInstanceOf(NotFoundError);
     });
 
-    it("allows the owner", async () => {
+    it("allows the owner, without logging an admin-access event", async () => {
       mockedPrisma.supportTicket.findUnique.mockResolvedValue({
         id: TICKET_ID,
         userId: OWNER_ID,
@@ -55,9 +60,11 @@ describe("SupportService — cross-user access (BOLA)", () => {
       await expect(
         service.getTicketDetails(TICKET_ID, OWNER_ID, "TENANT"),
       ).resolves.toMatchObject({ id: TICKET_ID });
+      expect(logActivity).not.toHaveBeenCalled();
     });
 
-    it("allows staff (ADMIN role) even though they don't own the ticket", async () => {
+    it("allows staff (ADMIN role) even though they don't own the ticket, and logs the access", async () => {
+      const ADMIN_ID = "admin-1";
       mockedPrisma.supportTicket.findUnique.mockResolvedValue({
         id: TICKET_ID,
         userId: OWNER_ID,
@@ -65,8 +72,15 @@ describe("SupportService — cross-user access (BOLA)", () => {
       });
 
       await expect(
-        service.getTicketDetails(TICKET_ID, ATTACKER_ID, "ADMIN"),
+        service.getTicketDetails(TICKET_ID, ADMIN_ID, "ADMIN"),
       ).resolves.toMatchObject({ id: TICKET_ID });
+      expect(logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: ADMIN_ID,
+          action: "ADMIN_VIEWED_SUPPORT_TICKET",
+          metadata: { ticketId: TICKET_ID, ticketOwnerId: OWNER_ID },
+        }),
+      );
     });
 
     it("rejects a non-existent ticketId with 404", async () => {
@@ -93,7 +107,7 @@ describe("SupportService — cross-user access (BOLA)", () => {
       expect(mockedPrisma.supportMessage.create).not.toHaveBeenCalled();
     });
 
-    it("allows the owner to reply", async () => {
+    it("allows the owner to reply, without logging an admin-access event", async () => {
       mockedPrisma.supportTicket.findUnique.mockResolvedValue({
         id: TICKET_ID,
         userId: OWNER_ID,
@@ -105,9 +119,11 @@ describe("SupportService — cross-user access (BOLA)", () => {
       await expect(
         service.replyToTicket(TICKET_ID, OWNER_ID, "TENANT", { message: "more info" }),
       ).resolves.toBeDefined();
+      expect(logActivity).not.toHaveBeenCalled();
     });
 
-    it("allows staff (ADMIN role) to reply even though they don't own the ticket", async () => {
+    it("allows staff (ADMIN role) to reply even though they don't own the ticket, and logs the access", async () => {
+      const ADMIN_ID = "admin-1";
       mockedPrisma.supportTicket.findUnique.mockResolvedValue({
         id: TICKET_ID,
         userId: OWNER_ID,
@@ -117,8 +133,15 @@ describe("SupportService — cross-user access (BOLA)", () => {
       mockedPrisma.supportMessage.create.mockResolvedValue({ id: "msg-1" });
 
       await expect(
-        service.replyToTicket(TICKET_ID, ATTACKER_ID, "ADMIN", { message: "we're on it" }),
+        service.replyToTicket(TICKET_ID, ADMIN_ID, "ADMIN", { message: "we're on it" }),
       ).resolves.toBeDefined();
+      expect(logActivity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: ADMIN_ID,
+          action: "ADMIN_REPLIED_SUPPORT_TICKET",
+          metadata: { ticketId: TICKET_ID, ticketOwnerId: OWNER_ID },
+        }),
+      );
     });
   });
 });

@@ -11,7 +11,10 @@ export class PaymentController extends Controller {
   /**
    * Verify Payment
    * Called by Frontend after Paystack redirect.
-   * Universal endpoint for Rent, Utilities, etc.
+   * Universal endpoint for Rent, Utilities, etc. — available to any
+   * authenticated user, regardless of role. The reference is scoped to the
+   * caller's own userId server-side (see PaymentService.verifyPayment), so
+   * no per-role restriction is needed here.
    */
   @Post("verify")
   @Security("jwt")
