@@ -36,6 +36,13 @@ export class UtilityService {
     const user = await prisma.user.findUnique({ where: { userId: userId } });
     if (!user) throw new BadRequestError("User not found");
 
+    // Attribute the payment to the tenant's current lease so the admin
+    // financials view can resolve which property/unit it was paid for
+    // (mirrors RentService.initiateRent, which does the same for rent).
+    const activeLease = await prisma.lease.findFirst({
+      where: { tenantId: userId, status: "ACTIVE" },
+    });
+
     // A. Validate with VTPass one last time (Safety Check)
     // Optional: Skipping to save API calls, but recommended in high-risk apps
 
@@ -90,6 +97,7 @@ export class UtilityService {
         utilityType: this.mapServiceToEnum(params.serviceID),
         meterNo: params.meterNumber,
         metadata: metadata,
+        leaseId: activeLease?.id ?? null,
       },
     });
 
