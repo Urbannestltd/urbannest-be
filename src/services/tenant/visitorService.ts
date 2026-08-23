@@ -21,6 +21,29 @@ import { generateNumericCode } from "../../utils/generateNumericCode";
 
 const RECURRING_VALID_MS = 365 * 24 * 60 * 60 * 1000; // 1 year — "open-ended until revoked"
 
+const AUTO_DEDUPE_WINDOW_MS = 10_000;
+
+/**
+ * Derives the idempotency key for a createInvite call. Prefers the
+ * caller-supplied Idempotency-Key header (namespaced per tenant so two
+ * tenants can't collide on the same client-chosen value); falls back to a
+ * key auto-derived from the request shape within a short time window, so
+ * accidental double-submits are still caught even if the caller never sends
+ * the header.
+ */
+export function buildCreateInviteIdempotencyKey(
+  tenantId: string,
+  headerKey: string | undefined,
+  params: CreateInviteRequest,
+): string {
+  if (headerKey) return `${tenantId}:${headerKey}`;
+
+  const visitorIdentity =
+    params.visitor.email || params.visitor.phone || params.visitor.name;
+  const bucket = Math.floor(Date.now() / AUTO_DEDUPE_WINDOW_MS);
+  return `${tenantId}:auto:${params.type}:${params.startDate}:${visitorIdentity}:${bucket}`;
+}
+
 /**
  * Derives validFrom/validUntil from the request per frequency:
  *  - ONE_OFF: exact window the tenant provided.

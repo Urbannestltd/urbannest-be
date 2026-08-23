@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Body,
+  Header,
   Middlewares,
   Route,
   Tags,
@@ -10,7 +11,7 @@ import {
   Get,
   Query,
 } from "tsoa";
-import { VisitorService } from "../../services/tenant/visitorService";
+import { VisitorService, buildCreateInviteIdempotencyKey } from "../../services/tenant/visitorService";
 import {
   CreateInviteSchema,
   CreateBulkInviteSchema,
@@ -20,9 +21,11 @@ import {
 } from "../../dtos/tenant/visitor.dto";
 import { successResponse } from "../../utils/responseHelper";
 import { validate } from "../../utils/validate";
+import { withIdempotency } from "../../utils/idempotency";
 import { VerifyCodeSchema } from "../../dtos/tenant/visitor.dto";
 import { Permission } from "@prisma/client";
 import { requirePermission } from "../../middlewares/permissionMiddleware";
+import { visitorInviteRateLimit } from "../../middlewares/rateLimitMiddleware";
 
 @Route("tenant/visitors")
 @Tags("Tenant - Visitor Management")
@@ -36,14 +39,19 @@ export class VisitorController extends Controller {
    */
   @Post("invite")
   @Security("jwt")
+  @Middlewares(visitorInviteRateLimit)
   public async createInvite(
     @Request() req: any,
     @Body() body: CreateInviteRequest,
+    @Header("Idempotency-Key") idempotencyKey?: string,
   ) {
     validate(CreateInviteSchema, body);
-    const result = await this.visitorService.createInvite(
+    const key = buildCreateInviteIdempotencyKey(req.user.userId, idempotencyKey, body);
+    const result = await withIdempotency(
+      key,
       req.user.userId,
-      body,
+      "POST /tenant/visitors/invite",
+      () => this.visitorService.createInvite(req.user.userId, body),
     );
     return successResponse(result, "Visitor registered");
   }

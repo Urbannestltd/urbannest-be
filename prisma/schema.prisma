@@ -1054,3 +1054,31 @@ model Reminder {
 
   @@index([userId])
 }
+
+// ==========================================
+// IDEMPOTENCY
+// ==========================================
+
+enum IdempotencyStatus {
+  PROCESSING
+  COMPLETED
+}
+
+// Guards write endpoints (e.g. visitor invite creation) against duplicate
+// submissions — retries, double-clicks, or concurrent identical requests.
+// `key` is unique so Postgres itself enforces that only one caller can ever
+// "win" a given key; everyone else gets a unique-constraint violation and is
+// treated as a duplicate rather than allowed to re-run the operation.
+model IdempotencyKey {
+  id           String            @id @default(uuid())
+  key          String            @unique
+  tenantId     String
+  endpoint     String
+  status       IdempotencyStatus @default(PROCESSING)
+  responseBody Json?
+  createdAt    DateTime          @default(now())
+  expiresAt    DateTime
+
+  @@index([tenantId])
+  @@index([expiresAt])
+}
