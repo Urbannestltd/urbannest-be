@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Route, Tags, Security, Request } from "tsoa";
 import { StorageService } from "../services/external/storageService";
 import { successResponse } from "../utils/responseHelper";
+import { validateUploadFilename, validateUploadFolder } from "../utils/fileUploadValidation";
 
 @Route("storage")
 @Tags("File Uploads")
@@ -21,6 +22,9 @@ export class StorageController extends Controller {
     @Request() req: any,
     @Body() body: { filename: string; folder: string },
   ) {
+    validateUploadFolder(body.folder);
+    validateUploadFilename(body.filename);
+
     const userId = req.user.userId;
     // Create a clean path: maintenance/user-123/176930000_leak.jpg
     const path = `${body.folder}/${userId}/${Date.now()}_${body.filename}`;
