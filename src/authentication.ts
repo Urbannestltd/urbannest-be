@@ -10,10 +10,11 @@ export function expressAuthentication(
   scopes?: string[],
 ): Promise<any> {
   if (securityName === "jwt") {
-    // 1. Extract the token
+    // 1. Extract the token. Deliberately NOT accepted via URL query string —
+    // query params end up in browser history, proxy/access logs, and
+    // Referer headers on subsequent navigation, none of which redact a JWT.
     const token =
       request.body?.token ||
-      request.query?.token ||
       request.headers?.["x-access-token"] ||
       request.headers?.["authorization"];
 

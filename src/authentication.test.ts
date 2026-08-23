@@ -55,6 +55,16 @@ describe("expressAuthentication", () => {
     jest.clearAllMocks();
   });
 
+  it("rejects a token supplied only via the URL query string (not accepted, to avoid leaking it via logs/history/referrer)", async () => {
+    const token = signToken({ userId: "u1", role: "TENANT" });
+    const request: any = { headers: {}, body: {}, query: { token } };
+
+    await expect(expressAuthentication(request, "jwt")).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    expect(mockedPrisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
   it("resolves for a valid token whose role matches the current DB role", async () => {
     mockedPrisma.user.findUnique.mockResolvedValue({
       userStatus: "ACTIVE",
