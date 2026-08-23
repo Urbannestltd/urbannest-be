@@ -1,6 +1,7 @@
 // src/services/leaseService.ts
 import { prisma } from "../../config/prisma";
-import { NotFoundError, ForbiddenError } from "../../utils/apiError";
+import { NotFoundError } from "../../utils/apiError";
+import { assertOwned } from "../../utils/ownership";
 import { LeaseResponse } from "../../dtos/tenant/lease.dto";
 
 export class LeaseService {
@@ -76,12 +77,8 @@ export class LeaseService {
       where: { id: leaseId },
     });
 
-    if (!lease) throw new NotFoundError("Lease not found");
-
-    // SECURITY: Ensure the requester is the actual tenant
-    if (lease.tenantId !== userId) {
-      throw new ForbiddenError("Access denied");
-    }
+    // SECURITY: Ensure the requester is the actual tenant.
+    assertOwned(lease, (l) => l.tenantId === userId, "Lease not found");
 
     if (!lease.documentUrl) {
       throw new NotFoundError("Digital document unavailable");

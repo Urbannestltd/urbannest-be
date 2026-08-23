@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Route, Tags, Security } from "tsoa";
+import { Controller, Post, Body, Route, Tags, Security, Request } from "tsoa";
 import { PaymentService } from "../services/paymentService";
 import { successResponse } from "../utils/responseHelper";
 import { BadRequestError } from "../utils/apiError";
@@ -15,10 +15,10 @@ export class PaymentController extends Controller {
    */
   @Post("verify")
   @Security("jwt")
-  public async verify(@Body() body: { reference: string }) {
+  public async verify(@Request() req: any, @Body() body: { reference: string }) {
     if (!body.reference) throw new BadRequestError("Reference is required");
 
-    const result = await this.paymentService.verifyPayment(body.reference);
+    const result = await this.paymentService.verifyPayment(body.reference, req.user.userId);
     return successResponse(result, "Payment verified successfully");
   }
 }

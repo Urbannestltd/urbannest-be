@@ -1,6 +1,7 @@
 import { prisma } from "../config/prisma";
 import { paystackClient } from "../utils/paystackClient";
-import { NotFoundError, BadRequestError } from "../utils/apiError";
+import { BadRequestError } from "../utils/apiError";
+import { assertOwned } from "../utils/ownership";
 import { PaymentStatus, UnitStatus, LeaseStatus } from "@prisma/client";
 import { VTPassService } from "./external/vtPassService";
 import { ZeptoMailService } from "./external/zeptoMailService";
@@ -20,12 +21,36 @@ export class PaymentService {
   private vtpass = new VTPassService();
   private emailService = new ZeptoMailService();
 
-  public async verifyPayment(reference: string) {
+  /**
+   * @param expectedUserId When set (the authenticated-tenant call path via
+   * PaymentController), the reference must belong to this user or the whole
+   * operation is a 404 — no Paystack call, no status update, no side
+   * effects. Left undefined for the Paystack webhook path (app.ts), which
+   * has no caller identity and is authenticated by HMAC signature instead.
+   */
+  public async verifyPayment(reference: string, expectedUserId?: string) {
     // ====================================================
     // PHASE 1: PRE-CHECKS (Fast, No Transaction)
     // ====================================================
 
-    // 1. Verify with Paystack
+    // 1. Find & own-check the local record BEFORE touching Paystack or any
+    // state, so a reference belonging to another tenant never gets this far.
+    const payment = await prisma.payment.findUnique({ where: { reference } });
+    assertOwned(
+      payment,
+      (p) => !expectedUserId || p.userId === expectedUserId,
+      "Transaction record not found.",
+    );
+
+    if (payment.status === PaymentStatus.PAID) {
+      return {
+        success: true,
+        message: "Transaction already processed.",
+        token: payment.utilityToken || undefined,
+      };
+    }
+
+    // 2. Verify with Paystack
     let verifyRes;
     try {
       verifyRes = await paystackClient.get(`/transaction/verify/${reference}`);
@@ -39,18 +64,6 @@ export class PaymentService {
         data: { status: PaymentStatus.FAILED },
       });
       throw new BadRequestError("Payment was not successful.");
-    }
-
-    // 2. Find Local Record
-    const payment = await prisma.payment.findUnique({ where: { reference } });
-    if (!payment) throw new NotFoundError("Transaction record not found.");
-
-    if (payment.status === PaymentStatus.PAID) {
-      return {
-        success: true,
-        message: "Transaction already processed.",
-        token: payment.utilityToken || undefined,
-      };
     }
 
     const meta = payment.metadata as any;

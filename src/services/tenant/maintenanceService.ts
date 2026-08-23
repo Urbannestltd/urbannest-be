@@ -4,7 +4,8 @@ import {
   CreateMaintenanceRequest,
   UpdateMaintenanceRequest,
 } from "../../dtos/tenant/maintenance.dto";
-import { BadRequestError, ForbiddenError, NotFoundError } from "../../utils/apiError";
+import { BadRequestError } from "../../utils/apiError";
+import { assertOwned } from "../../utils/ownership";
 import {
   MaintenanceCategory,
   MaintenancePriority,
@@ -120,10 +121,7 @@ export class MaintenanceService {
       where: { id: ticketId },
       select: { tenantId: true },
     });
-    if (!ticket) throw new NotFoundError("Maintenance request not found");
-    if (ticket.tenantId !== tenantId) {
-      throw new ForbiddenError("You can only view your own requests.");
-    }
+    assertOwned(ticket, (t) => t.tenantId === tenantId, "Maintenance request not found");
 
     const now = new Date();
     await prisma.$transaction([
@@ -158,15 +156,13 @@ export class MaintenanceService {
       include: { tenant: true, assignedTo: true },
     });
 
-    if (!ticket) throw new NotFoundError("Maintenance request not found");
-
     // Security: Ensure the sender is actually part of this ticket
-    // (Either the Tenant who created it OR the Manager assigned to it)
-    if (ticket.tenantId !== senderId && ticket.assignedToId !== senderId) {
-      // In a real app, you might also allow "ADMIN" roles generally
-      // but strict checking prevents random users from commenting.
-      // For now, we assume if you have the ID, you are valid or we check role.
-    }
+    // (Either the Tenant who created it OR the Manager assigned to it).
+    assertOwned(
+      ticket,
+      (t) => t.tenantId === senderId || t.assignedToId === senderId,
+      "Maintenance request not found",
+    );
 
     // B. Create Message
     const newMessage = await prisma.maintenanceMessage.create({
@@ -219,10 +215,7 @@ export class MaintenanceService {
       where: { id: ticketId },
       select: { tenantId: true },
     });
-    if (!ticket) throw new NotFoundError("Maintenance request not found");
-    if (ticket.tenantId !== tenantId) {
-      throw new ForbiddenError("You can only view messages on your own requests.");
-    }
+    assertOwned(ticket, (t) => t.tenantId === tenantId, "Maintenance request not found");
 
     return prisma.maintenanceMessage.findMany({
       where: {
@@ -253,12 +246,8 @@ export class MaintenanceService {
       where: { id: ticketId },
     });
 
-    if (!ticket) throw new NotFoundError("Maintenance request not found.");
-
     // B. Authorization Check
-    if (ticket.tenantId !== userId) {
-      throw new BadRequestError("You can only edit your own requests.");
-    }
+    assertOwned(ticket, (t) => t.tenantId === userId, "Maintenance request not found.");
 
     // C. Business Logic Check
     // Prevent edits if work has already started
@@ -293,14 +282,8 @@ export class MaintenanceService {
       where: { id: requestId },
     });
 
-    if (!request) {
-      throw new NotFoundError("Maintenance request not found");
-    }
-
     // 2. Check Ownership
-    if (request.tenantId !== userId) {
-      throw new BadRequestError("You can only delete your own requests.");
-    }
+    assertOwned(request, (r) => r.tenantId === userId, "Maintenance request not found");
 
     // 3. Check Status (Critical Step)
     if (request.status !== "PENDING") {
