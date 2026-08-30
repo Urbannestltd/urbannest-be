@@ -123,6 +123,8 @@ export interface TicketFiltersDto {
 export interface AddCommentDto {
   message: string;
   senderId: string;
+  /** Defaults to true — admin comments are internal-only unless explicitly sent to the tenant. */
+  isInternalNote?: boolean;
 }
 
 export interface UpdateTicketStatusDto {

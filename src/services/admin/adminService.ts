@@ -110,6 +110,56 @@ export class AdminService {
       lastInspection: lastFmMessage?.createdAt ?? null,
     };
   }
+
+  /**
+   * Per-property metrics for a landlord, shown on their admin user-detail
+   * page: assigned value, status, open lead count, and date listed.
+   * "Status" has no stored field on `property` — it's derived from whether
+   * any non-deleted unit is currently AVAILABLE.
+   */
+  private async getLandlordPropertyMetrics(propertyIds: string[]) {
+    const metrics = new Map<
+      string,
+      {
+        assignedValue: number;
+        status: "Available" | "Off Market";
+        numberOfLeads: number;
+        dateListed: Date;
+      }
+    >();
+    if (propertyIds.length === 0) return metrics;
+
+    const properties = await prisma.property.findMany({
+      where: { id: { in: propertyIds } },
+      select: {
+        id: true,
+        price: true,
+        createdAt: true,
+        units: {
+          where: { status: { not: "DELETED" } },
+          select: { status: true },
+        },
+        _count: {
+          select: {
+            agentLeads: { where: { status: { notIn: ["WITHDRAWN", "REJECTED"] } } },
+          },
+        },
+      },
+    });
+
+    for (const p of properties) {
+      metrics.set(p.id, {
+        assignedValue: p.price ?? 0,
+        status: p.units.some((u) => u.status === "AVAILABLE")
+          ? "Available"
+          : "Off Market",
+        numberOfLeads: p._count.agentLeads,
+        dateListed: p.createdAt,
+      });
+    }
+    return metrics;
+  }
+
   public async createUser(
     params: AdminCreateUserRequest,
     adminId?: string,
@@ -567,6 +617,18 @@ export class AdminService {
     if (!user) throw new BadRequestError("User not found");
 
     const mapped = this.mapUserProperties(user);
+
+    if (mapped.properties.asLandlord.length > 0) {
+      const landlordMetrics = await this.getLandlordPropertyMetrics(
+        mapped.properties.asLandlord.map((p: { id: string }) => p.id),
+      );
+      mapped.properties.asLandlord = mapped.properties.asLandlord.map(
+        (p: { id: string; name: string }) => ({
+          ...p,
+          ...landlordMetrics.get(p.id),
+        }),
+      );
+    }
 
     if (mapped.properties.asFacilityManager.length > 0) {
       const metrics = await Promise.all(

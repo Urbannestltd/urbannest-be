@@ -20,6 +20,10 @@ export interface UpdateLeaseDto {
   endDate?: string | Date;
   moveOutNotice?: string;
   documentUrl?: string;
+
+  // When rentAmount is changed, PENDING payments on this lease keep their
+  // original amount unless the admin explicitly opts in to updating them.
+  applyToExistingPayments?: boolean;
 }
 
 export interface LeaseDetailDto {

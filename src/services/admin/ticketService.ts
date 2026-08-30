@@ -525,6 +525,7 @@ export class AdminTicketService {
         senderId: data.senderId,
         message: data.message,
         attachments: [],
+        isInternalNote: data.isInternalNote ?? true,
       },
     });
   }

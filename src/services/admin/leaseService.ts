@@ -169,25 +169,43 @@ export class AdminLeaseService {
       );
     }
 
-    return await prisma.lease.update({
-      where: { id: leaseId },
-      data: {
-        ...(data.rentAmount !== undefined && { rentAmount: data.rentAmount }),
-        ...(data.serviceCharge !== undefined && {
-          serviceCharge: data.serviceCharge,
-        }),
-        ...(data.startDate !== undefined && {
-          startDate: new Date(data.startDate),
-        }),
-        ...(data.endDate !== undefined && { endDate: new Date(data.endDate) }),
-        ...(data.moveOutNotice !== undefined && {
-          moveOutNotice: data.moveOutNotice,
-        }),
-        ...(data.documentUrl !== undefined && {
-          documentUrl: data.documentUrl,
-        }),
-      },
-    });
+    const rentAmountChanged =
+      data.rentAmount !== undefined && data.rentAmount !== lease.rentAmount;
+
+    const [updatedLease] = await prisma.$transaction([
+      prisma.lease.update({
+        where: { id: leaseId },
+        data: {
+          ...(data.rentAmount !== undefined && { rentAmount: data.rentAmount }),
+          ...(data.serviceCharge !== undefined && {
+            serviceCharge: data.serviceCharge,
+          }),
+          ...(data.startDate !== undefined && {
+            startDate: new Date(data.startDate),
+          }),
+          ...(data.endDate !== undefined && { endDate: new Date(data.endDate) }),
+          ...(data.moveOutNotice !== undefined && {
+            moveOutNotice: data.moveOutNotice,
+          }),
+          ...(data.documentUrl !== undefined && {
+            documentUrl: data.documentUrl,
+          }),
+        },
+      }),
+      // Existing PENDING payments keep their original amount unless the
+      // admin explicitly asks to bring them in line with the new rent.
+      // PAID payments are never rewritten — they reflect what was actually paid.
+      ...(rentAmountChanged && data.applyToExistingPayments
+        ? [
+            prisma.payment.updateMany({
+              where: { leaseId, status: "PENDING", type: "RENT" },
+              data: { amount: data.rentAmount },
+            }),
+          ]
+        : []),
+    ]);
+
+    return updatedLease;
   }
 
   // --- RENEW INACTIVE LEASE ---

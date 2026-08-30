@@ -78,3 +78,18 @@ export interface VisitorStatsResponse {
   totalScheduled: number;
   totalWalkIns: number;
 }
+
+export interface VisitorHistoryItem {
+  id: string;
+  visitorName: string;
+  visitorPhone: string;
+  groupName: string | null;
+  isGroupInvite: boolean;
+  isWalkIn: boolean;
+  type: string;
+  code: string;
+  date: string;
+  checkInTime: string;
+  checkOutTime: string;
+  status: string;
+}

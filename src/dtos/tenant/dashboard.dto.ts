@@ -39,8 +39,10 @@ export interface DashboardOverviewResponse {
       accessCode: string;
       isGroupInvite: boolean;
       groupName: string | null; // e.g., "Group Invite (groupId)"
+      isWalkIn: boolean;
       status: InviteStatus;
       accessType: string; // "One-off"
+      date: string; // always today's date — this widget only ever lists today's visitors
       timeIn: string | null; // "11:43 AM"
       timeOut: string | null; // "4:47 PM"
     }>;

@@ -194,6 +194,7 @@ export class AdminPropertyService {
         facilityManager: true,
         landlord: true,
         agent: true,
+        frontDesk: true,
         units: {
           where: { status: { not: UnitStatus.DELETED } },
           include: {
@@ -319,6 +320,15 @@ export class AdminPropertyService {
             name: property.agent.userFullName || "Unknown",
             email: property.agent.userEmail,
             photoUrl: property.agent.userProfileUrl,
+          }
+        : null,
+
+      frontDesk: property.frontDesk
+        ? {
+            id: property.frontDesk.userId,
+            name: property.frontDesk.userFullName || "Unknown",
+            email: property.frontDesk.userEmail,
+            photoUrl: property.frontDesk.userProfileUrl,
           }
         : null,
 

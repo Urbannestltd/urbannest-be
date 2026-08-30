@@ -105,6 +105,7 @@ export interface PropertyDetailsResponseDto {
   } | null;
   landlord: { id: string; name: string; email: string; photoUrl: string | null } | null;
   agent: { id: string; name: string; email: string; photoUrl: string | null } | null;
+  frontDesk: { id: string; name: string; email: string; photoUrl: string | null } | null;
 
   // Revenue Chart
   rentalRevenue: { month: string; revenue: number }[];

@@ -99,7 +99,9 @@ export class DashboardService {
       accessCode: v.accessCode,
       groupName: v.group?.name ? `Group Invite (${v.groupId})` : null,
       isGroupInvite: !!v.groupId,
+      isWalkIn: v.isWalkIn,
       status: v.status,
+      date: new Date().toDateString(),
       scheduledDate: new Date(v.validFrom).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",

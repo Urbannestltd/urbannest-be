@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import {
   CreateBulkInviteRequest,
   CreateInviteRequest,
+  VisitorHistoryItem,
   VisitorPeriodFilter,
   VisitorStatsResponse,
 } from "../../dtos/tenant/visitor.dto";
@@ -362,7 +363,9 @@ export class VisitorService {
    * 4. GET VISITOR HISTORY
    * Returns list of past visitors for the tenant.
    */
-  public async getVisitorHistory(tenantId: string) {
+  public async getVisitorHistory(
+    tenantId: string,
+  ): Promise<VisitorHistoryItem[]> {
     // 1. Fetch invites with their associated Group Name
     const history = await prisma.visitorInvite.findMany({
       where: { tenantId },
@@ -392,6 +395,7 @@ export class VisitorService {
         visitorPhone: record.visitorPhone || "-",
         groupName: record.group?.name || null, // e.g., "Project Team Meeting" or null
         isGroupInvite: !!record.groupId,
+        isWalkIn: record.isWalkIn,
 
         // Context
         type: record.type,
