@@ -10,6 +10,7 @@ import {
   fmVisitCounterProposedEmail,
 } from "../../config/emailTemplates";
 import { getFmNotificationPrefs } from "../facility-manager/fmSettingsService";
+import { notificationService } from "../notificationService";
 import type {
   ScheduleVisitRequest,
   GetVisitsQuery,
@@ -119,6 +120,16 @@ export class AgentVisitsService {
           email.subject,
           email.html,
         );
+
+        await notificationService.notify({
+          recipientId: property.facilityManagerId,
+          senderId: agentId,
+          type: "AGENT_LEAD",
+          title: "New Agent Visit Scheduled",
+          body: `${agent?.userFullName ?? "An agent"} scheduled a visit to ${property.name ?? property.address} on ${visitDateStr}`,
+          entityType: "AgentVisit",
+          entityId: visit.id,
+        });
       }
     }
 
@@ -258,6 +269,16 @@ export class AgentVisitsService {
           email.subject,
           email.html,
         );
+
+        await notificationService.notify({
+          recipientId: visit.property.facilityManagerId,
+          senderId: agentId,
+          type: "AGENT_LEAD",
+          title: "Agent Visit Cancelled",
+          body: `${agent?.userFullName ?? "An agent"} cancelled their visit to ${visit.property.name ?? visit.property.address}`,
+          entityType: "AgentVisit",
+          entityId: visitId,
+        });
       }
     }
 
@@ -318,6 +339,16 @@ export class AgentVisitsService {
           email.subject,
           email.html,
         );
+
+        await notificationService.notify({
+          recipientId: visit.property.facilityManagerId,
+          senderId: agentId,
+          type: "AGENT_LEAD",
+          title: "Reschedule Accepted",
+          body: `${agent?.userFullName ?? "An agent"} accepted the reschedule for their visit to ${visit.property.name ?? visit.property.address}`,
+          entityType: "AgentVisit",
+          entityId: visitId,
+        });
       }
     }
 
@@ -367,6 +398,16 @@ export class AgentVisitsService {
           email.subject,
           email.html,
         );
+
+        await notificationService.notify({
+          recipientId: visit.property.facilityManagerId,
+          senderId: agentId,
+          type: "AGENT_LEAD",
+          title: "Reschedule Rejected",
+          body: `${agent?.userFullName ?? "An agent"} rejected the reschedule for their visit to ${visit.property.name ?? visit.property.address}`,
+          entityType: "AgentVisit",
+          entityId: visitId,
+        });
       }
     }
 
@@ -436,6 +477,16 @@ export class AgentVisitsService {
           email.subject,
           email.html,
         );
+
+        await notificationService.notify({
+          recipientId: visit.property.facilityManagerId,
+          senderId: agentId,
+          type: "AGENT_LEAD",
+          title: "Agent Proposed a New Visit Time",
+          body: `${agent?.userFullName ?? "An agent"} proposed a new time for their visit to ${visit.property.name ?? visit.property.address}`,
+          entityType: "AgentVisit",
+          entityId: visitId,
+        });
       }
     }
 

@@ -16,6 +16,7 @@ import {
   tenantBulkVisitorCodesEmail,
 } from "../../config/emailTemplates";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
+import { notificationService } from "../notificationService";
 import { InviteFrequency, InviteStatus, VisitorType } from "@prisma/client";
 import { resolveDateRangePreset } from "../../utils/dateRangePreset";
 import { generateNumericCode } from "../../utils/generateNumericCode";
@@ -307,6 +308,15 @@ export class VisitorService {
       checkin.html,
     );
 
+    await notificationService.notify({
+      recipientId: invite.tenantId,
+      type: "VISITOR",
+      title: "Visitor Checked In",
+      body: `${invite.visitorName} checked in at Main Gate`,
+      entityType: "VisitorInvite",
+      entityId: invite.id,
+    });
+
     // Notify admins who have visitor notifications enabled
     const adminRecipients = await getAdminRecipients("emailVisitors");
     if (adminRecipients.length > 0) {
@@ -333,6 +343,17 @@ export class VisitorService {
           alert.html,
         );
       }
+
+      await notificationService.notifyMany(
+        adminRecipients.map((admin) => ({
+          recipientId: admin.userId,
+          type: "VISITOR" as const,
+          title: "Visitor Checked In",
+          body: `${invite.tenant.userFullName ?? "A tenant"} had a visitor (${invite.visitorName}) check in`,
+          entityType: "VisitorInvite",
+          entityId: invite.id,
+        })),
+      );
     }
 
     return { success: true, message: "Visitor checked in successfully" };

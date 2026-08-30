@@ -1762,3 +1762,18 @@ export function adminLeaseTerminatedEmail(
     `),
   };
 }
+
+// ---------------------------------------------------------------------------
+// 41. Official notice — admin-authored message sent directly to a user
+// ---------------------------------------------------------------------------
+export function officialNoticeEmail(name: string, title: string, message: string) {
+  return {
+    subject: `Notice: ${title}`,
+    html: base(`
+      ${heading(title)}
+      ${subheading(`Hi ${name}`)}
+      ${para(message)}
+      ${alertBox("This is an official notice from Urbannest management.", "info")}
+    `),
+  };
+}

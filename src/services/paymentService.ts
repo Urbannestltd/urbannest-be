@@ -12,6 +12,7 @@ import {
   tenantPaymentReceiptEmail,
 } from "../config/emailTemplates";
 import { getAdminRecipients } from "../utils/getAdminRecipients";
+import { notificationService } from "./notificationService";
 
 // If a claim is older than this, treat it as abandoned (e.g. the process
 // crashed mid-verification) and let a fresh call retry instead of hanging forever.
@@ -168,6 +169,15 @@ export class PaymentService {
             subject,
             html,
           );
+
+          await notificationService.notify({
+            recipientId: payment.userId,
+            type: "PAYMENT",
+            title: "Utility Purchase Successful",
+            body: subject,
+            entityType: "Payment",
+            entityId: payment.id,
+          });
         }
 
         return {
@@ -212,6 +222,15 @@ export class PaymentService {
             subject,
             html,
           );
+
+          await notificationService.notify({
+            recipientId: payment.userId,
+            type: "PAYMENT",
+            title: "Utility Purchase — Token Pending",
+            body: subject,
+            entityType: "Payment",
+            entityId: payment.id,
+          });
         }
 
         return {
@@ -355,6 +374,15 @@ export class PaymentService {
             subject,
             html,
           );
+
+          await notificationService.notify({
+            recipientId: paid.userId,
+            type: "PAYMENT",
+            title: "Rent Payment Received",
+            body: subject,
+            entityType: "Payment",
+            entityId: paid.id,
+          });
         } else {
           const { subject, html } = tenantPaymentReceiptEmail(
             tenantName,
@@ -370,6 +398,15 @@ export class PaymentService {
             subject,
             html,
           );
+
+          await notificationService.notify({
+            recipientId: paid.userId,
+            type: "PAYMENT",
+            title: "Payment Received",
+            body: subject,
+            entityType: "Payment",
+            entityId: paid.id,
+          });
         }
       }
 
@@ -391,6 +428,17 @@ export class PaymentService {
           html,
         );
       }
+
+      await notificationService.notifyMany(
+        adminRecipients.map((admin) => ({
+          recipientId: admin.userId,
+          type: "PAYMENT" as const,
+          title: "Payment Received",
+          body: `${tenantName} paid ${paid.amount} (${paid.type}) for ${unitName}`,
+          entityType: "Payment",
+          entityId: paid.id,
+        })),
+      );
     }
 
     return txResult;

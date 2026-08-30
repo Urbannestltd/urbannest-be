@@ -14,6 +14,7 @@ import {
 import { ZeptoMailService } from "./../external/zeptoMailService";
 import { adminMaintenanceAlertEmail, maintenanceReplyEmail } from "../../config/emailTemplates";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
+import { notificationService } from "../notificationService";
 
 export class MaintenanceService {
   private emailService = new ZeptoMailService();
@@ -81,6 +82,17 @@ export class MaintenanceService {
           alert.html,
         );
       }
+
+      await notificationService.notifyMany(
+        adminRecipients.map((admin) => ({
+          recipientId: admin.userId,
+          type: "MAINTENANCE" as const,
+          title: "New Maintenance Request",
+          body: `${tenantUser?.userFullName ?? "A tenant"} reported a ${params.category} issue in ${lease.unit.name}`,
+          entityType: "MaintenanceRequest",
+          entityId: ticket.id,
+        })),
+      );
     }
 
     return ticket;
@@ -179,15 +191,18 @@ export class MaintenanceService {
     // Who receives the email? The person who DIDN'T send the message.
     let recipientEmail = "";
     let recipientName = "";
+    let recipientId: string | null = null;
 
     if (senderId === ticket.tenantId) {
       // Tenant sent it -> Notify Manager (if assigned) or Admin
       recipientEmail = ticket.assignedTo?.userEmail || "admin@urbannest.com";
       recipientName = ticket.assignedTo?.userFullName || "Facility Manager";
+      recipientId = ticket.assignedToId ?? null;
     } else {
       // Manager sent it -> Notify Tenant
       recipientEmail = ticket.tenant.userEmail;
       recipientName = ticket.tenant.userFullName || "Tenant";
+      recipientId = ticket.tenantId;
     }
 
     // Fire & Forget Email
@@ -202,6 +217,18 @@ export class MaintenanceService {
       reply.subject,
       reply.html,
     );
+
+    if (recipientId) {
+      await notificationService.notify({
+        recipientId,
+        senderId,
+        type: "MAINTENANCE",
+        title: "New Message on Maintenance Request",
+        body: params.message.substring(0, 100),
+        entityType: "MaintenanceRequest",
+        entityId: ticketId,
+      });
+    }
 
     return newMessage;
   }

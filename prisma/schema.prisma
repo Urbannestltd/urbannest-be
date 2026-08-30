@@ -262,6 +262,8 @@ model user {
 
   notificationSettings NotificationSetting?
   reminders            Reminder[]
+  notifications        Notification[] @relation("NotificationRecipient")
+  sentNotifications    Notification[] @relation("NotificationSender")
 
   paymentMethods PaymentMethod[]
 
@@ -1008,6 +1010,42 @@ model ActivityLog {
 // USER PREFERENCES & UTILS
 // ==========================================
 
+enum NotificationType {
+  NOTICE // admin-authored official notice
+  MAINTENANCE
+  VISITOR
+  LEASE
+  PAYMENT
+  TICKET_APPROVAL
+  WALK_IN
+  AGENT_LEAD
+  SYSTEM
+}
+
+model Notification {
+  id          String           @id @default(uuid())
+  recipientId String
+  senderId    String?
+  type        NotificationType
+  title       String
+  body        String
+
+  // Loose, no-FK pointer to the domain entity this notification is about
+  // (e.g. "MaintenanceRequest" / ticketId) — for deep-linking only.
+  entityType String?
+  entityId   String?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  recipient user  @relation("NotificationRecipient", fields: [recipientId], references: [userId], onDelete: Cascade)
+  sender    user? @relation("NotificationSender", fields: [senderId], references: [userId], onDelete: SetNull)
+
+  @@index([recipientId, createdAt])
+  @@index([recipientId, readAt])
+  @@map("notifications")
+}
+
 model NotificationSetting {
   id     String @id @default(uuid())
   userId String @unique
@@ -1016,6 +1054,7 @@ model NotificationSetting {
   emailLease       Boolean @default(true)
   emailMaintenance Boolean @default(true)
   emailVisitors    Boolean @default(true)
+  emailNotices     Boolean @default(true)
 
   pushPayments    Boolean @default(false)
   pushMaintenance Boolean @default(false)

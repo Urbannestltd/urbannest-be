@@ -3,6 +3,7 @@ import { ForbiddenError, NotFoundError, BadRequestError } from "../../utils/apiE
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { logActivity } from "../../utils/activityLogger";
 import { generateNumericCode } from "../../utils/generateNumericCode";
+import { notificationService } from "../notificationService";
 import {
   agentVisitApprovedEmail,
   agentVisitRejectedEmail,
@@ -180,6 +181,16 @@ export class FmAgentVisitsService {
       email.html,
     );
 
+    await notificationService.notify({
+      recipientId: visit.agentId,
+      senderId: fmId,
+      type: "AGENT_LEAD",
+      title: "Visit Approved",
+      body: `Your visit to ${visit.property.name ?? visit.property.address} was approved for ${visitDateStr}`,
+      entityType: "AgentVisit",
+      entityId: visitId,
+    });
+
     await logActivity({
       userId: fmId,
       action: "AGENT_VISIT_APPROVED",
@@ -223,6 +234,16 @@ export class FmAgentVisitsService {
       email.subject,
       email.html,
     );
+
+    await notificationService.notify({
+      recipientId: visit.agentId,
+      senderId: fmId,
+      type: "AGENT_LEAD",
+      title: "Visit Rejected",
+      body: `Your visit to ${visit.property.name ?? visit.property.address} was rejected${reason ? `: ${reason}` : ""}`,
+      entityType: "AgentVisit",
+      entityId: visitId,
+    });
 
     await logActivity({
       userId: fmId,
@@ -282,6 +303,16 @@ export class FmAgentVisitsService {
       email.subject,
       email.html,
     );
+
+    await notificationService.notify({
+      recipientId: visit.agentId,
+      senderId: fmId,
+      type: "AGENT_LEAD",
+      title: "Visit Reschedule Proposed",
+      body: `A new time was proposed for your visit to ${visit.property.name ?? visit.property.address}: ${proposedDateStr}`,
+      entityType: "AgentVisit",
+      entityId: visitId,
+    });
 
     await logActivity({
       userId: fmId,

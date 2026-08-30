@@ -10,6 +10,7 @@ import { BadRequestError } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { adminLeaseCreatedEmail, adminLeaseRenewedEmail, adminLeaseTerminatedEmail, tenantLeaseTerminatedEmail } from "../../config/emailTemplates";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
+import { notificationService } from "../notificationService";
 import { prisma } from "../../config/prisma";
 
 export class AdminLeaseService {
@@ -79,6 +80,17 @@ export class AdminLeaseService {
         html,
       );
     }
+
+    await notificationService.notifyMany(
+      adminRecipients.map((admin) => ({
+        recipientId: admin.userId,
+        type: "LEASE" as const,
+        title: "New Lease Created",
+        body: `A lease was created for ${tenant.userFullName ?? "a tenant"} on ${unitWithProperty?.name ?? "a unit"}`,
+        entityType: "Lease",
+        entityId: newLease.id,
+      })),
+    );
 
     return newLease;
   }
@@ -270,6 +282,17 @@ export class AdminLeaseService {
           html,
         );
       }
+
+      await notificationService.notifyMany(
+        adminRecipients.map((admin) => ({
+          recipientId: admin.userId,
+          type: "LEASE" as const,
+          title: "Lease Renewed",
+          body: `${tenantUser?.userFullName ?? "A tenant"}'s lease on ${unitWithProperty?.name ?? "a unit"} was renewed`,
+          entityType: "Lease",
+          entityId: renewedLease.id,
+        })),
+      );
     }
 
     return renewedLease;
@@ -326,6 +349,15 @@ export class AdminLeaseService {
         subject,
         html,
       );
+
+      await notificationService.notify({
+        recipientId: lease.tenant.userId,
+        type: "LEASE",
+        title: "Lease Terminated",
+        body: subject,
+        entityType: "Lease",
+        entityId: leaseId,
+      });
     }
 
     // Notify admins with lease notifications enabled
@@ -345,5 +377,16 @@ export class AdminLeaseService {
         html,
       );
     }
+
+    await notificationService.notifyMany(
+      adminRecipients.map((admin) => ({
+        recipientId: admin.userId,
+        type: "LEASE" as const,
+        title: "Lease Terminated",
+        body: `${tenantName}'s lease on ${unitName} was terminated`,
+        entityType: "Lease",
+        entityId: leaseId,
+      })),
+    );
   }
 }

@@ -7,6 +7,7 @@ import {
 } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { logActivity } from "../../utils/activityLogger";
+import { notificationService } from "../notificationService";
 import {
   tenantWalkInApprovalEmail,
   fmWalkInTimedOutEmail,
@@ -193,6 +194,16 @@ export class FmWalkInsService {
       action: "WALK_IN_REGISTERED",
       description: `Walk-in visitor ${data.visitorName} registered by ${fm?.userFullName ?? "FM"} for unit ${unit.name}`,
       metadata: { visitId: visit.id, unitId: data.unitId },
+    });
+
+    await notificationService.notify({
+      recipientId: activeLease.tenant.userId,
+      senderId: fmId,
+      type: "WALK_IN",
+      title: "Walk-In Visitor Awaiting Your Approval",
+      body: `${data.visitorName} is waiting at ${unit.name} — approve or reject within the time window`,
+      entityType: "VisitorInvite",
+      entityId: visit.id,
     });
 
     return this.mapVisit(visit);
@@ -493,6 +504,15 @@ async function applyWalkInTimeout(
         emailTemplate.html,
       )
       .catch(() => {});
+
+    await notificationService.notify({
+      recipientId: registrant.userId,
+      type: "WALK_IN",
+      title: "Walk-In Approval Timed Out",
+      body: `${visit.visitorName}'s walk-in for ${visit.tenant.userFullName ?? "a tenant"} auto-resolved to ${newStatus} after the approval window expired`,
+      entityType: "VisitorInvite",
+      entityId: visit.id,
+    });
   }
 
   return newStatus;

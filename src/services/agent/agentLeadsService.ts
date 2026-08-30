@@ -4,6 +4,7 @@ import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from ".
 import { logActivity } from "../../utils/activityLogger";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { landlordLeadForwardedEmail } from "../../config/emailTemplates";
+import { notificationService } from "../notificationService";
 import type {
   SubmitLeadRequest,
   AgentLeadResponse,
@@ -273,6 +274,16 @@ export class AgentLeadsService {
           email.subject,
           email.html,
         );
+
+        await notificationService.notify({
+          recipientId: lead.property.landlordId,
+          senderId: agentId,
+          type: "AGENT_LEAD",
+          title: "New Lead Forwarded",
+          body: `${agent?.userFullName ?? "An agent"} forwarded a lead for ${lead.prospectName} on ${lead.property.name ?? "your property"}`,
+          entityType: "AgentLead",
+          entityId: leadId,
+        });
       }
     }
 

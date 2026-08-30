@@ -12,7 +12,7 @@ type NotifField =
  */
 export async function getAdminRecipients(
   preference: NotifField,
-): Promise<{ email: string; name: string | null }[]> {
+): Promise<{ userId: string; email: string; name: string | null }[]> {
   const admins = await prisma.user.findMany({
     where: {
       userRole: { roleName: "ADMIN" },
@@ -22,8 +22,12 @@ export async function getAdminRecipients(
         { notificationSettings: { [preference]: true } },
       ],
     },
-    select: { userEmail: true, userFullName: true },
+    select: { userId: true, userEmail: true, userFullName: true },
   });
 
-  return admins.map((a) => ({ email: a.userEmail, name: a.userFullName }));
+  return admins.map((a) => ({
+    userId: a.userId,
+    email: a.userEmail,
+    name: a.userFullName,
+  }));
 }

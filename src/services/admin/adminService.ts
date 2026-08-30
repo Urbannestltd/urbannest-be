@@ -8,10 +8,13 @@ import { BadRequestError } from "../../utils/apiError";
 import { SessionService } from "../sessionService";
 import bcrypt from "bcrypt";
 import { ZeptoMailService } from "../external/zeptoMailService";
-import { registrationInviteEmail } from "../../config/emailTemplates";
+import { registrationInviteEmail, officialNoticeEmail } from "../../config/emailTemplates";
 import { Permission } from "@prisma/client";
 import { date } from "zod";
 import { logActivity } from "../../utils/activityLogger";
+import { notificationService } from "../notificationService";
+import { SendNoticeDto } from "../../dtos/admin/notice.dto";
+import { NotFoundError } from "../../utils/apiError";
 
 export class AdminService {
   private zeptoMailService = new ZeptoMailService();
@@ -646,6 +649,39 @@ export class AdminService {
     }
 
     return mapped;
+  }
+
+  /**
+   * Admin-authored "Send Notice" — always creates the in-app notification;
+   * emails the recipient too unless they've turned off `emailNotices`.
+   */
+  public async sendNotice(userId: string, adminId: string, dto: SendNoticeDto) {
+    const recipient = await prisma.user.findUnique({
+      where: { userId },
+      select: { userEmail: true, userFullName: true },
+    });
+    if (!recipient) throw new NotFoundError("User not found");
+
+    await notificationService.notify({
+      recipientId: userId,
+      senderId: adminId,
+      type: "NOTICE",
+      title: dto.title,
+      body: dto.message,
+    });
+
+    if (await notificationService.isEmailEnabled(userId, "emailNotices")) {
+      const { subject, html } = officialNoticeEmail(
+        recipient.userFullName ?? "there",
+        dto.title,
+        dto.message,
+      );
+      await this.zeptoMailService.sendEmail(
+        { email: recipient.userEmail, name: recipient.userFullName ?? undefined },
+        subject,
+        html,
+      );
+    }
   }
 
   public async changePassword(

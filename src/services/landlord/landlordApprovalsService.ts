@@ -6,6 +6,7 @@ import {
 } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { logActivity } from "../../utils/activityLogger";
+import { notificationService } from "../notificationService";
 import {
   landlordLeadApprovedAgentEmail,
   landlordLeadRejectedAgentEmail,
@@ -231,6 +232,16 @@ export class LandlordApprovalsService {
       )
       .catch(() => {});
 
+    await notificationService.notify({
+      recipientId: lead.agent.userId,
+      senderId: landlordId,
+      type: "AGENT_LEAD",
+      title: "Application Approved",
+      body: `Your application for ${lead.prospectName} on ${lead.property.name ?? "the property"} was approved`,
+      entityType: "AgentLead",
+      entityId: leadId,
+    });
+
     if (lead.prospectEmail) {
       const prospectTpl = landlordLeadApprovedProspectEmail(
         lead.prospectName,
@@ -318,6 +329,16 @@ export class LandlordApprovalsService {
         agentTpl.html,
       )
       .catch(() => {});
+
+    await notificationService.notify({
+      recipientId: lead.agent.userId,
+      senderId: landlordId,
+      type: "AGENT_LEAD",
+      title: "Application Rejected",
+      body: `Your application for ${lead.prospectName} on ${lead.property.name ?? "the property"} was rejected: ${reason}`,
+      entityType: "AgentLead",
+      entityId: leadId,
+    });
 
     if (lead.prospectEmail) {
       const prospectTpl = landlordLeadRejectedProspectEmail(

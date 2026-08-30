@@ -3,6 +3,7 @@ import { prisma } from "../../config/prisma";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { getAdminRecipients } from "../../utils/getAdminRecipients";
+import { notificationService } from "../notificationService";
 import { expensePendingApprovalEmail, expenseFlaggedEmail } from "../../config/emailTemplates";
 import type { FmExpenseItem, FmBudgetSummary } from "../../dtos/facility-manager/fm.tickets.dto";
 
@@ -676,6 +677,18 @@ export class FmTicketsService {
           email.html,
         );
       }
+
+      await notificationService.notifyMany(
+        adminRecipients.map((admin) => ({
+          recipientId: admin.userId,
+          senderId: userId,
+          type: "MAINTENANCE" as const,
+          title: "Expense Pending Approval",
+          body: `${fm?.userFullName ?? "A facility manager"} logged an expense of ${data.amount} on "${ticketSubject}", exceeding budget`,
+          entityType: "MaintenanceRequest",
+          entityId: ticketId,
+        })),
+      );
     }
 
     return this.mapExpense(expense);
@@ -797,6 +810,18 @@ export class FmTicketsService {
       );
     }
 
+    await notificationService.notifyMany(
+      adminRecipients.map((admin) => ({
+        recipientId: admin.userId,
+        senderId: userId,
+        type: "MAINTENANCE" as const,
+        title: "Expense Flagged",
+        body: `${fm?.userFullName ?? "A facility manager"} flagged an expense on "${ticket.subject ?? "Maintenance Request"}": ${reason}`,
+        entityType: "MaintenanceRequest",
+        entityId: ticketId,
+      })),
+    );
+
     return this.mapExpense(updated);
   }
 
@@ -867,6 +892,18 @@ export class FmTicketsService {
         email.html,
       );
     }
+
+    await notificationService.notifyMany(
+      adminRecipients.map((admin) => ({
+        recipientId: admin.userId,
+        senderId: userId,
+        type: "MAINTENANCE" as const,
+        title: "Rebuttal Accepted",
+        body: `${fm?.userFullName ?? "A facility manager"} accepted the rebuttal on "${ticket?.subject ?? "Maintenance Request"}"`,
+        entityType: "MaintenanceRequest",
+        entityId: ticketId,
+      })),
+    );
 
     return this.mapExpense(updated);
   }

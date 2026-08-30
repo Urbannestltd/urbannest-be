@@ -21,6 +21,7 @@ import {
   AdminCreateUserSchema,
 } from "../../dtos/admin/admin";
 import { ApiResponse } from "../../dtos/apiResponse";
+import { SendNoticeSchema } from "../../dtos/admin/notice.dto";
 import { validate } from "../../utils/validate";
 import { AdminService } from "../../services/admin/adminService";
 
@@ -88,6 +89,18 @@ export class AdminController extends Controller {
   public async getUserById(@Path() userId: string) {
     const data = await this.adminService.getUserById(userId);
     return { success: true, message: "User retrieved", data };
+  }
+
+  // Send an official, one-off notice to a user (in-app + email).
+  @Post("users/{userId}/notices")
+  public async sendNotice(
+    @Path() userId: string,
+    @Body() body: unknown,
+    @Request() req: any,
+  ) {
+    const dto = validate(SendNoticeSchema, body);
+    await this.adminService.sendNotice(userId, req.user.userId, dto);
+    return { success: true, message: "Notice sent successfully" };
   }
 
   @Get("settings/system")

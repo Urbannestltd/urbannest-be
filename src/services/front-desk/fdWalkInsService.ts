@@ -7,6 +7,7 @@ import {
 } from "../../utils/apiError";
 import { ZeptoMailService } from "../external/zeptoMailService";
 import { logActivity } from "../../utils/activityLogger";
+import { notificationService } from "../notificationService";
 import {
   tenantWalkInApprovalEmail,
 } from "../../config/emailTemplates";
@@ -192,6 +193,16 @@ export class FdWalkInsService {
       action: "WALK_IN_REGISTERED",
       description: `Walk-in visitor ${data.visitorName} registered by ${fd?.userFullName ?? "Front Desk"} for unit ${unit.name}`,
       metadata: { visitId: visit.id, unitId: data.unitId },
+    });
+
+    await notificationService.notify({
+      recipientId: activeLease.tenant.userId,
+      senderId: fdId,
+      type: "WALK_IN",
+      title: "Walk-In Visitor Awaiting Your Approval",
+      body: `${data.visitorName} is waiting at ${unit.name} — approve or reject within the time window`,
+      entityType: "VisitorInvite",
+      entityId: visit.id,
     });
 
     return this.mapVisit(visit);

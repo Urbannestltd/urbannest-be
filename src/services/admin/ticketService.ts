@@ -16,6 +16,7 @@ import {
   ticketRejectedEmail,
   ticketRebuttalEmail,
 } from "../../config/emailTemplates";
+import { notificationService } from "../notificationService";
 
 const prisma = new PrismaClient();
 
@@ -611,6 +612,16 @@ export class AdminTicketService {
         subject,
         html,
       );
+
+      await notificationService.notify({
+        recipientId: ticket.tenantId,
+        senderId: adminId,
+        type: "TICKET_APPROVAL",
+        title: "Maintenance Request Approved",
+        body: subject,
+        entityType: "MaintenanceRequest",
+        entityId: ticketId,
+      });
     }
 
     return updated;
@@ -656,6 +667,16 @@ export class AdminTicketService {
         subject,
         html,
       );
+
+      await notificationService.notify({
+        recipientId: ticket.tenantId,
+        senderId: adminId,
+        type: "TICKET_APPROVAL",
+        title: "Maintenance Request Rejected",
+        body: subject,
+        entityType: "MaintenanceRequest",
+        entityId: ticketId,
+      });
     }
 
     return updated;
@@ -705,6 +726,16 @@ export class AdminTicketService {
         subject,
         html,
       );
+
+      await notificationService.notify({
+        recipientId: ticket.tenantId,
+        senderId: adminId,
+        type: "TICKET_APPROVAL",
+        title: "Maintenance Request Rebuttal",
+        body: subject,
+        entityType: "MaintenanceRequest",
+        entityId: ticketId,
+      });
     }
 
     return updated;
