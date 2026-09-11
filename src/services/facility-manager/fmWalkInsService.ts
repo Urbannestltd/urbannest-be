@@ -407,6 +407,7 @@ export async function resolveWalkInApproval(
   visitId: string,
   action: "approve" | "reject",
   actorId: string,
+  via: "tenant" | "email link" = "tenant",
 ): Promise<void> {
   const visit = await prisma.visitorInvite.findUnique({
     where: { id: visitId },
@@ -439,7 +440,7 @@ export async function resolveWalkInApproval(
   void logActivity({
     userId: actorId,
     action: action === "approve" ? "WALK_IN_APPROVED" : "WALK_IN_REJECTED",
-    description: `Walk-in visitor ${visit.visitorName} ${action === "approve" ? "approved" : "rejected"} by tenant`,
+    description: `Walk-in visitor ${visit.visitorName} ${action === "approve" ? "approved" : "rejected"} via ${via}`,
     metadata: { visitId },
   });
 }

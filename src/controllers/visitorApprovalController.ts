@@ -1,6 +1,6 @@
 import { Get, Query, Route, Controller, Tags, Response } from "tsoa";
 import { prisma } from "../config/prisma";
-import { logActivity } from "../utils/activityLogger";
+import { resolveWalkInApproval } from "../services/facility-manager/fmWalkInsService";
 
 const htmlPage = (title: string, message: string, isError = false) => `<!DOCTYPE html>
 <html lang="en">
@@ -96,22 +96,17 @@ export class VisitorApprovalController extends Controller {
       );
     }
 
-    const newStatus = action === "approve" ? "CHECKED_IN" : "REJECTED";
-    await prisma.visitorInvite.update({
-      where: { id: visit.id },
-      data: {
-        status: newStatus as any,
-        checkedInAt: action === "approve" ? new Date() : undefined,
-        approvalToken: null,
-      },
-    });
-
-    void logActivity({
-      userId: visit.tenantId,
-      action: action === "approve" ? "WALK_IN_APPROVED" : "WALK_IN_REJECTED",
-      description: `Walk-in visitor ${visit.visitorName} ${action === "approve" ? "approved" : "rejected"} via email link`,
-      metadata: { visitId: visit.id },
-    });
+    try {
+      await resolveWalkInApproval(visit.id, action, visit.tenantId, "email link");
+    } catch {
+      // Pre-checks above already cover "not found" / already-resolved / expired;
+      // this only guards against a race between the checks and the update.
+      return htmlPage(
+        "Already Resolved",
+        "This visitor request has just been resolved. No further action is needed.",
+        false,
+      );
+    }
 
     if (action === "approve") {
       return htmlPage(

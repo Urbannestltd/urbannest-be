@@ -329,6 +329,14 @@ export class AdminLeaseService {
         where: { id: lease.unitId },
         data: { status: UnitStatus.AVAILABLE },
       }),
+      ...(lease.tenant
+        ? [
+            prisma.user.update({
+              where: { userId: lease.tenant.userId },
+              data: { userStatus: "UNASSIGNED" },
+            }),
+          ]
+        : []),
     ]);
 
     const tenantName = lease.tenant?.userFullName ?? "Tenant";

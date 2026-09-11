@@ -41,8 +41,10 @@ export interface DashboardOverviewResponse {
       groupName: string | null; // e.g., "Group Invite (groupId)"
       isWalkIn: boolean;
       status: InviteStatus;
-      accessType: string; // "One-off"
+      accessType: string; // "One-off" | "One-off (Agent)" | "Whole Day" | "Recurring"
       date: string; // always today's date — this widget only ever lists today's visitors
+      dateExpected: string; // the invite's actual expected date, e.g. "12/01/2026"
+      timeExpected: string; // the invite's expected/scheduled time, e.g. "11:00 AM"
       timeIn: string | null; // "11:43 AM"
       timeOut: string | null; // "4:47 PM"
     }>;

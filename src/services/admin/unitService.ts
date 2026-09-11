@@ -523,6 +523,7 @@ export class AdminUnitService {
 
       currentLeaseData = {
         leaseId,
+        status: activeLease.status,
         rentAmount: activeLease.rentAmount,
         serviceCharge: activeLease.serviceCharge || 0,
         leaseExpiryPercentage: `${percentage}%`,
@@ -540,6 +541,7 @@ export class AdminUnitService {
       fullName: tenant.userFullName || "Unknown",
       profilePic: tenant.userProfileUrl,
       status: activeLease ? "Active Lease" : "No Active Lease",
+      tenantStatus: tenant.userStatus,
 
       email: tenant.userEmail,
       phone: tenant.userPhone,
@@ -552,6 +554,7 @@ export class AdminUnitService {
 
       leaseHistory: pastLeases.map((l) => ({
         leaseId: l.id,
+        status: l.status,
         reference: l.unit.property.name || "Unknown Property",
         startDate: l.startDate,
         endDate: l.endDate,

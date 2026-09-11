@@ -856,7 +856,7 @@ export class AdminService {
           tenantId: userId,
           status: { notIn: ["RESOLVED", "FIXED", "CANCELLED"] },
         },
-        data: { status: "CANCELLED" },
+        data: { status: "CANCELLED", statusChangedAt: new Date() },
       });
 
       // Unassign maintenance requests assigned to this user

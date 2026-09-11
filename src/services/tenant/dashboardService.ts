@@ -102,15 +102,19 @@ export class DashboardService {
       isWalkIn: v.isWalkIn,
       status: v.status,
       date: new Date().toDateString(),
-      scheduledDate: new Date(v.validFrom).toLocaleTimeString([], {
+      dateExpected: new Date(v.validFrom).toLocaleDateString(),
+      timeExpected: new Date(v.validFrom).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      validUntil: new Date(v.validUntil).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      accessType: v.frequency === "ONE_OFF" ? "One-off" : "Recurring",
+      accessType:
+        v.frequency === "ONE_OFF"
+          ? "One-off"
+          : v.frequency === "ONE_OFF_AGENT"
+            ? "One-off (Agent)"
+            : v.frequency === "WHOLE_DAY"
+              ? "Whole Day"
+              : "Recurring",
       timeIn: v.checkedInAt
         ? new Date(v.checkedInAt).toLocaleTimeString([], {
             hour: "2-digit",

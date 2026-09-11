@@ -116,7 +116,7 @@ export class MaintenanceService {
 
     return tickets.map((t) => {
       const viewedAt = t.tenantViewedAt ?? t.createdAt;
-      const statusChangedSinceViewed = t.updatedAt > viewedAt;
+      const statusChangedSinceViewed = !!t.statusChangedAt && t.statusChangedAt > viewedAt;
       const hasUnreadReply = t.messages.some(
         (m) => m.senderId !== tenantId && m.readAt === null,
       );

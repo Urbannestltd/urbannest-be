@@ -458,7 +458,10 @@ export class FmTicketsService {
     await prisma.$transaction([
       prisma.maintenanceRequest.update({
         where: { id: ticketId },
-        data: { status: newStatus as MaintenanceStatus },
+        data: {
+          status: newStatus as MaintenanceStatus,
+          statusChangedAt: new Date(),
+        },
       }),
       prisma.maintenanceMessage.create({
         data: {

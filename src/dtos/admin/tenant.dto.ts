@@ -4,6 +4,7 @@ export interface TenantProfileResponseDto {
   fullName: string;
   profilePic: string | null;
   status: "Active Lease" | "No Active Lease";
+  tenantStatus: string;
 
   // General Information
   email: string;
@@ -16,6 +17,7 @@ export interface TenantProfileResponseDto {
   // Lease Information (Current)
   currentLease: {
     leaseId: string;
+    status: string;
     rentAmount: number;
     serviceCharge: number;
     leaseExpiryPercentage: string; // e.g., "80%"
@@ -29,6 +31,7 @@ export interface TenantProfileResponseDto {
   // Histories & Lists
   leaseHistory: {
     leaseId: string;
+    status: string;
     reference: string;
     startDate: Date;
     endDate: Date;

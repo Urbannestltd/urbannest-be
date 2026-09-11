@@ -540,7 +540,7 @@ export class AdminTicketService {
 
     const updatedTicket = await prisma.maintenanceRequest.update({
       where: { id: ticketId },
-      data: { status: data.status },
+      data: { status: data.status, statusChangedAt: new Date() },
     });
 
     await prisma.maintenanceMessage.create({

@@ -262,36 +262,36 @@ model user {
 
   notificationSettings NotificationSetting?
   reminders            Reminder[]
-  notifications        Notification[] @relation("NotificationRecipient")
-  sentNotifications    Notification[] @relation("NotificationSender")
+  notifications        Notification[]       @relation("NotificationRecipient")
+  sentNotifications    Notification[]       @relation("NotificationSender")
 
   paymentMethods PaymentMethod[]
 
-  properties        property[] @relation("landlordProperties")
-  managedProperties property[] @relation("managedProperties")
-  agentedProperties property[] @relation("agentProperties")
+  properties          property[] @relation("landlordProperties")
+  managedProperties   property[] @relation("managedProperties")
+  agentedProperties   property[] @relation("agentProperties")
   frontDeskProperties property[] @relation("frontDeskProperties")
 
-  isTwoFactorEnabled Boolean   @default(false)
+  isTwoFactorEnabled Boolean       @default(false)
   twoFactorSecret    String?
   twoFactorExpiry    DateTime?
   sessions           Session[]
   activityLogs       ActivityLog[]
 
-  permissions  Permission[]  @default([])
+  permissions Permission[] @default([])
 
   isDeleted Boolean   @default(false)
-  deletedAt  DateTime?
+  deletedAt DateTime?
 
-  agentVisits          AgentVisit[]       @relation("agentVisits")
-  proposedReschedules  AgentVisit[]       @relation("proposedReschedules")
-  agentLeads           AgentLead[]        @relation("agentLeads")
-  agentLeadDocuments   AgentLeadDocument[] @relation("agentLeadDocuments")
-  agentFees            AgentFee[]         @relation("agentFees")
-  loggedExpenses       Expense[]          @relation("loggedExpenses")
-  budgetAdjustments    BudgetAdjustment[] @relation("budgetAdjustments")
-  fmRegisteredWalkIns  VisitorInvite[]    @relation("fmRegisteredWalkIns")
-  fdRegisteredWalkIns  VisitorInvite[]    @relation("fdRegisteredWalkIns")
+  agentVisits         AgentVisit[]        @relation("agentVisits")
+  proposedReschedules AgentVisit[]        @relation("proposedReschedules")
+  agentLeads          AgentLead[]         @relation("agentLeads")
+  agentLeadDocuments  AgentLeadDocument[] @relation("agentLeadDocuments")
+  agentFees           AgentFee[]          @relation("agentFees")
+  loggedExpenses      Expense[]           @relation("loggedExpenses")
+  budgetAdjustments   BudgetAdjustment[]  @relation("budgetAdjustments")
+  fmRegisteredWalkIns VisitorInvite[]     @relation("fmRegisteredWalkIns")
+  fdRegisteredWalkIns VisitorInvite[]     @relation("fdRegisteredWalkIns")
 
   @@index([userRoleId])
   @@map("user")
@@ -487,8 +487,8 @@ model lease {
   payments     payment[]
   utilityBills utilityBill[]
 
-  serviceCharge   Float?  @map("service_charge")
-  moveOutNotice   String? @map("move_out_notice") // e.g., "1 month"
+  serviceCharge Float?  @map("service_charge")
+  moveOutNotice String? @map("move_out_notice") // e.g., "1 month"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -642,7 +642,7 @@ model VisitorInvite {
   registeredByFdId  String?
   approvalToken     String?   @unique
   approvalExpiresAt DateTime?
-  fallbackRule      String?   // "SEND_UP" | "REFUSE_ENTRY" (commercial only)
+  fallbackRule      String? // "SEND_UP" | "REFUSE_ENTRY" (commercial only)
 
   // Gate departure verification fields
   departureToken     String?   @unique
@@ -671,7 +671,7 @@ model VisitorInvite {
 // ==========================================
 
 model AgentVisit {
-  id         String           @id @default(uuid())
+  id         String  @id @default(uuid())
   agentId    String
   propertyId String
   unitId     String?
@@ -709,7 +709,7 @@ model AgentVisit {
 // ==========================================
 
 model AgentLead {
-  id         String          @id @default(uuid())
+  id         String  @id @default(uuid())
   agentId    String
   propertyId String
   unitId     String?
@@ -720,20 +720,20 @@ model AgentLead {
   proposedRent  Float?
   notes         String?
 
-  occupation        String?
-  monthlyIncome     Float?
-  employerName      String?
-  employerAddress   String?
+  occupation         String?
+  monthlyIncome      Float?
+  employerName       String?
+  employerAddress    String?
   employmentDuration String?
-  annualIncome      Float?
+  annualIncome       Float?
 
   status          AgentLeadStatus @default(PENDING)
   rejectionReason String?
   decidedAt       DateTime?
 
-  agent     user                 @relation("agentLeads",    fields: [agentId],    references: [userId])
-  property  property             @relation(fields: [propertyId], references: [id])
-  unit      unit?                @relation(fields: [unitId],     references: [id])
+  agent     user                @relation("agentLeads", fields: [agentId], references: [userId])
+  property  property            @relation(fields: [propertyId], references: [id])
+  unit      unit?               @relation(fields: [unitId], references: [id])
   fee       AgentFee?
   documents AgentLeadDocument[]
   referees  AgentLeadReferee[]
@@ -788,10 +788,10 @@ model AgentLeadDocument {
   leadId  String?
   agentId String
 
-  category AgentLeadDocumentCategory
-  type     AgentLeadDocumentType
-  url      String
-  fileName String
+  category      AgentLeadDocumentCategory
+  type          AgentLeadDocumentType
+  url           String
+  fileName      String
   fileSizeBytes Int
 
   lead  AgentLead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -818,8 +818,8 @@ model AgentFee {
 
   confirmedAt DateTime?
   paidAt      DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([agentId])
   @@index([status])
@@ -895,6 +895,12 @@ model MaintenanceRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Set only when `status` is actually changed (see call sites that update
+  // it). Kept separate from `updatedAt`, which is bumped by any write —
+  // including the tenant "marked viewed" write — and so can't be compared
+  // against `tenantViewedAt` without immediately re-triggering.
+  statusChangedAt DateTime?
+
   // Last time the tenant opened this ticket — drives the "new activity" dot
   // on the tenant ticket list (status changes, e.g. resolved, plus unread
   // replies both count, since a chat message doesn't bump `updatedAt`).
@@ -920,7 +926,7 @@ model MaintenanceMessage {
 
   message        String
   attachments    String[]
-  isInternalNote Boolean @default(false)
+  isInternalNote Boolean  @default(false)
 
   ticket MaintenanceRequest @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   sender user               @relation(fields: [senderId], references: [userId])
