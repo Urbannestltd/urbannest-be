@@ -9,6 +9,7 @@ import {
   SuccessResponse,
   Query,
   Security,
+  Middlewares,
 } from "tsoa";
 import * as express from "express";
 import { AuthenticationService } from "../services/authenticationService";
@@ -35,6 +36,11 @@ import {
 } from "../dtos/tenant/settings.dto";
 import { SessionService } from "../services/sessionService";
 import { RefreshTokenRequest } from "../dtos/session.dto";
+import {
+  loginRateLimit,
+  otpRateLimit,
+  passwordResetRateLimit,
+} from "../middlewares/rateLimitMiddleware";
 
 @Route("auth")
 @Tags("Authentication")
@@ -98,6 +104,7 @@ export class AuthenticationController extends Controller {
   // }
 
   @Post("login")
+  @Middlewares(loginRateLimit)
   public async login(@Body() body: LoginRequest) {
     validate(LoginSchema, body);
     const result = await this.authenticationService.login(body);
@@ -114,6 +121,7 @@ export class AuthenticationController extends Controller {
    * Only called if Step 1 returned "require2fa: true".
    */
   @Post("verify-2fa")
+  @Middlewares(otpRateLimit)
   public async verifyTwoFactor(@Body() body: VerifyTwoFactorRequest) {
     // Schema: { userId: string, otp: string }
     // Note: In a real app, 'userId' might be passed via a temporary JWT from Step 1,
@@ -137,6 +145,7 @@ export class AuthenticationController extends Controller {
 
   @Post("forgot-password")
   @SuccessResponse("200", "Email Sent")
+  @Middlewares(passwordResetRateLimit)
   public async forgotPassword(@Body() body: ForgotPasswordRequest) {
     const validatedBody = validate(ForgotPasswordSchema, body);
 
@@ -148,10 +157,9 @@ export class AuthenticationController extends Controller {
    */
   @Post("reset-password")
   @SuccessResponse("200", "Password Reset Successful")
+  @Middlewares(passwordResetRateLimit)
   public async resetPassword(@Body() body: ResetPasswordRequest) {
     const validatedBody = validate(ResetPasswordSchema, body);
-    const result =
-      await this.authenticationService.resetPassword(validatedBody);
 
     return await this.authenticationService.resetPassword(validatedBody);
   }

@@ -9,6 +9,7 @@ import { errorHandler } from "./middlewares/errorHandler";
 import swaggerUi from "swagger-ui-express";
 import { RegisterRoutes } from "./build/routes";
 import swaggerDocument from "./build/swagger.json";
+import { prisma } from "./config/prisma";
 import { PaymentService } from "./services/paymentService";
 import { ReminderWorker } from "./services/workers/reminderWorker";
 import { WalkInTimeoutWorker } from "./services/workers/walkInTimeoutWorker";
@@ -16,7 +17,32 @@ import { NoShowWorker } from "./services/workers/noShowWorker";
 
 const app: Application = express();
 
-app.use(cors());
+// ============================================================
+// CORS
+// Defaults cover the known dev and prod frontend deployments.
+// Override/extend via ALLOWED_ORIGINS (comma-separated) in env
+// without needing a code change.
+// ============================================================
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://urbannest-frontend-chi.vercel.app",
+  "https://www.urbannesttech.com",
+];
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
+  : DEFAULT_ALLOWED_ORIGINS;
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (server-to-server, curl, mobile clients, webhooks)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
+  }),
+);
 app.use(helmet());
 
 // ============================================================
@@ -70,12 +96,27 @@ app.use(activityLoggerMiddleware);
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // ============================================================
+// HEALTH CHECK
+// Verifies the process is up and the database is reachable.
+// Use for uptime checks / load balancer liveness probes.
+// ============================================================
+app.get("/health", async (_req: Request, res: Response) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ status: "ok", db: "up" });
+  } catch (err: any) {
+    console.error("[Health] database check failed:", err.message);
+    res.status(503).json({ status: "error", db: "down" });
+  }
+});
+
+// ============================================================
 // VERCEL CRON ENDPOINTS
 // Called by Vercel on a schedule. Protected by CRON_SECRET.
 // ============================================================
 function verifyCronSecret(req: Request, res: Response): boolean {
   const secret = process.env.CRON_SECRET;
-  if (secret && req.headers["authorization"] !== `Bearer ${secret}`) {
+  if (!secret || req.headers["authorization"] !== `Bearer ${secret}`) {
     res.status(401).json({ message: "Unauthorized" });
     return false;
   }

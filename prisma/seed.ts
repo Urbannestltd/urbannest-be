@@ -10,7 +10,18 @@ import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
+function assertNotProduction() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Refusing to run prisma/seed.ts with NODE_ENV=production. " +
+        "This script seeds demo accounts sharing a single default password and must never touch a production database."
+    );
+  }
+}
+
 async function main() {
+  assertNotProduction();
+
   console.log("🌱 Starting Seeding Process...");
 
   const saltRounds = 10;

@@ -7,7 +7,7 @@
  */
 jest.mock("../../config/prisma", () => ({
   prisma: {
-    user: { findUnique: jest.fn() },
+    user: { findUnique: jest.fn(), update: jest.fn() },
     lease: { findUnique: jest.fn(), update: jest.fn() },
     unit: { update: jest.fn() },
     $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
@@ -32,7 +32,7 @@ import { JWT_PRIVATE_KEY } from "../../config/env";
 import { Permission, LeaseStatus } from "@prisma/client";
 
 const mockedPrisma = prisma as unknown as {
-  user: { findUnique: jest.Mock };
+  user: { findUnique: jest.Mock; update: jest.Mock };
   lease: { findUnique: jest.Mock; update: jest.Mock };
   unit: { update: jest.Mock };
 };
